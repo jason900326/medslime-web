@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { GameStateProvider } from "@/components/game-state-provider";
+import ScrollJumpButtons from "@/components/scroll-jump-buttons";
 
 export const metadata: Metadata = {
   title: "MedSlime",
@@ -15,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="zh-Hant">
       <body>
-        <GameStateProvider>{children}</GameStateProvider>
+        <GameStateProvider>
+          {children}
+          <ScrollJumpButtons />
+        </GameStateProvider>
       </body>
     </html>
   );

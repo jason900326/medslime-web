@@ -31,6 +31,7 @@ const tasks = [
 
 export default function Home() {
   const game = useGameState();
+
   const companion =
     SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
@@ -63,12 +64,21 @@ export default function Home() {
               🧠 開始學習
             </Link>
 
-            <Link
-              href="/slimes"
-              className="mt-3 block w-full rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
-            >
-              🐾 我的史萊姆
-            </Link>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/slimes"
+                className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
+              >
+                🐾 我的史萊姆
+              </Link>
+
+              <Link
+                href="/achievements"
+                className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
+              >
+                🏆 成就
+              </Link>
+            </div>
           </div>
 
           <div className="rounded-[30px] border border-[#d8e9df] bg-white p-6 shadow-[0_14px_36px_rgba(40,106,69,0.06)]">
