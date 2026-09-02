@@ -112,10 +112,14 @@ async function renderQuestionCrops(
   pdfUrl: string,
   questionNumber: number,
 ) {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // worker 放在 public/pdf.worker.min.mjs。
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+  // 直接讓 Next.js / Turbopack 打包 pdf.js worker，
+  // 不再依賴 public/pdf.worker.min.mjs 是否有被複製成功。
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
 
   const proxyUrl =
     `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
