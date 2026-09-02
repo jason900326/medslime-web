@@ -3,6 +3,18 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+const ACTIVE_USER_KEY = "medslime_active_user_id";
+
+function syncActiveUserId(userId: string | null) {
+  if (typeof window === "undefined") return;
+
+  if (userId) {
+    window.sessionStorage.setItem(ACTIVE_USER_KEY, userId);
+  } else {
+    window.sessionStorage.removeItem(ACTIVE_USER_KEY);
+  }
+}
+
 export function useAuthUser() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -16,8 +28,11 @@ export function useAuthUser() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      setUserId(user?.id ?? null);
+      const nextUserId = user?.id ?? null;
+
+      setUserId(nextUserId);
       setEmail(user?.email ?? null);
+      syncActiveUserId(nextUserId);
       setLoading(false);
     };
 
@@ -26,8 +41,11 @@ export function useAuthUser() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
+      const nextUserId = session?.user?.id ?? null;
+
+      setUserId(nextUserId);
       setEmail(session?.user?.email ?? null);
+      syncActiveUserId(nextUserId);
       setLoading(false);
     });
 

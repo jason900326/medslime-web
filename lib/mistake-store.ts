@@ -20,13 +20,26 @@ export type MistakeRecord = {
   reviewed: boolean;
 };
 
-const STORAGE_KEY = "medslime_mistakes_v1";
+const LEGACY_STORAGE_KEY = "medslime_mistakes_v1";
+const ACTIVE_USER_KEY = "medslime_active_user_id";
+const ANONYMOUS_KEY = "anonymous";
+
+function getMistakeStorageKey() {
+  if (typeof window === "undefined") {
+    return `${LEGACY_STORAGE_KEY}:${ANONYMOUS_KEY}`;
+  }
+
+  const userId =
+    window.sessionStorage.getItem(ACTIVE_USER_KEY) ?? ANONYMOUS_KEY;
+
+  return `${LEGACY_STORAGE_KEY}:${userId}`;
+}
 
 export function readMistakes(): MistakeRecord[] {
   if (typeof window === "undefined") return [];
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(getMistakeStorageKey());
     if (!raw) return [];
 
     const parsed = JSON.parse(raw);
@@ -38,7 +51,11 @@ export function readMistakes(): MistakeRecord[] {
 
 export function writeMistakes(records: MistakeRecord[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+
+  window.localStorage.setItem(
+    getMistakeStorageKey(),
+    JSON.stringify(records),
+  );
 }
 
 export function upsertMistakes(records: MistakeRecord[]) {
