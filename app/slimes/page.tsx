@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import LoginRequired from "@/components/login-required";
+import { useAuthUser } from "@/hooks/use-auth-user";
 import {
   getPlayerDisplayName,
   useGameState,
@@ -13,11 +16,15 @@ import {
 } from "@/lib/slime-data";
 
 export default function SlimesPage() {
+  const auth = useAuthUser();
   const game = useGameState();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<
     "ALL" | "N" | "R" | "SR" | "SSR"
   >("ALL");
+  const [sortMode, setSortMode] = useState<
+    "owned-rarity" | "rarity-owned" | "name"
+  >("owned-rarity");
 
   const sortedSlimes = useMemo(() => {
     return [...SLIMES]
@@ -25,41 +32,122 @@ export default function SlimesPage() {
         rarityFilter === "ALL" ? true : slime.rarity === rarityFilter,
       )
       .sort((a, b) => {
-        if (a.id === game.companionId) return -1;
-        if (b.id === game.companionId) return 1;
-        return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+        // 無論選哪種排序，目前陪伴中的史萊姆永遠放第一個。
+        if (a.id === game.companionId && b.id !== game.companionId) {
+          return -1;
+        }
+
+        if (b.id === game.companionId && a.id !== game.companionId) {
+          return 1;
+        }
+
+        const aOwned = game.slimes[a.id]?.owned ?? false;
+        const bOwned = game.slimes[b.id]?.owned ?? false;
+
+        if (sortMode === "owned-rarity") {
+          if (aOwned !== bOwned) {
+            return aOwned ? -1 : 1;
+          }
+
+          return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+        }
+
+        if (sortMode === "rarity-owned") {
+          const rarityDiff =
+            RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+
+          if (rarityDiff !== 0) {
+            return rarityDiff;
+          }
+
+          if (aOwned !== bOwned) {
+            return aOwned ? -1 : 1;
+          }
+
+          return 0;
+        }
+
+        return a.defaultName.localeCompare(
+          b.defaultName,
+          "zh-Hant",
+        );
       });
-  }, [rarityFilter, game.companionId]);
+  }, [rarityFilter, game.slimes, game.companionId, sortMode]);
+
+  if (auth.loading) {
+    return <main className="min-h-screen bg-[#f8fcf9]" />;
+  }
+
+  if (!auth.isLoggedIn) {
+    return (
+      <LoginRequired
+        title="登入後查看你的史萊姆"
+        description="史萊姆收藏、陪伴角色、碎片與專屬飾品都屬於你的個人帳號資料。"
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
         <TopBar showBack />
 
-        <section className="mt-8">
-          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-            COLLECTION
+        <section className="mt-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+              COLLECTION
+            </div>
+
+            <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">
+              史萊姆圖鑑
+            </h1>
           </div>
-          <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">
-            史萊姆圖鑑
-          </h1>
+
+          <Link
+            href="/gacha"
+            className="inline-flex items-center justify-center rounded-2xl bg-[#31c978] px-6 py-3.5 font-black text-white shadow-[0_10px_24px_rgba(49,201,120,0.18)] transition hover:-translate-y-0.5 hover:bg-[#2dbc70]"
+          >
+            🎟️ 前往抽卡
+          </Link>
         </section>
 
-        <section className="mt-6 flex flex-wrap gap-2">
-          {(["ALL", "N", "R", "SR", "SSR"] as const).map((rarity) => (
-            <button
-              key={rarity}
-              onClick={() => setRarityFilter(rarity)}
-              className={[
-                "rounded-full border px-4 py-2 text-sm font-black transition",
-                rarityFilter === rarity
-                  ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                  : "border-[#dbe9e1] bg-white text-[#466a58]",
-              ].join(" ")}
+        <section className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {(["ALL", "N", "R", "SR", "SSR"] as const).map((rarity) => (
+              <button
+                key={rarity}
+                onClick={() => setRarityFilter(rarity)}
+                className={[
+                  "rounded-full border px-4 py-2 text-sm font-black transition",
+                  rarityFilter === rarity
+                    ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
+                    : "border-[#dbe9e1] bg-white text-[#466a58]",
+                ].join(" ")}
+              >
+                {rarity === "ALL" ? "全部" : rarity}
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-black text-[#557768]">
+            <span>排序</span>
+            <select
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(
+                  event.target.value as
+                    | "owned-rarity"
+                    | "rarity-owned"
+                    | "name",
+                )
+              }
+              className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2.5 font-black text-[#315b45] outline-none transition focus:border-[#65d795]"
             >
-              {rarity === "ALL" ? "全部" : rarity}
-            </button>
-          ))}
+              <option value="owned-rarity">已擁有</option>
+              <option value="rarity-owned">稀有度</option>
+              <option value="name">名稱</option>
+            </select>
+          </label>
         </section>
 
         <section className="mt-6 grid grid-cols-2 items-start gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -92,12 +180,31 @@ function SlimeCard({
 }) {
   const game = useGameState();
   const player = game.slimes[slime.id];
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
   const owned = player?.owned ?? false;
   const companion = game.companionId === slime.id;
   const fragments = player?.fragments ?? 0;
   const accessoryUnlocked = player?.accessoryUnlocked ?? false;
   const hiddenSSR = slime.rarity === "SSR" && !owned;
   const displayName = getPlayerDisplayName(slime.id, player);
+
+  const startNicknameEdit = () => {
+    setNicknameDraft(player?.nickname ?? "");
+    setEditingNickname(true);
+  };
+
+  const saveNickname = () => {
+    const next = nicknameDraft.trim();
+
+    game.setNickname(slime.id, next);
+    setEditingNickname(false);
+  };
+
+  const cancelNicknameEdit = () => {
+    setNicknameDraft(player?.nickname ?? "");
+    setEditingNickname(false);
+  };
 
   const fragmentPercent = Math.min(100, (fragments / 30) * 100);
 
@@ -128,8 +235,63 @@ function SlimeCard({
         )}
       </div>
 
-      <div className="mt-3 text-lg font-black">
-        {hiddenSSR ? "???" : displayName}
+      <div className="mt-3">
+        {editingNickname && owned && expanded ? (
+          <div className="mx-auto flex max-w-[260px] items-center gap-2">
+            <input
+              autoFocus
+              value={nicknameDraft}
+              onChange={(event) => setNicknameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  saveNickname();
+                }
+
+                if (event.key === "Escape") {
+                  cancelNicknameEdit();
+                }
+              }}
+              placeholder={slime.defaultName}
+              className="min-w-0 flex-1 rounded-xl border border-[#bcdcca] bg-white px-3 py-2 text-center text-base font-black text-[#17372a] outline-none focus:border-[#65d795]"
+            />
+
+            <button
+              type="button"
+              onClick={saveNickname}
+              className="rounded-xl bg-[#31c978] px-3 py-2 text-sm font-black text-white"
+              aria-label="儲存暱稱"
+              title="儲存暱稱"
+            >
+              ✓
+            </button>
+
+            <button
+              type="button"
+              onClick={cancelNicknameEdit}
+              className="rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-black text-[#60786c]"
+              aria-label="取消修改暱稱"
+              title="取消"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 text-lg font-black">
+            <span>{hiddenSSR ? "???" : displayName}</span>
+
+            {owned && expanded && !hiddenSSR && (
+              <button
+                type="button"
+                onClick={startNicknameEdit}
+                className="rounded-lg border-0 bg-transparent p-1 text-base text-[#668276] transition hover:bg-[#eef7f1]"
+                aria-label="修改史萊姆暱稱"
+                title="修改暱稱"
+              >
+                ✏️
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-1 text-sm font-bold text-[#789083]">

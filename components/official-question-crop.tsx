@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 type CropState =
-  | { status: "idle" | "loading" }
+  | { status: "idle" }
+  | { status: "loading" }
   | { status: "ready"; images: string[] }
   | { status: "error"; message: string };
 
@@ -18,9 +19,7 @@ function escapeRegExp(value: string) {
 }
 
 function matchesQuestionNumber(text: string, questionNumber: number) {
-  const value = text
-    .replace(/\s+/g, " ")
-    .trim();
+  const value = text.replace(/\s+/g, " ").trim();
 
   if (!value) return false;
 
@@ -32,15 +31,51 @@ function matchesQuestionNumber(text: string, questionNumber: number) {
   );
 }
 
+async function getTextItemsSafariSafe(page: any) {
+  /*
+   * Safari 26.x 與新版 pdf.js 的已知相容性問題：
+   * page.getTextContent() 內部使用 for-await-of 讀 ReadableStream，
+   * 但部分 Safari 的 ReadableStream 沒有 Symbol.asyncIterator，
+   * 會噴出：
+   * "undefined is not a function (near '...value of readableStream...')"
+   *
+   * 改成直接使用 streamTextContent().getReader()，
+   * 避開 pdf.js 內部那段 for-await-of。
+   */
+  const stream = page.streamTextContent();
+  const reader = stream.getReader();
+  const items: any[] = [];
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+
+      if (done) break;
+
+      if (value?.items && Array.isArray(value.items)) {
+        items.push(...value.items);
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Safari 上 releaseLock 失敗也不影響結果。
+    }
+  }
+
+  return items;
+}
+
 async function findAnchor(
   pdf: any,
   questionNumber: number,
 ): Promise<TextAnchor | null> {
   for (let pageIndex = 0; pageIndex < pdf.numPages; pageIndex += 1) {
     const page = await pdf.getPage(pageIndex + 1);
-    const content = await page.getTextContent();
+    const items = await getTextItemsSafariSafe(page);
 
-    const candidates = content.items
+    const candidates = items
       .filter(
         (item: any) =>
           typeof item?.str === "string" &&
@@ -51,15 +86,18 @@ async function findAnchor(
         x: Number(item.transform[4] ?? 0),
         y: Number(item.transform[5] ?? 0),
       }))
-      .filter(
-        (item: { text: string; x: number; y: number }) =>
-          matchesQuestionNumber(item.text, questionNumber),
+      .filter((item: { text: string; x: number; y: number }) =>
+        matchesQuestionNumber(item.text, questionNumber),
       )
-      // 題號通常靠近頁面左側；避免誤抓正文裡的數字。
-      .sort((a: any, b: any) => a.x - b.x);
+      .sort(
+        (
+          a: { text: string; x: number; y: number },
+          b: { text: string; x: number; y: number },
+        ) => a.x - b.x,
+      );
 
     const preferred =
-      candidates.find((item: any) => item.x < 180) ??
+      candidates.find((item: { x: number }) => item.x < 180) ??
       candidates[0];
 
     if (preferred) {
@@ -74,7 +112,7 @@ async function findAnchor(
   return null;
 }
 
-async function canvasToDataUrl(
+function canvasToDataUrl(
   source: HTMLCanvasElement,
   sx: number,
   sy: number,
@@ -112,20 +150,41 @@ async function renderQuestionCrops(
   pdfUrl: string,
   questionNumber: number,
 ) {
+  /*
+   * iPad Safari 對 pdf.js 的串流讀取相容性比較差。
+   * 先把整份 PDF 下載成 ArrayBuffer，再交給 pdf.js。
+   */
+  const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
+
+  const response = await fetch(proxyUrl, {
+    method: "GET",
+    cache: "force-cache",
+  });
+
+  if (!response.ok) {
+    throw new Error(`官方 PDF 下載失敗：HTTP ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const pdfBytes = new Uint8Array(arrayBuffer);
+
+  /*
+   * 動態 import 只在瀏覽器執行。
+   * 使用 modern build，但完全不讓 pdf.js 自己 fetch PDF。
+   */
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // 直接讓 Next.js / Turbopack 打包 pdf.js worker，
-  // 不再依賴 public/pdf.worker.min.mjs 是否有被複製成功。
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url,
   ).toString();
 
-  const proxyUrl =
-    `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
+  const loadingTask = pdfjs.getDocument({
+    data: pdfBytes,
+    isEvalSupported: false,
+  });
 
-  const task = pdfjs.getDocument(proxyUrl);
-  const pdf = await task.promise;
+  const pdf = await loadingTask.promise;
 
   try {
     const start = await findAnchor(pdf, questionNumber);
@@ -141,7 +200,7 @@ async function renderQuestionCrops(
         ? next.pageIndex
         : start.pageIndex;
 
-    const scale = 1.75;
+    const scale = 1.7;
     const images: string[] = [];
 
     for (
@@ -163,9 +222,10 @@ async function renderQuestionCrops(
       }
 
       await page.render({
+        canvas,
         canvasContext: context,
         viewport,
-      }).promise;
+      } as any).promise;
 
       let cropTop = 18;
       let cropBottom = canvas.height - 18;
@@ -178,32 +238,23 @@ async function renderQuestionCrops(
         cropTop = Math.max(0, viewportY - 24);
       }
 
-      if (
-        next &&
-        pageIndex === next.pageIndex
-      ) {
+      if (next && pageIndex === next.pageIndex) {
         const [, viewportY] = viewport.convertToViewportPoint(
           next.x,
           next.y,
         );
-        cropBottom = Math.min(
-          canvas.height,
-          viewportY - 12,
-        );
+        cropBottom = Math.min(canvas.height, viewportY - 12);
       }
 
-      if (cropBottom <= cropTop + 20) {
-        continue;
-      }
+      if (cropBottom <= cropTop + 20) continue;
 
-      // 保留足夠左右空間，避免裁掉表格、圖片或長選項。
       const sideMargin = Math.max(
         12,
         Math.round(canvas.width * 0.035),
       );
 
       images.push(
-        await canvasToDataUrl(
+        canvasToDataUrl(
           canvas,
           sideMargin,
           cropTop,
@@ -219,7 +270,7 @@ async function renderQuestionCrops(
 
     return images;
   } finally {
-    await task.destroy();
+    await loadingTask.destroy();
   }
 }
 
@@ -247,12 +298,14 @@ export default function OfficialQuestionCrop({
       return;
     }
 
+    const safePdfUrl = pdfUrl;
+
     async function run() {
       setState({ status: "loading" });
 
       try {
         const images = await renderQuestionCrops(
-          pdfUrl,
+          safePdfUrl,
           questionNumber,
         );
 
@@ -275,7 +328,7 @@ export default function OfficialQuestionCrop({
       }
     }
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;
@@ -304,16 +357,20 @@ export default function OfficialQuestionCrop({
     );
   }
 
+  const images = state.images;
+
   return (
     <div className="space-y-3">
-      {state.images.map((image, index) => (
+      {images.map((image, index) => (
         <div
           key={`${questionNumber}-${index}`}
           className="overflow-hidden rounded-[16px] border border-[#dde7e1] bg-white"
         >
           <img
             src={image}
-            alt={`官方第 ${questionNumber} 題${state.images.length > 1 ? `第 ${index + 1} 段` : ""}`}
+            alt={`官方第 ${questionNumber} 題${
+              images.length > 1 ? `第 ${index + 1} 段` : ""
+            }`}
             className="h-auto w-full object-contain"
           />
         </div>

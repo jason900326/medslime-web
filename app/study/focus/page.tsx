@@ -107,9 +107,16 @@ export default function FocusPage() {
     setStartedAt(new Date().toISOString());
     setMode("running");
   };
+const stopEarly = () => {
+  const confirmed = window.confirm(
+    "確定要提前結束這次專注嗎？\n\n提前結束可能會影響本輪可獲得的金幣。",
+  );
 
-  const stopEarly = () => {
-    const endedAt = new Date().toISOString();
+  if (!confirmed) {
+    return;
+  }
+
+  const endedAt = new Date().toISOString();
 
     game.recordFocusSession({
       plannedMinutes,

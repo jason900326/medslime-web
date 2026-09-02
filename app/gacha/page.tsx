@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/top-bar";
+import LoginRequired from "@/components/login-required";
+import { useAuthUser } from "@/hooks/use-auth-user";
 import { useGameState } from "@/components/game-state-provider";
 import { SLIME_BY_ID } from "@/lib/slime-data";
 
@@ -11,9 +13,40 @@ type Result = ReturnType<typeof useGameState>["pullOne"] extends () => infer R
   : never;
 
 export default function GachaPage() {
+  const auth = useAuthUser();
   const game = useGameState();
   const [results, setResults] = useState<Result[]>([]);
   const [pulling, setPulling] = useState(false);
+
+  useEffect(() => {
+    if (!auth.userId) return;
+
+    const grantKey = `medslime_dev_gacha_grant_${auth.userId}`;
+
+    if (window.localStorage.getItem(grantKey)) {
+      return;
+    }
+
+    // 開發測試用：每個登入帳號只發一次。
+    game.addCoins(5000);
+    game.addTickets(50);
+    window.localStorage.setItem(grantKey, "1");
+  }, [auth.userId, game]);
+
+  if (auth.loading) {
+    return <main className="min-h-screen bg-[#f8fcf9]" />;
+  }
+
+  if (!auth.isLoggedIn) {
+    return (
+      <LoginRequired
+        title="登入後才能抽卡"
+        description="抽卡會消耗金幣或抽卡券，並改變你的史萊姆收藏，因此需要先登入帳號。"
+        backHref="/"
+        backLabel="返回首頁"
+      />
+    );
+  }
 
   const performPull = async (
     count: 1 | 10,
@@ -21,18 +54,14 @@ export default function GachaPage() {
   ) => {
     if (pulling) return;
 
-    if (payment === "free") {
-      if (!game.useFreePull()) return;
-    }
+    if (payment === "free" && !game.useFreePull()) return;
 
     if (payment === "coins") {
       const price = count === 1 ? 100 : 1000;
       if (!game.spendCoins(price)) return;
     }
 
-    if (payment === "tickets") {
-      if (!game.spendTickets(count)) return;
-    }
+    if (payment === "tickets" && !game.spendTickets(count)) return;
 
     setPulling(true);
     setResults([]);
@@ -51,7 +80,11 @@ export default function GachaPage() {
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
-        <TopBar showBack />
+        <TopBar
+          showBack
+          backHref="/slimes"
+          backLabel="返回史萊姆圖鑑"
+        />
 
         <section className="mt-8 rounded-[30px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-7 shadow-[0_18px_44px_rgba(40,106,69,0.08)]">
           <div className="text-sm font-black tracking-[0.08em] text-[#c58a2d]">
@@ -129,42 +162,51 @@ export default function GachaPage() {
                 還沒有抽卡結果。
               </div>
             ) : (
-              <div
-                className={
-                  results.length === 1
-                    ? "mx-auto grid max-w-sm grid-cols-1 gap-4"
-                    : "grid grid-cols-2 gap-4 md:grid-cols-5"
-                }
-              >
-                {results.map((result, index) => {
-                  const slime = SLIME_BY_ID[result.slimeId];
+              <>
+                <div
+                  className={
+                    results.length === 1
+                      ? "mx-auto grid max-w-sm grid-cols-1 gap-4"
+                      : "grid grid-cols-2 gap-4 md:grid-cols-5"
+                  }
+                >
+                  {results.map((result, index) => {
+                    const slime = SLIME_BY_ID[result.slimeId];
 
-                  return (
-                    <article
-                      key={`${result.slimeId}-${index}`}
-                      className="rounded-[24px] border border-[#dfe9e3] bg-white p-4 text-center shadow-[0_10px_24px_rgba(31,83,53,0.05)]"
-                    >
-                      <div className="flex min-h-[150px] items-center justify-center">
-                        <img
-                          src={slime.image}
-                          alt={slime.defaultName}
-                          className="h-auto w-full max-w-[150px] object-contain"
-                        />
-                      </div>
+                    return (
+                      <article
+                        key={`${result.slimeId}-${index}`}
+                        className="rounded-[24px] border border-[#dfe9e3] bg-white p-4 text-center shadow-[0_10px_24px_rgba(31,83,53,0.05)]"
+                      >
+                        <div className="flex min-h-[150px] items-center justify-center">
+                          <img
+                            src={slime.image}
+                            alt={slime.defaultName}
+                            className="h-auto w-full max-w-[150px] object-contain"
+                          />
+                        </div>
 
-                      <div className="mt-2 text-sm font-black text-[#789083]">
-                        {slime.rarity}
-                      </div>
+                        <div className="mt-2 text-sm font-black text-[#789083]">
+                          {slime.rarity}
+                        </div>
 
-                      <div className="mt-1 font-black">
-                        {slime.defaultName}
-                      </div>
+                        <div className="mt-1 font-black">
+                          {slime.defaultName}
+                        </div>
 
-                      <ResultReward result={result} />
-                    </article>
-                  );
-                })}
-              </div>
+                        <ResultReward result={result} />
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <Link
+                  href="/slimes"
+                  className="mx-auto mt-5 block max-w-sm rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-black text-[#315b45] transition hover:bg-[#f5faf7]"
+                >
+                  🐾 回圖鑑看看
+                </Link>
+              </>
             )}
           </div>
         </section>
@@ -229,7 +271,9 @@ function PullOption({
   return (
     <article className="rounded-[24px] border border-[#e3e9e5] bg-white p-5">
       <div className="text-lg font-black">{title}</div>
-      <div className="mt-1 text-sm font-medium text-[#789083]">{subtitle}</div>
+      <div className="mt-1 text-sm font-medium text-[#789083]">
+        {subtitle}
+      </div>
 
       <button
         disabled={disabled}

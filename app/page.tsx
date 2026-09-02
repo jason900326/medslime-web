@@ -1,47 +1,88 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/top-bar";
 import {
   getPlayerDisplayName,
   useGameState,
 } from "@/components/game-state-provider";
 import { SLIME_BY_ID } from "@/lib/slime-data";
-
-const tasks = [
-  {
-    icon: "🧠",
-    title: "完成 5 題",
-    progress: "5 / 5 題",
-    reward: "✓ 已完成",
-  },
-  {
-    icon: "🔍",
-    title: "訂正 1 題",
-    progress: "0 / 1 題",
-    reward: "🪙 10",
-  },
-  {
-    icon: "⏱️",
-    title: "專注 20 分鐘",
-    progress: "0 / 20 分鐘",
-    reward: "🪙 10",
-  },
-];
+import { useAuthUser } from "@/hooks/use-auth-user";
 
 export default function Home() {
+  const auth = useAuthUser();
   const game = useGameState();
+  const [todayKey, setTodayKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    setTodayKey(`${y}-${m}-${d}`);
+  }, []);
 
   const companion =
     SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
+
+  const today =
+    todayKey
+      ? game.activityByDate[todayKey] ?? {
+          questionsAnswered: 0,
+          mistakesReviewed: 0,
+          focusSeconds: 0,
+        }
+      : {
+          questionsAnswered: 0,
+          mistakesReviewed: 0,
+          focusSeconds: 0,
+        };
+
+  const tasks = [
+    {
+      icon: "🧠",
+      title: "完成 5 題",
+      progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
+      reward:
+        today.questionsAnswered >= 5 ? "✓ 已完成" : "🪙 10",
+    },
+    {
+      icon: "🔍",
+      title: "訂正 1 題",
+      progress: `${Math.min(today.mistakesReviewed, 1)} / 1 題`,
+      reward:
+        today.mistakesReviewed >= 1 ? "✓ 已完成" : "🪙 10",
+    },
+    {
+      icon: "⏱️",
+      title: "專注 20 分鐘",
+      progress: `${Math.min(
+        Math.floor(today.focusSeconds / 60),
+        20,
+      )} / 20 分鐘`,
+      reward:
+        today.focusSeconds >= 20 * 60 ? "✓ 已完成" : "🪙 10",
+    },
+  ];
+
+  const protectedHref = (href: string) =>
+    auth.isLoggedIn ? href : "/auth/login";
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
         <TopBar />
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+        <section
+          className={[
+            "mt-8 grid gap-5",
+            auth.isLoggedIn
+              ? "lg:grid-cols-[1.2fr_0.8fr]"
+              : "lg:grid-cols-1",
+          ].join(" ")}
+        >
           <div className="rounded-[30px] border border-[#d8e9df] bg-gradient-to-br from-[#e7f9ee] via-white to-[#ebf8fc] p-7 shadow-[0_18px_44px_rgba(40,106,69,0.08)]">
             <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
               TODAY&apos;S STUDY
@@ -66,14 +107,14 @@ export default function Home() {
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Link
-                href="/slimes"
+                href={protectedHref("/slimes")}
                 className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
               >
                 🐾 我的史萊姆
               </Link>
 
               <Link
-                href="/achievements"
+                href={protectedHref("/achievements")}
                 className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
               >
                 🏆 成就
@@ -81,57 +122,63 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-[#d8e9df] bg-white p-6 shadow-[0_14px_36px_rgba(40,106,69,0.06)]">
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <img
-                src={companion.image}
-                alt={getPlayerDisplayName(companion.id, playerSlime)}
-                className="h-auto w-full max-w-[280px] object-contain"
-              />
+          {auth.isLoggedIn && game.isReady ? (
+            <div className="rounded-[30px] border border-[#d8e9df] bg-white p-6 shadow-[0_14px_36px_rgba(40,106,69,0.06)]">
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <img
+                  src={companion.image}
+                  alt={getPlayerDisplayName(companion.id, playerSlime)}
+                  className="h-auto w-full max-w-[280px] object-contain"
+                />
 
-              <div className="mt-4 text-2xl font-black">
-                {getPlayerDisplayName(companion.id, playerSlime)}
-              </div>
+                <div className="mt-4 text-2xl font-black">
+                  {getPlayerDisplayName(companion.id, playerSlime)}
+                </div>
 
-              <div className="mt-1 text-sm font-bold text-[#789083]">
-                陪伴中
+                <div className="mt-1 text-sm font-bold text-[#789083]">
+                  陪伴中
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
-        <section className="mt-10">
-          <div className="mb-4 text-2xl font-black tracking-[-0.03em]">
-            今日任務
-          </div>
+        {auth.isLoggedIn && game.isReady ? (
+          <section className="mt-10">
+            <div className="mb-4 text-2xl font-black tracking-[-0.03em]">
+              今日任務
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {tasks.map((task) => (
-              <div
-                key={task.title}
-                className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">
-                  {task.icon}
+            <div className="grid gap-4 md:grid-cols-3">
+              {tasks.map((task) => (
+                <div
+                  key={task.title}
+                  className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">
+                    {task.icon}
+                  </div>
+                  <div className="mt-4 text-lg font-black">
+                    {task.title}
+                  </div>
+                  <div className="mt-1 text-sm font-medium text-[#789083]">
+                    {task.progress}
+                  </div>
+                  <div className="mt-4 font-black text-[#2a9d5e]">
+                    {task.reward}
+                  </div>
                 </div>
-                <div className="mt-4 text-lg font-black">{task.title}</div>
-                <div className="mt-1 text-sm font-medium text-[#789083]">
-                  {task.progress}
-                </div>
-                <div className="mt-4 font-black text-[#2a9d5e]">
-                  {task.reward}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <Link
-            href="/tasks"
-            className="mt-4 block w-full rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
-          >
-            查看每日／每週任務
-          </Link>
-        </section>
+            <Link
+              href="/tasks"
+              className="mt-4 block w-full rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
+            >
+              查看每日／每週任務
+            </Link>
+          </section>
+        ) : null}
       </div>
     </main>
   );

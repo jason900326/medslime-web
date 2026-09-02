@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { useGameState } from "@/components/game-state-provider";
+import { useAuthUser } from "@/hooks/use-auth-user";
 
 type TopBarProps = {
   showBack?: boolean;
@@ -15,7 +18,15 @@ export default function TopBar({
   backLabel = "返回首頁",
 }: TopBarProps) {
   const router = useRouter();
-  const { streak, coins, tickets } = useGameState();
+  const game = useGameState();
+  const auth = useAuthUser();
+
+  const logout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  };
 
   return (
     <header className="relative z-50 flex flex-wrap items-center justify-between gap-4">
@@ -41,9 +52,40 @@ export default function TopBar({
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <ResourcePill label={`🔥 ${streak} 天`} />
-        <ResourcePill label={`🪙 ${coins}`} />
-        <ResourcePill label={`🎫 ${tickets}`} />
+        {!auth.loading && auth.isLoggedIn && (
+          <>
+            <ResourcePill label={`🔥 ${game.streak} 天`} />
+            <ResourcePill label={`🪙 ${game.coins}`} />
+            <ResourcePill label={`🎫 ${game.tickets}`} />
+          </>
+        )}
+
+        {!auth.loading &&
+          (auth.isLoggedIn ? (
+            <>
+              <div
+                className="hidden max-w-[190px] truncate rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#557768] shadow-sm sm:block"
+                title={auth.email ?? ""}
+              >
+                {auth.email}
+              </div>
+
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#315b45] shadow-sm transition hover:bg-[#f5faf7]"
+              >
+                登出
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#315b45] shadow-sm transition hover:bg-[#f5faf7]"
+            >
+              登入
+            </Link>
+          ))}
       </div>
     </header>
   );

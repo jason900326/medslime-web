@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameState } from "@/components/game-state-provider";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";

@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { SLIMES, SLIME_BY_ID, type SlimeRarity } from "@/lib/slime-data";
 
 type PlayerSlimeState = {
@@ -29,6 +30,12 @@ export type FocusSession = {
   companionId: string;
 };
 
+export type DailyActivity = {
+  questionsAnswered: number;
+  mistakesReviewed: number;
+  focusSeconds: number;
+};
+
 type GameState = {
   coins: number;
   tickets: number;
@@ -37,6 +44,12 @@ type GameState = {
   slimes: Record<string, PlayerSlimeState>;
   freePullDate: string | null;
   pity: number;
+  totalPulls: number;
+  totalQuestionsAnswered: number;
+  totalMistakesReviewed: number;
+  activityByDate: Record<string, DailyActivity>;
+  claimedAchievementIds: string[];
+  claimedTaskIds: string[];
   focusHistory: FocusSession[];
 };
 
@@ -62,6 +75,16 @@ type GameStateContextValue = GameState & {
   unlockAccessory: (slimeId: string) => boolean;
   setCompanion: (slimeId: string) => void;
   setNickname: (slimeId: string, nickname: string) => void;
+  claimAchievementReward: (
+    achievementId: string,
+    reward: { type: "coins" | "tickets"; amount: number },
+  ) => boolean;
+  recordQuestionsAnswered: (count: number) => void;
+  recordMistakesReviewed: (count: number) => void;
+  claimTaskReward: (
+    taskClaimId: string,
+    reward: { type: "coins" | "tickets"; amount: number },
+  ) => boolean;
 
   todayFocusSeconds: number;
   todayFocusMinutes: number;
@@ -76,45 +99,142 @@ type GameStateContextValue = GameState & {
   }) => number;
 };
 
-const STORAGE_KEY = "medslime_game_state_v2";
 const FOCUS_COIN_CAP = 30;
 
-const defaultState: GameState = {
-  coins: 520,
-  tickets: 12,
-  streak: 3,
-  companionId: "n-pink",
+/*
+ * 正式帳號的初始資料。
+ * 測試用 5000 金幣 / 50 抽卡券仍由目前 gacha 頁的一次性 dev grant 發放。
+ *
+ * 上線前務必：
+ * 1. 移除 gacha dev grant
+ * 2. 確認 coins / tickets 初始值符合正式規則
+ */
+const starterState: GameState = {
+  coins: 0,
+  tickets: 0,
+  streak: 0,
+  companionId: "n-green",
   freePullDate: null,
   pity: 0,
+  totalPulls: 0,
+  totalQuestionsAnswered: 0,
+  totalMistakesReviewed: 0,
+  activityByDate: {},
+  claimedAchievementIds: [],
+  claimedTaskIds: [],
   focusHistory: [],
   slimes: {
     "n-green": {
       owned: true,
-      fragments: 30,
-      accessoryUnlocked: false,
-      nickname: "小綠",
-    },
-    "n-pink": {
-      owned: true,
-      fragments: 20,
-      accessoryUnlocked: false,
-      nickname: "Pink",
-    },
-    "n-blue": {
-      owned: true,
       fragments: 0,
       accessoryUnlocked: false,
-    },
-    "ssr-chill": {
-      owned: true,
-      fragments: 0,
-      accessoryUnlocked: false,
-      nickname: "Chill",
     },
   },
 };
 
+const anonymousState: GameState = {
+  ...starterState,
+  slimes: {
+    ...starterState.slimes,
+  },
+  focusHistory: [],
+};
+
 const GameStateContext = createContext<GameStateContextValue | null>(null);
+
+function cloneStarterState(): GameState {
+  return {
+    ...starterState,
+    slimes: Object.fromEntries(
+      Object.entries(starterState.slimes).map(([id, value]) => [
+        id,
+        { ...value },
+      ]),
+    ),
+    activityByDate: Object.fromEntries(
+      Object.entries(starterState.activityByDate).map(([key, value]) => [
+        key,
+        { ...value },
+      ]),
+    ),
+    claimedAchievementIds: [...starterState.claimedAchievementIds],
+    claimedTaskIds: [...starterState.claimedTaskIds],
+    focusHistory: [],
+  };
+}
+
+function normalizeState(raw: unknown): GameState {
+  if (!raw || typeof raw !== "object") {
+    return cloneStarterState();
+  }
+
+  const parsed = raw as Partial<GameState>;
+
+  return {
+    ...cloneStarterState(),
+    ...parsed,
+    coins:
+      typeof parsed.coins === "number" && Number.isFinite(parsed.coins)
+        ? Math.max(0, parsed.coins)
+        : starterState.coins,
+    tickets:
+      typeof parsed.tickets === "number" && Number.isFinite(parsed.tickets)
+        ? Math.max(0, parsed.tickets)
+        : starterState.tickets,
+    streak:
+      typeof parsed.streak === "number" && Number.isFinite(parsed.streak)
+        ? Math.max(0, parsed.streak)
+        : starterState.streak,
+    pity:
+      typeof parsed.pity === "number" && Number.isFinite(parsed.pity)
+        ? Math.max(0, parsed.pity)
+        : starterState.pity,
+    totalPulls:
+      typeof parsed.totalPulls === "number" &&
+      Number.isFinite(parsed.totalPulls)
+        ? Math.max(0, parsed.totalPulls)
+        : 0,
+    totalQuestionsAnswered:
+      typeof parsed.totalQuestionsAnswered === "number" &&
+      Number.isFinite(parsed.totalQuestionsAnswered)
+        ? Math.max(0, parsed.totalQuestionsAnswered)
+        : 0,
+    totalMistakesReviewed:
+      typeof parsed.totalMistakesReviewed === "number" &&
+      Number.isFinite(parsed.totalMistakesReviewed)
+        ? Math.max(0, parsed.totalMistakesReviewed)
+        : 0,
+    activityByDate:
+      parsed.activityByDate && typeof parsed.activityByDate === "object"
+        ? (parsed.activityByDate as Record<string, DailyActivity>)
+        : {},
+    claimedAchievementIds: Array.isArray(parsed.claimedAchievementIds)
+      ? parsed.claimedAchievementIds.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : [],
+    claimedTaskIds: Array.isArray(parsed.claimedTaskIds)
+      ? parsed.claimedTaskIds.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : [],
+    freePullDate:
+      typeof parsed.freePullDate === "string" || parsed.freePullDate === null
+        ? parsed.freePullDate
+        : null,
+    companionId:
+      typeof parsed.companionId === "string"
+        ? parsed.companionId
+        : starterState.companionId,
+    focusHistory: Array.isArray(parsed.focusHistory)
+      ? parsed.focusHistory
+      : [],
+    slimes: {
+      ...starterState.slimes,
+      ...(parsed.slimes ?? {}),
+    },
+  };
+}
 
 function getLocalDateKey(date = new Date()) {
   const y = date.getFullYear();
@@ -148,42 +268,138 @@ function pickWeightedSlime(forceSSR: boolean) {
 }
 
 export function GameStateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<GameState>(defaultState);
+  const supabase = useMemo(() => createClient(), []);
+
+  const [state, setState] = useState<GameState>(anonymousState);
   const [isReady, setIsReady] = useState(false);
   const [todayKey, setTodayKey] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setTodayKey(getLocalDateKey());
 
-    try {
-      const saved =
-        localStorage.getItem(STORAGE_KEY) ??
-        localStorage.getItem("medslime_game_state_v1");
+    let cancelled = false;
 
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<GameState>;
+    const loadForUser = async (nextUserId: string | null) => {
+      setIsReady(false);
+      setUserId(nextUserId);
+      setLoadedUserId(null);
 
-        setState({
-          ...defaultState,
-          ...parsed,
-          focusHistory: parsed.focusHistory ?? [],
-          slimes: {
-            ...defaultState.slimes,
-            ...(parsed.slimes ?? {}),
-          },
-        });
+      if (!nextUserId) {
+        if (!cancelled) {
+          setState({
+            ...anonymousState,
+            slimes: { ...anonymousState.slimes },
+            focusHistory: [],
+          });
+          setIsReady(true);
+        }
+        return;
       }
-    } catch {
-      // localStorage 無法讀取時回到預設狀態。
-    } finally {
-      setIsReady(true);
-    }
-  }, []);
 
+      const { data, error } = await supabase
+        .from("player_account_state")
+        .select("state")
+        .eq("user_id", nextUserId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("讀取 MedSlime 遊戲資料失敗：", error);
+        setState(cloneStarterState());
+        setLoadedUserId(nextUserId);
+        setIsReady(true);
+        return;
+      }
+
+      if (!data) {
+        const initialState = cloneStarterState();
+
+        const { error: insertError } = await supabase
+          .from("player_account_state")
+          .insert({
+            user_id: nextUserId,
+            state: initialState,
+          });
+
+        if (cancelled) return;
+
+        if (insertError) {
+          console.error("建立 MedSlime 遊戲資料失敗：", insertError);
+        }
+
+        setState(initialState);
+        setLoadedUserId(nextUserId);
+        setIsReady(true);
+        return;
+      }
+
+      setState(normalizeState(data.state));
+      setLoadedUserId(nextUserId);
+      setIsReady(true);
+    };
+
+    const initialize = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      await loadForUser(user?.id ?? null);
+    };
+
+    void initialize();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void loadForUser(session?.user?.id ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  /*
+   * 登入後，所有遊戲狀態變化都寫進該 user_id 的 Supabase row。
+   * 使用短 debounce，避免一次抽十連時每個 state update 都各送一個 request。
+   */
   useEffect(() => {
-    if (!isReady) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, isReady]);
+    if (
+      !isReady ||
+      !userId ||
+      loadedUserId !== userId
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void supabase
+        .from("player_account_state")
+        .upsert(
+          {
+            user_id: userId,
+            state,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          },
+        )
+        .then(({ error }) => {
+          if (error) {
+            console.error("儲存 MedSlime 遊戲資料失敗：", error);
+          }
+        });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [state, isReady, userId, loadedUserId, supabase]);
 
   const todayFocusSessions = useMemo(() => {
     if (!todayKey) return [];
@@ -211,9 +427,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   );
 
   const canUseFreePull =
-    todayKey !== null && state.freePullDate !== todayKey;
+    Boolean(userId) &&
+    todayKey !== null &&
+    state.freePullDate !== todayKey;
 
   const addCoins = (amount: number) => {
+    if (!userId) return;
+
     setState((current) => ({
       ...current,
       coins: Math.max(0, current.coins + amount),
@@ -221,6 +441,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const addTickets = (amount: number) => {
+    if (!userId) return;
+
     setState((current) => ({
       ...current,
       tickets: Math.max(0, current.tickets + amount),
@@ -228,7 +450,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const spendCoins = (amount: number) => {
-    if (state.coins < amount) return false;
+    if (!userId || state.coins < amount) return false;
 
     setState((current) => {
       if (current.coins < amount) return current;
@@ -239,7 +461,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const spendTickets = (amount: number) => {
-    if (state.tickets < amount) return false;
+    if (!userId || state.tickets < amount) return false;
 
     setState((current) => {
       if (current.tickets < amount) return current;
@@ -250,7 +472,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const useFreePull = () => {
-    if (!canUseFreePull) return false;
+    if (!userId || !canUseFreePull) return false;
 
     const dateKey = getLocalDateKey();
     setTodayKey(dateKey);
@@ -273,6 +495,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setState((current) => ({
         ...current,
         pity: slime.rarity === "SSR" ? 0 : current.pity + 1,
+        totalPulls: current.totalPulls + 1,
         slimes: {
           ...current.slimes,
           [slime.id]: {
@@ -296,6 +519,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setState((current) => ({
         ...current,
         pity: slime.rarity === "SSR" ? 0 : current.pity + 1,
+        totalPulls: current.totalPulls + 1,
         coins: current.coins + refund,
       }));
 
@@ -310,6 +534,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setState((current) => ({
         ...current,
         pity: slime.rarity === "SSR" ? 0 : current.pity + 1,
+        totalPulls: current.totalPulls + 1,
       }));
 
       return {
@@ -329,6 +554,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       return {
         ...current,
         pity: slime.rarity === "SSR" ? 0 : current.pity + 1,
+        totalPulls: current.totalPulls + 1,
         slimes: {
           ...current.slimes,
           [slime.id]: {
@@ -350,6 +576,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     const playerSlime = state.slimes[slimeId];
 
     if (
+      !userId ||
       !playerSlime?.owned ||
       playerSlime.accessoryUnlocked ||
       playerSlime.fragments < 30
@@ -385,7 +612,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const setCompanion = (slimeId: string) => {
-    if (!state.slimes[slimeId]?.owned) return;
+    if (!userId || !state.slimes[slimeId]?.owned) return;
 
     setState((current) => ({
       ...current,
@@ -394,7 +621,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
 
   const setNickname = (slimeId: string, nickname: string) => {
-    if (!state.slimes[slimeId]?.owned) return;
+    if (!userId || !state.slimes[slimeId]?.owned) return;
 
     setState((current) => ({
       ...current,
@@ -408,6 +635,138 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const claimAchievementReward = (
+    achievementId: string,
+    reward: { type: "coins" | "tickets"; amount: number },
+  ) => {
+    if (
+      !userId ||
+      state.claimedAchievementIds.includes(achievementId) ||
+      reward.amount <= 0
+    ) {
+      return false;
+    }
+
+    setState((current) => {
+      if (current.claimedAchievementIds.includes(achievementId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        coins:
+          reward.type === "coins"
+            ? current.coins + reward.amount
+            : current.coins,
+        tickets:
+          reward.type === "tickets"
+            ? current.tickets + reward.amount
+            : current.tickets,
+        claimedAchievementIds: [
+          ...current.claimedAchievementIds,
+          achievementId,
+        ],
+      };
+    });
+
+    return true;
+  };
+
+  const recordQuestionsAnswered = (count: number) => {
+    if (!userId || count <= 0) return;
+
+    const safeCount = Math.max(0, Math.floor(count));
+    const dateKey = getLocalDateKey();
+
+    setState((current) => {
+      const today = current.activityByDate[dateKey] ?? {
+        questionsAnswered: 0,
+        mistakesReviewed: 0,
+        focusSeconds: 0,
+      };
+
+      return {
+        ...current,
+        totalQuestionsAnswered:
+          current.totalQuestionsAnswered + safeCount,
+        activityByDate: {
+          ...current.activityByDate,
+          [dateKey]: {
+            ...today,
+            questionsAnswered:
+              today.questionsAnswered + safeCount,
+          },
+        },
+      };
+    });
+  };
+
+  const recordMistakesReviewed = (count: number) => {
+    if (!userId || count <= 0) return;
+
+    const safeCount = Math.max(0, Math.floor(count));
+    const dateKey = getLocalDateKey();
+
+    setState((current) => {
+      const today = current.activityByDate[dateKey] ?? {
+        questionsAnswered: 0,
+        mistakesReviewed: 0,
+        focusSeconds: 0,
+      };
+
+      return {
+        ...current,
+        totalMistakesReviewed:
+          current.totalMistakesReviewed + safeCount,
+        activityByDate: {
+          ...current.activityByDate,
+          [dateKey]: {
+            ...today,
+            mistakesReviewed:
+              today.mistakesReviewed + safeCount,
+          },
+        },
+      };
+    });
+  };
+
+  const claimTaskReward = (
+    taskClaimId: string,
+    reward: { type: "coins" | "tickets"; amount: number },
+  ) => {
+    if (
+      !userId ||
+      state.claimedTaskIds.includes(taskClaimId) ||
+      reward.amount <= 0
+    ) {
+      return false;
+    }
+
+    setState((current) => {
+      if (current.claimedTaskIds.includes(taskClaimId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        coins:
+          reward.type === "coins"
+            ? current.coins + reward.amount
+            : current.coins,
+        tickets:
+          reward.type === "tickets"
+            ? current.tickets + reward.amount
+            : current.tickets,
+        claimedTaskIds: [
+          ...current.claimedTaskIds,
+          taskClaimId,
+        ],
+      };
+    });
+
+    return true;
+  };
+
   const recordFocusSession = (input: {
     plannedMinutes: number;
     actualSeconds: number;
@@ -415,6 +774,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     startedAt: string;
     endedAt: string;
   }) => {
+    if (!userId) return 0;
+
     const dateKey = getLocalDateKey(new Date(input.endedAt));
 
     const earnedBefore = state.focusHistory
@@ -439,11 +800,27 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       companionId: state.companionId,
     };
 
-    setState((current) => ({
-      ...current,
-      coins: current.coins + coinsEarned,
-      focusHistory: [session, ...current.focusHistory].slice(0, 100),
-    }));
+    setState((current) => {
+      const today = current.activityByDate[dateKey] ?? {
+        questionsAnswered: 0,
+        mistakesReviewed: 0,
+        focusSeconds: 0,
+      };
+
+      return {
+        ...current,
+        coins: current.coins + coinsEarned,
+        focusHistory: [session, ...current.focusHistory].slice(0, 100),
+        activityByDate: {
+          ...current.activityByDate,
+          [dateKey]: {
+            ...today,
+            focusSeconds:
+              today.focusSeconds + Math.max(0, input.actualSeconds),
+          },
+        },
+      };
+    });
 
     setTodayKey(getLocalDateKey());
 
@@ -464,6 +841,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       unlockAccessory,
       setCompanion,
       setNickname,
+      claimAchievementReward,
+      recordQuestionsAnswered,
+      recordMistakesReviewed,
+      claimTaskReward,
       todayFocusSeconds,
       todayFocusMinutes,
       todayFocusCoins,

@@ -54,7 +54,7 @@ export default function StudyPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            先把正式前端流程搬起來。登入與 Supabase 資料稍後再接回來。
+            選擇你現在最需要的學習方式。
           </p>
         </section>
 

@@ -12,6 +12,7 @@ import {
 } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
+import { upsertMistakes } from "@/lib/mistake-store";
 
 type Question = {
   id: string;
@@ -310,6 +311,42 @@ function ExamQuizContent() {
     return "gray";
   };
 
+  const saveMistakes = () => {
+    const now = new Date().toISOString();
+
+    const records = questions
+      .filter((item) => {
+        const userAnswer = answers[item.id];
+        const isWrong =
+          item.correctIndex !== null &&
+          userAnswer !== undefined &&
+          userAnswer !== item.correctIndex;
+
+        const isUncertain = uncertain[item.id] ?? false;
+
+        return isWrong || isUncertain;
+      })
+      .map((item) => ({
+        id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+        source: "national-exam" as const,
+        sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
+        subject,
+        year,
+        session,
+        questionNumber: item.questionNumber,
+        stem: item.stem,
+        options: item.options,
+        correctIndex: item.correctIndex,
+        userAnswer: answers[item.id] ?? null,
+        uncertain: uncertain[item.id] ?? false,
+        officialPdfUrl: item.questionPdfUrl,
+        createdAt: now,
+        reviewed: false,
+      }));
+
+    upsertMistakes(records);
+  };
+
   const closeTutorial = () => {
     localStorage.setItem(
       TUTORIAL_STORAGE_KEY,
@@ -458,12 +495,8 @@ function ExamQuizContent() {
           </div>
 
           {(question.hasImageHint || question.sourceOnlyMode) && (
-            <div className="mt-5">
-              <OfficialQuestionCrop
-                pdfUrl={question.questionPdfUrl}
-                questionNumber={question.questionNumber}
-                compact
-              />
+            <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-black leading-6 text-[#80651e]">
+              🖼️ 本題有圖片，建議點開官方原題確認。
             </div>
           )}
 
@@ -701,9 +734,8 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowSubmitDialog(
-                    false,
-                  );
+                  saveMistakes();
+                  setShowSubmitDialog(false);
                   setFinished(true);
                 }}
                 className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"

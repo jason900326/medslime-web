@@ -2,129 +2,173 @@
 
 import { useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import { useGameState } from "@/components/game-state-provider";
+import { SLIMES } from "@/lib/slime-data";
 
 type AchievementCategory = "學習" | "收藏" | "抽卡" | "特殊";
 
-type Achievement = {
+type AchievementDefinition = {
   id: string;
   category: AchievementCategory;
   name: string;
   description: string;
-  progress: number;
   target: number;
   unit: string;
-  reward: string;
-  claimed: boolean;
+  reward: {
+    type: "coins" | "tickets";
+    amount: number;
+  };
+  getProgress: (game: ReturnType<typeof useGameState>) => number;
 };
 
-const initialAchievements: Achievement[] = [
+const achievementDefinitions: AchievementDefinition[] = [
   {
     id: "focus-1",
     category: "學習",
     name: "坐得住了",
     description: "累積專注 1 小時",
-    progress: 60,
     target: 60,
     unit: "分鐘",
-    reward: "🪙 50",
-    claimed: false,
+    reward: { type: "coins", amount: 50 },
+    getProgress: (game) =>
+      Math.floor(
+        game.focusHistory.reduce(
+          (sum, session) => sum + session.actualSeconds,
+          0,
+        ) / 60,
+      ),
   },
   {
     id: "focus-10",
     category: "學習",
     name: "開始認真",
     description: "累積專注 10 小時",
-    progress: 320,
     target: 600,
     unit: "分鐘",
-    reward: "🪙 100",
-    claimed: false,
+    reward: { type: "coins", amount: 100 },
+    getProgress: (game) =>
+      Math.floor(
+        game.focusHistory.reduce(
+          (sum, session) => sum + session.actualSeconds,
+          0,
+        ) / 60,
+      ),
   },
   {
     id: "focus-30",
     category: "學習",
     name: "屁股黏住了",
     description: "累積專注 30 小時",
-    progress: 320,
     target: 1800,
     unit: "分鐘",
-    reward: "🎫 1",
-    claimed: false,
+    reward: { type: "tickets", amount: 1 },
+    getProgress: (game) =>
+      Math.floor(
+        game.focusHistory.reduce(
+          (sum, session) => sum + session.actualSeconds,
+          0,
+        ) / 60,
+      ),
   },
   {
     id: "questions-1000",
     category: "學習",
     name: "題海居民",
     description: "累積作答 1,000 題",
-    progress: 1000,
     target: 1000,
     unit: "題",
-    reward: "🪙 100",
-    claimed: true,
+    reward: { type: "coins", amount: 100 },
+    getProgress: (game) => game.totalQuestionsAnswered,
   },
   {
     id: "collection-5",
     category: "收藏",
     name: "開始有點擠了",
     description: "收集 5 隻不同史萊姆",
-    progress: 4,
     target: 5,
     unit: "隻",
-    reward: "🪙 50",
-    claimed: false,
+    reward: { type: "coins", amount: 50 },
+    getProgress: (game) =>
+      Object.values(game.slimes).filter((slime) => slime.owned).length,
   },
   {
     id: "collection-all-n",
     category: "收藏",
     name: "普通但完整",
     description: "收集全部 N 稀有度史萊姆",
-    progress: 3,
-    target: 4,
+    target: SLIMES.filter((slime) => slime.rarity === "N").length,
     unit: "隻",
-    reward: "🪙 100",
-    claimed: false,
+    reward: { type: "coins", amount: 100 },
+    getProgress: (game) =>
+      SLIMES.filter(
+        (slime) =>
+          slime.rarity === "N" &&
+          game.slimes[slime.id]?.owned,
+      ).length,
   },
   {
     id: "pull-10",
     category: "抽卡",
     name: "手癢了",
     description: "累積抽卡 10 次",
-    progress: 10,
     target: 10,
     unit: "抽",
-    reward: "🪙 50",
-    claimed: false,
+    reward: { type: "coins", amount: 50 },
+    getProgress: (game) => game.totalPulls,
   },
   {
     id: "pull-100",
     category: "抽卡",
     name: "這不是賭博",
     description: "累積抽卡 100 次",
-    progress: 37,
     target: 100,
     unit: "抽",
-    reward: "🎫 1",
-    claimed: false,
+    reward: { type: "tickets", amount: 1 },
+    getProgress: (game) => game.totalPulls,
   },
   {
     id: "special-ssr",
     category: "特殊",
     name: "SSR！",
     description: "第一次抽到 SSR 史萊姆",
-    progress: 1,
     target: 1,
     unit: "次",
-    reward: "🎫 1",
-    claimed: false,
+    reward: { type: "tickets", amount: 1 },
+    getProgress: (game) =>
+      SLIMES.some(
+        (slime) =>
+          slime.rarity === "SSR" &&
+          game.slimes[slime.id]?.owned,
+      )
+        ? 1
+        : 0,
   },
 ];
 
 const categories = ["全部", "學習", "收藏", "抽卡", "特殊"] as const;
 
 export default function AchievementsPage() {
-  const [items, setItems] = useState(initialAchievements);
+  const game = useGameState();
   const [category, setCategory] =
     useState<(typeof categories)[number]>("全部");
+
+  const items = useMemo(
+    () =>
+      achievementDefinitions.map((definition) => ({
+        ...definition,
+        progress: definition.getProgress(game),
+        claimed: game.claimedAchievementIds.includes(
+          definition.id,
+        ),
+      })),
+    [
+      game.focusHistory,
+      game.slimes,
+      game.totalPulls,
+      game.totalQuestionsAnswered,
+      game.claimedAchievementIds,
+    ],
+  );
 
   const filtered = useMemo(() => {
     return items
@@ -135,8 +179,13 @@ export default function AchievementsPage() {
         const aComplete = a.progress >= a.target;
         const bComplete = b.progress >= b.target;
 
-        if (a.claimed !== b.claimed) return Number(a.claimed) - Number(b.claimed);
-        if (aComplete !== bComplete) return Number(bComplete) - Number(aComplete);
+        if (a.claimed !== b.claimed) {
+          return Number(a.claimed) - Number(b.claimed);
+        }
+
+        if (aComplete !== bComplete) {
+          return Number(bComplete) - Number(aComplete);
+        }
 
         return 0;
       });
@@ -148,17 +197,25 @@ export default function AchievementsPage() {
 
   const claimedCount = items.filter((item) => item.claimed).length;
 
-  const claimAchievement = (id: string) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id &&
-        item.progress >= item.target &&
-        !item.claimed
-          ? { ...item, claimed: true }
-          : item,
-      ),
+  const claimAchievement = (achievement: (typeof items)[number]) => {
+    if (
+      achievement.progress < achievement.target ||
+      achievement.claimed
+    ) {
+      return;
+    }
+
+    game.claimAchievementReward(
+      achievement.id,
+      achievement.reward,
     );
   };
+
+  if (!game.isReady) {
+    return (
+      <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]" />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -175,7 +232,7 @@ export default function AchievementsPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            看得到進度、看得到獎勵，也看得到自己已經走了多遠。
+            成就進度會依照目前登入帳號的真實學習與收藏資料計算。
           </p>
         </section>
 
@@ -186,7 +243,9 @@ export default function AchievementsPage() {
           />
           <SummaryCard
             label="完成率"
-            value={`${Math.round((completedCount / items.length) * 100)}%`}
+            value={`${Math.round(
+              (completedCount / items.length) * 100,
+            )}%`}
           />
           <SummaryCard
             label="已領取"
@@ -213,7 +272,9 @@ export default function AchievementsPage() {
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((achievement) => {
-            const complete = achievement.progress >= achievement.target;
+            const complete =
+              achievement.progress >= achievement.target;
+
             const percent = Math.min(
               100,
               Math.max(
@@ -262,8 +323,11 @@ export default function AchievementsPage() {
                 <div className="mt-5 flex items-center justify-between gap-3 text-sm font-black">
                   <span className="text-[#557768]">目前進度</span>
                   <span>
-                    {Math.min(achievement.progress, achievement.target)} /{" "}
-                    {achievement.target} {achievement.unit}
+                    {Math.min(
+                      achievement.progress,
+                      achievement.target,
+                    )}{" "}
+                    / {achievement.target} {achievement.unit}
                   </span>
                 </div>
 
@@ -279,7 +343,9 @@ export default function AchievementsPage() {
 
                 <div className="mt-5 flex items-center justify-between gap-3">
                   <div className="text-sm font-black text-[#2a9d5e]">
-                    {achievement.reward}
+                    {achievement.reward.type === "coins"
+                      ? `🪙 ${achievement.reward.amount}`
+                      : `🎫 ${achievement.reward.amount}`}
                   </div>
 
                   {achievement.claimed ? (
@@ -291,7 +357,9 @@ export default function AchievementsPage() {
                     </button>
                   ) : complete ? (
                     <button
-                      onClick={() => claimAchievement(achievement.id)}
+                      onClick={() =>
+                        claimAchievement(achievement)
+                      }
                       className="rounded-xl bg-[#31c978] px-4 py-2 text-sm font-black text-white transition hover:bg-[#2dbc70]"
                     >
                       領取

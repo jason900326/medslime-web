@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import { useGameState } from "@/components/game-state-provider";
 
 type Question = {
   id: string;
@@ -44,6 +45,7 @@ const mockQuestions: Question[] = [
 
 export default function MaterialQuizPage() {
   const router = useRouter();
+  const game = useGameState();
 
   const [sourceName, setSourceName] = useState("你的教材");
   const [index, setIndex] = useState(0);
@@ -54,6 +56,7 @@ export default function MaterialQuizPage() {
   );
   const [finished, setFinished] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [recorded, setRecorded] = useState(false);
 
   useEffect(() => {
     try {
@@ -106,6 +109,16 @@ export default function MaterialQuizPage() {
     if (hasAnswer) return "green";
     if (isUncertain) return "red";
     return "gray";
+  };
+
+  const finishQuiz = () => {
+    if (!recorded) {
+      game.recordQuestionsAnswered(Object.keys(answers).length);
+      setRecorded(true);
+    }
+
+    setShowSubmitDialog(false);
+    setFinished(true);
   };
 
   if (finished) {
@@ -359,10 +372,7 @@ export default function MaterialQuizPage() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowSubmitDialog(false);
-                  setFinished(true);
-                }}
+                onClick={finishQuiz}
                 className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
               >
                 確認交卷

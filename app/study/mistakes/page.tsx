@@ -1,110 +1,50 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import { useGameState } from "@/components/game-state-provider";
+import {
+  MistakeRecord,
+  readMistakes,
+  removeMistake,
+  setMistakeReviewed,
+} from "@/lib/mistake-store";
 
-type MistakeSource = "國考" | "教材";
-
-type MistakeItem = {
-  id: string;
-  source: MistakeSource;
-  subject: string;
-  chapter: string;
-  stem: string;
-  options: string[];
-  correctAnswer: number;
-  userAnswer: number;
-  explanation: string;
-  reviewed: boolean;
-};
-
-const initialMistakes: MistakeItem[] = [
-  {
-    id: "m1",
-    source: "國考",
-    subject: "臨床微生物學",
-    chapter: "革蘭氏陽性菌",
-    stem: "下列何者最符合 Staphylococcus aureus 的典型特徵？",
-    options: [
-      "Catalase negative、coagulase negative",
-      "Catalase positive、coagulase positive",
-      "Oxidase positive、indole positive",
-      "Urease negative、PYR positive",
-    ],
-    correctAnswer: 1,
-    userAnswer: 0,
-    explanation:
-      "Staphylococcus 屬通常為 catalase positive，而 S. aureus 的重要鑑別特徵之一是 coagulase positive。",
-    reviewed: false,
-  },
-  {
-    id: "m2",
-    source: "教材",
-    subject: "臨床生化學",
-    chapter: "肝功能",
-    stem: "下列哪一項酵素最常用來評估膽汁鬱積相關變化？",
-    options: ["ALT", "AST", "ALP", "CK-MB"],
-    correctAnswer: 2,
-    userAnswer: 1,
-    explanation:
-      "ALP 常在膽汁鬱積與膽道阻塞時上升；ALT 與 AST 較偏向肝細胞損傷。",
-    reviewed: false,
-  },
-  {
-    id: "m3",
-    source: "國考",
-    subject: "臨床血液學",
-    chapter: "紅血球疾病",
-    stem: "缺鐵性貧血最常見的紅血球型態為何？",
-    options: [
-      "Macrocytic hyperchromic",
-      "Normocytic normochromic",
-      "Microcytic hypochromic",
-      "Spherocytic hyperchromic",
-    ],
-    correctAnswer: 2,
-    userAnswer: 2,
-    explanation:
-      "缺鐵性貧血典型呈 microcytic hypochromic，MCV 與 MCH 常下降。",
-    reviewed: true,
-  },
-];
+type Filter = "全部" | "國考" | "教材";
 
 export default function MistakesPage() {
-  const [mistakes, setMistakes] = useState(initialMistakes);
-  const [sourceFilter, setSourceFilter] = useState<"全部" | MistakeSource>("全部");
-  const [subjectFilter, setSubjectFilter] = useState("全部");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const game = useGameState();
+  const [items, setItems] = useState<MistakeRecord[]>([]);
+  const [filter, setFilter] = useState<Filter>("全部");
 
-  const subjects = useMemo(
-    () => ["全部", ...Array.from(new Set(mistakes.map((item) => item.subject)))],
-    [mistakes],
-  );
+  useEffect(() => {
+    setItems(readMistakes());
+  }, []);
 
   const filtered = useMemo(() => {
-    return mistakes
-      .filter((item) =>
-        sourceFilter === "全部" ? true : item.source === sourceFilter,
-      )
-      .filter((item) =>
-        subjectFilter === "全部" ? true : item.subject === subjectFilter,
-      )
-      .sort((a, b) => Number(a.reviewed) - Number(b.reviewed));
-  }, [mistakes, sourceFilter, subjectFilter]);
+    return items
+      .filter((item) => {
+        if (filter === "全部") return true;
+        if (filter === "國考") return item.source === "national-exam";
+        return item.source === "material";
+      })
+      .sort((a, b) => {
+        if (a.reviewed !== b.reviewed) {
+          return Number(a.reviewed) - Number(b.reviewed);
+        }
 
-  const reviewedCount = mistakes.filter((item) => item.reviewed).length;
+        return (
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
+        );
+      });
+  }, [items, filter]);
 
-  const toggleReviewed = (id: string) => {
-    setMistakes((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, reviewed: !item.reviewed } : item,
-      ),
-    );
-  };
+  const unreviewedCount = items.filter((item) => !item.reviewed).length;
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
         <section className="mt-8">
@@ -116,171 +56,177 @@ export default function MistakesPage() {
             錯題庫
           </h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            把答錯與不確定的題目集中整理，先處理還沒複習過的題目。
+          <p className="mt-3 leading-7 text-[#70877a]">
+            答錯或標記「我不確定」的題目會自動收進這裡。
           </p>
         </section>
 
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
-          <SummaryCard label="錯題總數" value={`${mistakes.length} 題`} />
-          <SummaryCard label="已複習" value={`${reviewedCount} 題`} />
-          <SummaryCard
-            label="待複習"
-            value={`${mistakes.length - reviewedCount} 題`}
-          />
+        <section className="mt-6 grid gap-4 sm:grid-cols-2">
+          <SummaryCard label="全部題目" value={`${items.length} 題`} />
+          <SummaryCard label="待複習" value={`${unreviewedCount} 題`} />
         </section>
 
-        <section className="mt-6 flex flex-col gap-3 rounded-[22px] border border-[#dfece4] bg-white p-4 md:flex-row md:items-center">
-          <div className="flex flex-wrap gap-2">
-            {(["全部", "國考", "教材"] as const).map((source) => (
-              <button
-                key={source}
-                onClick={() => setSourceFilter(source)}
-                className={[
-                  "rounded-full border px-4 py-2 text-sm font-black transition",
-                  sourceFilter === source
-                    ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                    : "border-[#dbe9e1] bg-white text-[#466a58] hover:bg-[#f5faf7]",
-                ].join(" ")}
-              >
-                {source}
-              </button>
-            ))}
-          </div>
-
-          <select
-            value={subjectFilter}
-            onChange={(event) => setSubjectFilter(event.target.value)}
-            className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-bold text-[#315b45] outline-none md:ml-auto"
-          >
-            {subjects.map((subject) => (
-              <option key={subject} value={subject}>
-                {subject === "全部" ? "全部科目" : subject}
-              </option>
-            ))}
-          </select>
+        <section className="mt-6 flex flex-wrap gap-2">
+          {(["全部", "國考", "教材"] as Filter[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setFilter(item)}
+              className={[
+                "rounded-full border px-4 py-2 text-sm font-black transition",
+                filter === item
+                  ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
+                  : "border-[#dbe9e1] bg-white text-[#466a58]",
+              ].join(" ")}
+            >
+              {item}
+            </button>
+          ))}
         </section>
 
-        <section className="mt-6 space-y-4">
-          {filtered.map((item) => {
-            const expanded = expandedId === item.id;
-
-            return (
-              <article
-                key={item.id}
-                className={[
-                  "rounded-[26px] border bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)] transition",
-                  item.reviewed
-                    ? "border-[#e4ebe7] opacity-75"
-                    : "border-[#dce9e1]",
-                ].join(" ")}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#eefaf2] px-3 py-1 text-xs font-black text-[#28754b]">
-                    {item.source}
-                  </span>
-
-                  <span className="rounded-full bg-[#f3f6f4] px-3 py-1 text-xs font-black text-[#60786c]">
-                    {item.subject}
-                  </span>
-
-                  <span className="text-xs font-bold text-[#8a9c92]">
-                    {item.chapter}
-                  </span>
-
-                  {item.reviewed && (
-                    <span className="ml-auto rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#28754b]">
-                      ✓ 已複習
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 text-lg font-black leading-8">
-                  {item.stem}
-                </div>
-
-                <div className="mt-4 grid gap-2">
-                  {item.options.map((option, index) => {
-                    const isCorrect = index === item.correctAnswer;
-                    const isWrongUserChoice =
-                      index === item.userAnswer && index !== item.correctAnswer;
-
-                    return (
-                      <div
-                        key={option}
-                        className={[
-                          "rounded-xl border px-4 py-3 text-sm font-bold",
-                          isCorrect
-                            ? "border-[#bde3cc] bg-[#edf9f1] text-[#266f48]"
-                            : isWrongUserChoice
-                              ? "border-[#ebc7c7] bg-[#fff3f3] text-[#9b5050]"
-                              : "border-[#e2eae5] bg-white text-[#4b6859]",
-                        ].join(" ")}
-                      >
-                        {String.fromCharCode(65 + index)}. {option}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div
-                  className={[
-                    "grid transition-[grid-template-rows,opacity,margin] duration-300",
-                    expanded
-                      ? "mt-5 grid-rows-[1fr] opacity-100"
-                      : "mt-0 grid-rows-[0fr] opacity-0",
-                  ].join(" ")}
-                >
-                  <div className="overflow-hidden">
-                    <div className="border-t border-[#e4ece7] pt-5">
-                      <div className="text-sm font-black text-[#315b45]">
-                        解析
-                      </div>
-
-                      <p className="mt-2 leading-7 text-[#6f887b]">
-                        {item.explanation}
-                      </p>
-
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    onClick={() =>
-                      setExpandedId((current) =>
-                        current === item.id ? null : item.id,
-                      )
-                    }
-                    className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45] transition hover:bg-[#f5faf7]"
-                  >
-                    {expanded ? "收起解析" : "查看解析"}
-                  </button>
-
-                  <button
-                    onClick={() => toggleReviewed(item.id)}
-                    className={[
-                      "rounded-xl px-4 py-2 text-sm font-black transition",
-                      item.reviewed
-                        ? "border border-[#d7e7de] bg-white text-[#60786c]"
-                        : "bg-[#31c978] text-white hover:bg-[#2dbc70]",
-                    ].join(" ")}
-                  >
-                    {item.reviewed ? "取消已複習" : "標記已複習"}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-
-          {filtered.length === 0 && (
-            <div className="rounded-[26px] border border-dashed border-[#cfded5] bg-white/70 p-10 text-center font-bold text-[#789083]">
-              這個篩選條件下沒有錯題。
+        <section className="mt-6 space-y-5">
+          {filtered.length === 0 ? (
+            <div className="rounded-[26px] border border-[#dfece4] bg-white p-8 text-center">
+              <div className="text-4xl">📘</div>
+              <div className="mt-4 text-xl font-black">
+                目前沒有錯題
+              </div>
+              <div className="mt-2 text-sm font-bold text-[#789083]">
+                做題後，答錯或標記不確定的題目會出現在這裡。
+              </div>
             </div>
+          ) : (
+            filtered.map((item) => (
+              <MistakeCard
+                key={item.id}
+                item={item}
+                onReviewed={(reviewed) => {
+                  if (reviewed && !item.reviewed) {
+                    game.recordMistakesReviewed(1);
+                  }
+
+                  setItems(setMistakeReviewed(item.id, reviewed));
+                }}
+                onRemove={() => setItems(removeMistake(item.id))}
+              />
+            ))
           )}
         </section>
       </div>
     </main>
+  );
+}
+
+function MistakeCard({
+  item,
+  onReviewed,
+  onRemove,
+}: {
+  item: MistakeRecord;
+  onReviewed: (reviewed: boolean) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <article
+      className={[
+        "rounded-[26px] border bg-white p-6 shadow-[0_10px_26px_rgba(31,83,53,0.05)]",
+        item.reviewed ? "border-[#e5ebe7] opacity-75" : "border-[#dce9e1]",
+      ].join(" ")}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
+            {item.source === "national-exam" ? "NATIONAL EXAM" : "MATERIAL"}
+          </div>
+          <div className="mt-1 text-sm font-bold text-[#789083]">
+            {item.sourceLabel}
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {item.uncertain && (
+            <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#8a6814]">
+              ❓ 不確定
+            </span>
+          )}
+          {!item.reviewed && (
+            <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
+              待複習
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 text-lg font-black leading-8">
+        {item.questionNumber ? `${item.questionNumber}. ` : ""}
+        {item.stem}
+      </div>
+
+      <div className="mt-5 space-y-2">
+        {item.options.map((option, index) => {
+          const correct = item.correctIndex === index;
+          const chosen = item.userAnswer === index;
+
+          return (
+            <div
+              key={`${item.id}-${index}`}
+              className={[
+                "rounded-xl border px-4 py-3 font-bold",
+                correct
+                  ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
+                  : chosen
+                    ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
+                    : "border-[#e1e9e4] bg-white text-[#60786c]",
+              ].join(" ")}
+            >
+              {String.fromCharCode(65 + index)}. {option}
+              {correct && " ✓"}
+              {chosen && !correct && " ← 你的答案"}
+            </div>
+          );
+        })}
+      </div>
+
+      {item.userAnswer === null && (
+        <div className="mt-4 rounded-xl bg-[#fff8df] px-4 py-3 text-sm font-bold text-[#80651e]">
+          這題沒有正式作答，但你曾標記「我不確定」。
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => onReviewed(!item.reviewed)}
+          className={[
+            "rounded-xl px-4 py-2 text-sm font-black transition",
+            item.reviewed
+              ? "border border-[#d7e7de] bg-white text-[#557768]"
+              : "bg-[#31c978] text-white",
+          ].join(" ")}
+        >
+          {item.reviewed ? "取消已複習" : "✓ 標記已複習"}
+        </button>
+
+        {item.officialPdfUrl && (
+          <a
+            href={item.officialPdfUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45]"
+          >
+            📄 官方來源
+          </a>
+        )}
+
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
+        >
+          移除
+        </button>
+      </div>
+    </article>
   );
 }
 
