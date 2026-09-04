@@ -1,6 +1,5 @@
 "use client";
 
-import { useGameState } from "@/components/game-state-provider";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
@@ -33,27 +32,27 @@ export default function ExamPage() {
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
-        <section className="mt-8">
-          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+        <section className="mt-6">
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
             NATIONAL EXAM
           </div>
 
-          <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
             我要刷國考
           </h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            選擇年度、梯次與科目後開始作答。
+          <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+            選好年度、梯次和科目，就可以開始作答。
           </p>
         </section>
 
-        <section className="mt-8 rounded-[30px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_34px_rgba(30,78,50,0.06)] md:p-8">
+        <section className="mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_12px_30px_rgba(30,78,50,0.05)] md:p-7">
           <div className="text-lg font-black">考試設定</div>
 
-          <div className="mt-6">
+          <div className="mt-5">
             <div className="mb-2 text-sm font-black text-[#557768]">
               年度
             </div>
@@ -61,7 +60,7 @@ export default function ExamPage() {
             <select
               value={rocYear}
               onChange={(event) => setRocYear(Number(event.target.value))}
-              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-bold text-[#17372a] outline-none focus:border-[#65d795]"
+              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold text-[#17372a] outline-none focus:border-[#65d795]"
             >
               {rocYears.map((item) => (
                 <option key={item} value={item}>
@@ -83,10 +82,10 @@ export default function ExamPage() {
                   type="button"
                   onClick={() => setSession(item as 1 | 2)}
                   className={[
-                    "rounded-xl border px-4 py-3 font-black transition",
+                    "rounded-xl border px-4 py-3 text-base font-black transition",
                     session === item
                       ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                      : "border-[#dbe9e1] bg-white text-[#466a58] hover:bg-[#f5faf7]",
+                      : "border-[#dbe9e1] bg-white text-[#466a58]",
                   ].join(" ")}
                 >
                   第 {item} 次
@@ -103,7 +102,7 @@ export default function ExamPage() {
             <select
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
-              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-bold text-[#17372a] outline-none focus:border-[#65d795]"
+              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold text-[#17372a] outline-none focus:border-[#65d795]"
             >
               {subjects.map((item) => (
                 <option key={item} value={item}>
@@ -113,13 +112,9 @@ export default function ExamPage() {
             </select>
           </div>
 
-          <div className="mt-5 rounded-[20px] bg-[#f6fbf8] p-4 text-sm font-bold leading-7 text-[#6f887b]">
-            民國 {rocYear} 年 · 第 {session} 次 · {subject}
-          </div>
-
           <Link
             href={quizHref}
-            className="mt-5 block w-full rounded-2xl bg-[#31c978] px-5 py-4 text-center font-black text-white transition hover:bg-[#2dbc70]"
+            className="mt-6 block w-full rounded-2xl bg-[#31c978] px-5 py-4 text-center font-black text-white transition hover:bg-[#2dbc70]"
           >
             ✏️ 開始測驗
           </Link>

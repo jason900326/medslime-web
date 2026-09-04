@@ -10,7 +10,7 @@ import { SLIME_BY_ID } from "@/lib/slime-data";
 
 type TimerMode = "idle" | "running" | "paused" | "finished";
 
-const presets = [30, 60] as const;
+const presets = [25, 30, 45, 60, 90] as const;
 
 export default function FocusPage() {
   const game = useGameState();
@@ -189,17 +189,15 @@ export default function FocusPage() {
               value={customMinutes}
               disabled={mode === "running" || mode === "paused"}
               onChange={(event) => setCustomMinutes(event.target.value)}
-              placeholder="自訂"
-              className="w-20 rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-bold outline-none focus:border-[#65d795]"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applyCustom();
+                }
+              }}
+              placeholder="自訂分鐘"
+              className="min-w-[112px] flex-1 rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-bold outline-none focus:border-[#65d795] sm:flex-none"
             />
-
-            <button
-              disabled={mode === "running" || mode === "paused"}
-              onClick={applyCustom}
-              className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45] disabled:opacity-50"
-            >
-              套用
-            </button>
           </div>
 
           <div className="mt-8 text-center">

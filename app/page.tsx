@@ -19,6 +19,18 @@ const sillyMessages = [
   "可以下課了嗎？我沒有課。",
   "我有在陪你，只是看不出來。",
   "再戳我，我就……算了。",
+  "先說好，我不會幫你考。",
+  "讀五分鐘也是讀，先算你贏。",
+  "我沒有拖延，我在醞釀。",
+  "你看題目，我看你。",
+  "我今天的工作是保持圓形。",
+  "剛剛那題看起來就很可疑。",
+  "不要急，我連骨頭都沒有。",
+  "休息可以，消失不行。",
+  "我感覺你快會了。感覺而已。",
+  "考試不會跑掉，可惜。",
+  "知識進來了嗎？我沒看到。",
+  "今天也要努力假裝很從容。",
 ];
 
 type RoomPosition = {
@@ -330,11 +342,11 @@ export default function Home() {
 
       <style jsx global>{`
         @keyframes medslime-poke {
-          0% { transform: translateY(0) scale(1); }
-          28% { transform: translateY(-24px) scale(0.94, 1.08); }
-          55% { transform: translateY(0) scale(1.08, 0.92); }
-          75% { transform: translateY(-8px) scale(0.97, 1.03); }
-          100% { transform: translateY(0) scale(1); }
+          0% { transform: translateY(0); }
+          28% { transform: translateY(-24px); }
+          55% { transform: translateY(0); }
+          75% { transform: translateY(-8px); }
+          100% { transform: translateY(0); }
         }
         @keyframes medslime-hop {
           0% { transform: translateY(0); }
