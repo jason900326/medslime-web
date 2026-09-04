@@ -221,41 +221,6 @@ export default function Home() {
         {auth.isLoggedIn && game.isReady ? (
           <>
             <section className="mt-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-xl font-black tracking-[-0.03em]">今日任務</h2>
-                <Link href="/tasks" className="text-sm font-black text-[#2ba962]">
-                  查看全部 →
-                </Link>
-              </div>
-
-              <div className="rounded-[24px] border border-[#dfece4] bg-white px-4 py-2 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
-                {tasks.map((task, index) => (
-                  <div
-                    key={task.label}
-                    className={[
-                      "flex items-center gap-3 py-3.5",
-                      index !== tasks.length - 1 ? "border-b border-[#edf2ef]" : "",
-                    ].join(" ")}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eefaf2] text-lg">
-                      {task.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-black">{task.label}</div>
-                      <div className="mt-0.5 text-xs font-bold text-[#8a9c92]">{task.progress}</div>
-                    </div>
-                    <div className={[
-                      "shrink-0 text-sm font-black",
-                      task.complete ? "text-[#2ba962]" : "text-[#8b6c2f]",
-                    ].join(" ")}>
-                      {task.complete ? "✓" : task.reward}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-5">
               <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">今日學習</h2>
               <div className="grid grid-cols-4 gap-2">
                 <StatCard label="作答" value={`${today.questionsAnswered}`} />
@@ -277,7 +242,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-6 pb-8">
+        <section className="mt-6">
           <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">史萊姆生活</h2>
           <div className="grid grid-cols-2 gap-3">
             <MiniGameCard
@@ -301,6 +266,43 @@ export default function Home() {
             />
           </div>
         </section>
+
+        {auth.isLoggedIn && game.isReady ? (
+          <section className="mt-6 pb-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-xl font-black tracking-[-0.03em]">今日任務</h2>
+              <Link href="/tasks" className="text-sm font-black text-[#2ba962]">
+                查看全部 →
+              </Link>
+            </div>
+
+            <div className="rounded-[24px] border border-[#dfece4] bg-white px-4 py-2 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+              {tasks.map((task, index) => (
+                <div
+                  key={task.label}
+                  className={[
+                    "flex items-center gap-3 py-3.5",
+                    index !== tasks.length - 1 ? "border-b border-[#edf2ef]" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eefaf2] text-lg">
+                    {task.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-black">{task.label}</div>
+                    <div className="mt-0.5 text-xs font-bold text-[#8a9c92]">{task.progress}</div>
+                  </div>
+                  <div className={[
+                    "shrink-0 text-sm font-black",
+                    task.complete ? "text-[#2ba962]" : "text-[#8b6c2f]",
+                  ].join(" ")}>
+                    {task.complete ? "✓" : task.reward}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       <style jsx global>{`
