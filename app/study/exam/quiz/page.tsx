@@ -12,6 +12,8 @@ import {
 } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
+import AIExplanationButton from "@/components/ai-explanation-button";
+import { useGameState } from "@/components/game-state-provider";
 import { upsertMistakes } from "@/lib/mistake-store";
 
 type Question = {
@@ -51,6 +53,7 @@ export default function ExamQuizPage() {
 function ExamQuizContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const game = useGameState();
 
   const year = searchParams.get("year") ?? "115";
   const session = searchParams.get("session") ?? "1";
@@ -83,6 +86,7 @@ function ExamQuizContent() {
     useState(false);
   const [showOriginalQuestion, setShowOriginalQuestion] =
     useState(false);
+  const [recorded, setRecorded] = useState(false);
 
   useEffect(() => {
     const controller =
@@ -98,6 +102,7 @@ function ExamQuizContent() {
       setUncertain({});
       setStruckOptions({});
       setFinished(false);
+      setRecorded(false);
       setShowSubmitDialog(false);
 
       try {
@@ -311,7 +316,7 @@ function ExamQuizContent() {
     return "gray";
   };
 
-  const saveMistakes = () => {
+  const saveMistakes = async () => {
     const now = new Date().toISOString();
 
     const records = questions
@@ -344,7 +349,23 @@ function ExamQuizContent() {
         reviewed: false,
       }));
 
-    upsertMistakes(records);
+    await upsertMistakes(records);
+  };
+
+  const finishExam = async () => {
+    try {
+      await saveMistakes();
+    } catch (error) {
+      console.error("國考錯題儲存失敗：", error);
+    }
+
+    if (!recorded) {
+      game.recordQuestionsAnswered(Object.keys(answers).length);
+      setRecorded(true);
+    }
+
+    setShowSubmitDialog(false);
+    setFinished(true);
   };
 
   const closeTutorial = () => {
@@ -354,6 +375,17 @@ function ExamQuizContent() {
     );
     setShowTutorial(false);
   };
+
+  const reviewQuestions = questions.filter((item) => {
+    const userAnswer = answers[item.id];
+    const isWrong =
+      item.correctIndex !== null &&
+      userAnswer !== undefined &&
+      userAnswer !== item.correctIndex;
+    const isUncertain = uncertain[item.id] ?? false;
+
+    return isWrong || isUncertain;
+  });
 
   if (finished) {
     return (
@@ -374,7 +406,7 @@ function ExamQuizContent() {
               作答完成
             </h1>
 
-            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2">
+            <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
               <ResultCard
                 label="答對"
                 value={`${correctCount} / ${gradableCount}`}
@@ -382,27 +414,119 @@ function ExamQuizContent() {
 
               <ResultCard
                 label="換算分數"
-                value={`${score.toFixed(
-                  2,
-                )} 分`}
+                value={`${score.toFixed(2)} 分`}
+              />
+
+              <ResultCard
+                label="需要複習"
+                value={`${reviewQuestions.length} 題`}
               />
             </div>
 
-            {gradableCount <
-              questions.length && (
-              <div className="mx-auto mt-4 max-w-2xl rounded-2xl bg-[#fff8df] p-4 text-sm font-bold text-[#80651e]">
-                有{" "}
-                {questions.length -
-                  gradableCount}{" "}
-                題目前沒有可用的單一標準答案，因此未納入計分。
+            {gradableCount < questions.length && (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-4 text-sm font-bold text-[#80651e]">
+                有 {questions.length - gradableCount} 題目前沒有可用的單一標準答案，因此未納入計分。
               </div>
             )}
 
             {uncertainCount > 0 && (
               <div className="mt-4 text-sm font-bold text-[#789083]">
-                你另外標記了{" "}
-                {uncertainCount}{" "}
-                題「我不確定」。
+                你另外標記了 {uncertainCount} 題「我不確定」。
+              </div>
+            )}
+
+            {reviewQuestions.length > 0 ? (
+              <section className="mx-auto mt-8 max-w-3xl space-y-4 text-left">
+                <div className="text-lg font-black text-[#17372a]">
+                  需要複習的題目
+                </div>
+
+                {reviewQuestions.map((item) => {
+                  const userAnswer = answers[item.id];
+                  const isUncertain = uncertain[item.id] ?? false;
+                  const isWrong =
+                    item.correctIndex !== null &&
+                    userAnswer !== undefined &&
+                    userAnswer !== item.correctIndex;
+
+                  return (
+                    <div
+                      key={`result-review-${item.id}`}
+                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-5"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-black text-[#2ba962]">
+                          第 {item.questionNumber} 題
+                        </div>
+
+                        {isWrong && (
+                          <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
+                            答錯
+                          </span>
+                        )}
+
+                        {isUncertain && (
+                          <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#80651e]">
+                            ❓ 不確定
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 font-black leading-7 text-[#17372a]">
+                        {item.stem}
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {item.options.map((option, optionIndex) => {
+                          const isCorrect =
+                            item.correctIndex === optionIndex;
+                          const isChosen =
+                            userAnswer === optionIndex;
+
+                          return (
+                            <div
+                              key={`result-${item.id}-${optionIndex}`}
+                              className={[
+                                "rounded-xl border px-4 py-3 text-sm font-bold",
+                                isCorrect
+                                  ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
+                                  : isChosen
+                                    ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
+                                    : "border-[#e1e9e4] bg-white text-[#60786c]",
+                              ].join(" ")}
+                            >
+                              {String.fromCharCode(65 + optionIndex)}. {option}
+                              {isCorrect && " ✓"}
+                              {isChosen && !isCorrect && " ← 你的答案"}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {item.correctIndex !== null && (
+                        <AIExplanationButton
+                          payload={{
+                            questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+                            source: "national-exam",
+                            sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
+                            stem: item.stem,
+                            options: item.options,
+                            correctIndex: item.correctIndex,
+                            userAnswer:
+                              userAnswer === undefined
+                                ? null
+                                : userAnswer,
+                            uncertain: isUncertain,
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </section>
+            ) : (
+              <div className="mx-auto mt-8 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
+                ✓ 這次沒有需要複習的錯題或不確定題目。
               </div>
             )}
 
@@ -494,9 +618,15 @@ function ExamQuizContent() {
             {question.stem}
           </div>
 
-          {(question.hasImageHint || question.sourceOnlyMode) && (
+          {question.hasImageHint && (
             <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-black leading-6 text-[#80651e]">
-              🖼️ 本題有圖片，建議點開官方原題確認。
+              🖼️ 本題包含圖表／影像，建議點開官方原題確認。
+            </div>
+          )}
+
+          {question.sourceOnlyMode && !question.hasImageHint && (
+            <div className="mt-4 rounded-2xl border border-[#e1e7e3] bg-[#f7faf8] px-4 py-3 text-sm font-black leading-6 text-[#60786c]">
+              📄 本題文字解析可能不完整，建議點開官方原題確認。
             </div>
           )}
 
@@ -733,11 +863,7 @@ function ExamQuizContent() {
 
               <button
                 type="button"
-                onClick={() => {
-                  saveMistakes();
-                  setShowSubmitDialog(false);
-                  setFinished(true);
-                }}
+                onClick={finishExam}
                 className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
               >
                 確認交卷
@@ -769,28 +895,11 @@ function ExamQuizContent() {
               </button>
             </div>
 
-            <div className="mt-6 rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-5">
-              <div className="text-lg font-black leading-8 text-[#17372a]">
-                {question.questionNumber}. {question.stem}
-              </div>
-
-              <div className="mt-5">
-                <OfficialQuestionCrop
-                  pdfUrl={question.questionPdfUrl}
-                  questionNumber={question.questionNumber}
-                />
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {question.options.map((option, optionIndex) => (
-                  <div
-                    key={`official-${question.id}-${optionIndex}`}
-                    className="rounded-xl border border-[#e1e9e4] bg-white px-4 py-3 font-bold text-[#466a58]"
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </div>
-                ))}
-              </div>
+            <div className="mt-6">
+              <OfficialQuestionCrop
+                pdfUrl={question.questionPdfUrl}
+                questionNumber={question.questionNumber}
+              />
             </div>
           </div>
         </div>

@@ -4,50 +4,116 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import { useGameState } from "@/components/game-state-provider";
+import AIExplanationButton from "@/components/ai-explanation-button";
+import { upsertMistakes } from "@/lib/mistake-store";
 
 type Question = {
   id: string;
   stem: string;
   options: string[];
   answer: number;
+  explanation: string;
+  sourcePage: number | null;
 };
 
-const mockQuestions: Question[] = [
-  {
-    id: "m1",
-    stem: "依照教材內容，下列哪一項敘述最適合本章節的核心概念？",
-    options: [
-      "此選項為教材概念 A",
-      "此選項為教材概念 B",
-      "此選項為教材概念 C",
-      "此選項為教材概念 D",
-    ],
-    answer: 1,
-  },
-  {
-    id: "m2",
-    stem: "根據教材整理的重點，下列何者最符合正確的機制描述？",
-    options: [
-      "機制敘述 A",
-      "機制敘述 B",
-      "機制敘述 C",
-      "機制敘述 D",
-    ],
-    answer: 2,
-  },
-  {
-    id: "m3",
-    stem: "下列何者最可能是教材中特別需要注意的考點？",
-    options: ["考點 A", "考點 B", "考點 C", "考點 D"],
-    answer: 0,
-  },
-];
+type StoredQuiz = {
+  ownerUserId: string | null;
+  fileName: string;
+  createdAt: string;
+  analysis: {
+    title: string;
+    summary: string;
+    keyPoints: string[];
+  };
+  questions: Array<{
+    stem: string;
+    options: string[];
+    answer: number;
+    explanation: string;
+    sourcePage: number | null;
+  }>;
+};
+
+const QUIZ_STORAGE_KEY = "medslime_material_quiz_v2";
+const ACTIVE_USER_KEY = "medslime_active_user_id";
+
+function loadStoredQuiz(): {
+  sourceName: string;
+  questions: Question[];
+  error: string | null;
+} {
+  if (typeof window === "undefined") {
+    return {
+      sourceName: "你的教材",
+      questions: [],
+      error: null,
+    };
+  }
+
+  try {
+    const raw = sessionStorage.getItem(QUIZ_STORAGE_KEY);
+
+    if (!raw) {
+      return {
+        sourceName: "你的教材",
+        questions: [],
+        error: "找不到剛才產生的教材測驗，請回上一頁重新分析教材。",
+      };
+    }
+
+    const parsed = JSON.parse(raw) as StoredQuiz;
+    const activeUserId =
+      sessionStorage.getItem(ACTIVE_USER_KEY) ?? null;
+
+    if ((parsed.ownerUserId ?? null) !== activeUserId) {
+      return {
+        sourceName: "你的教材",
+        questions: [],
+        error:
+          "這份教材測驗不是目前帳號產生的，請回上一頁重新分析教材。",
+      };
+    }
+
+    if (!Array.isArray(parsed.questions) || parsed.questions.length !== 10) {
+      return {
+        sourceName: parsed.fileName || "你的教材",
+        questions: [],
+        error: "教材測驗資料不完整，請回上一頁重新分析教材。",
+      };
+    }
+
+    const questions = parsed.questions.map((item, index) => ({
+      id: `material:${parsed.createdAt}:${index + 1}`,
+      stem: item.stem,
+      options: item.options,
+      answer: item.answer,
+      explanation: item.explanation,
+      sourcePage: item.sourcePage,
+    }));
+
+    return {
+      sourceName: parsed.fileName || "你的教材",
+      questions,
+      error: null,
+    };
+  } catch {
+    return {
+      sourceName: "你的教材",
+      questions: [],
+      error: "教材測驗資料讀取失敗，請回上一頁重新分析教材。",
+    };
+  }
+}
 
 export default function MaterialQuizPage() {
   const router = useRouter();
   const game = useGameState();
 
   const [sourceName, setSourceName] = useState("你的教材");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
@@ -59,33 +125,34 @@ export default function MaterialQuizPage() {
   const [recorded, setRecorded] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("medslime_material_quiz_source");
-
-      if (raw) {
-        const parsed = JSON.parse(raw) as { fileName?: string };
-        if (parsed.fileName) {
-          setSourceName(parsed.fileName);
-        }
-      }
-    } catch {
-      // 保留預設名稱即可。
-    }
+    const loaded = loadStoredQuiz();
+    setSourceName(loaded.sourceName);
+    setQuestions(loaded.questions);
+    setLoadError(loaded.error);
+    setReady(true);
   }, []);
 
-  const question = mockQuestions[index];
+  const question = questions[index];
 
   const correctCount = useMemo(() => {
-    return mockQuestions.reduce((sum, item) => {
+    return questions.reduce((sum, item) => {
       return sum + (answers[item.id] === item.answer ? 1 : 0);
     }, 0);
-  }, [answers]);
+  }, [answers, questions]);
 
-  const unansweredCount = useMemo(
+  const unansweredNumbers = useMemo(
     () =>
-      mockQuestions.filter((item) => answers[item.id] === undefined).length,
-    [answers],
+      questions
+        .map((item, questionIndex) => ({
+          item,
+          number: questionIndex + 1,
+        }))
+        .filter(({ item }) => answers[item.id] === undefined)
+        .map(({ number }) => number),
+    [answers, questions],
   );
+
+  const unansweredCount = unansweredNumbers.length;
 
   const toggleStrike = (questionId: string, optionIndex: number) => {
     setStruckOptions((current) => {
@@ -111,7 +178,51 @@ export default function MaterialQuizPage() {
     return "gray";
   };
 
-  const finishQuiz = () => {
+  const saveMistakes = async () => {
+    const now = new Date().toISOString();
+
+    const records = questions
+      .map((item, questionIndex) => ({
+        item,
+        questionIndex,
+        userAnswer: answers[item.id],
+        isUncertain: uncertain[item.id] ?? false,
+      }))
+      .filter(({ item, userAnswer, isUncertain }) => {
+        const isWrong =
+          userAnswer !== undefined && userAnswer !== item.answer;
+
+        return isWrong || isUncertain;
+      })
+      .map(({ item, questionIndex, userAnswer, isUncertain }) => ({
+        id: `material:${sourceName}:${item.id}`,
+        source: "material" as const,
+        sourceLabel:
+          item.sourcePage !== null
+            ? `${sourceName} · Page ${item.sourcePage}`
+            : sourceName,
+        questionNumber: questionIndex + 1,
+        stem: item.stem,
+        options: item.options,
+        correctIndex: item.answer,
+        userAnswer: userAnswer ?? null,
+        uncertain: isUncertain,
+        officialPdfUrl: null,
+        explanation: item.explanation,
+        createdAt: now,
+        reviewed: false,
+      }));
+
+    await upsertMistakes(records);
+  };
+
+  const finishQuiz = async () => {
+    try {
+      await saveMistakes();
+    } catch (error) {
+      console.error("教材錯題儲存失敗：", error);
+    }
+
     if (!recorded) {
       game.recordQuestionsAnswered(Object.keys(answers).length);
       setRecorded(true);
@@ -121,7 +232,44 @@ export default function MaterialQuizPage() {
     setFinished(true);
   };
 
+  if (!ready) {
+    return <LoadingQuiz />;
+  }
+
+  if (loadError || questions.length === 0 || !question) {
+    return (
+      <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+        <div className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-10">
+          <TopBar
+            showBack
+            backHref="/study/material"
+            backLabel="返回教材"
+          />
+
+          <section className="mt-10 rounded-[28px] border border-[#f0dddd] bg-white p-7">
+            <div className="text-2xl font-black text-[#9b5050]">
+              找不到教材測驗
+            </div>
+            <p className="mt-3 font-bold leading-7 text-[#70877a]">
+              {loadError ?? "請回上一頁重新分析教材。"}
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/study/material")}
+              className="mt-6 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+            >
+              返回教材分析
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   if (finished) {
+    const uncertainCount =
+      Object.values(uncertain).filter(Boolean).length;
+
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-10">
@@ -140,19 +288,100 @@ export default function MaterialQuizPage() {
               作答完成
             </h1>
 
-            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-2">
+            <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-3">
               <ResultCard
                 label="答對"
-                value={`${correctCount} / ${mockQuestions.length}`}
+                value={`${correctCount} / ${questions.length}`}
               />
-
               <ResultCard
                 label="不確定"
-                value={`${
-                  Object.values(uncertain).filter(Boolean).length
-                } 題`}
+                value={`${uncertainCount} 題`}
+              />
+              <ResultCard
+                label="已作答"
+                value={`${Object.keys(answers).length} 題`}
               />
             </div>
+
+            <section className="mx-auto mt-8 max-w-3xl space-y-4 text-left">
+              {questions.map((item, questionIndex) => {
+                const userAnswer = answers[item.id];
+                const correct = userAnswer === item.answer;
+
+                if (
+                  correct &&
+                  !(uncertain[item.id] ?? false)
+                ) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-5"
+                  >
+                    <div className="text-sm font-black text-[#2ba962]">
+                      第 {questionIndex + 1} 題
+                      {item.sourcePage !== null
+                        ? ` · Page ${item.sourcePage}`
+                        : ""}
+                    </div>
+                    <div className="mt-2 font-black leading-7">
+                      {item.stem}
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {item.options.map((option, optionIndex) => {
+                        const isCorrect = item.answer === optionIndex;
+                        const isChosen = userAnswer === optionIndex;
+
+                        return (
+                          <div
+                            key={`result-${item.id}-${optionIndex}`}
+                            className={[
+                              "rounded-xl border px-4 py-3 text-sm font-bold",
+                              isCorrect
+                                ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
+                                : isChosen
+                                  ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
+                                  : "border-[#e1e9e4] bg-white text-[#60786c]",
+                            ].join(" ")}
+                          >
+                            {String.fromCharCode(65 + optionIndex)}. {option}
+                            {isCorrect && " ✓"}
+                            {isChosen && !isCorrect && " ← 你的答案"}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 rounded-xl bg-white px-4 py-3 text-sm font-bold leading-6 text-[#60786c]">
+                      {item.explanation}
+                    </div>
+
+                    <AIExplanationButton
+                      payload={{
+                        questionKey: item.id,
+                        source: "material",
+                        sourceLabel:
+                          item.sourcePage !== null
+                            ? `${sourceName} · Page ${item.sourcePage}`
+                            : sourceName,
+                        stem: item.stem,
+                        options: item.options,
+                        correctIndex: item.answer,
+                        userAnswer:
+                          userAnswer === undefined
+                            ? null
+                            : userAnswer,
+                        uncertain:
+                          uncertain[item.id] ?? false,
+                        existingExplanation: item.explanation,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </section>
 
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <button
@@ -168,7 +397,7 @@ export default function MaterialQuizPage() {
                 onClick={() => router.push("/study/material")}
                 className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45] transition hover:bg-[#f5faf7]"
               >
-                返回上一頁
+                分析其他教材
               </button>
             </div>
           </section>
@@ -197,7 +426,7 @@ export default function MaterialQuizPage() {
         </section>
 
         <QuestionProgress
-          questions={mockQuestions}
+          questions={questions}
           currentIndex={index}
           getStatus={getStatus}
           onJump={setIndex}
@@ -205,8 +434,15 @@ export default function MaterialQuizPage() {
 
         <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
           <div className="flex items-center justify-between gap-4">
-            <div className="text-sm font-black text-[#789083]">
-              Q{index + 1} / {mockQuestions.length}
+            <div>
+              <div className="text-sm font-black text-[#789083]">
+                Q{index + 1} / {questions.length}
+              </div>
+              {question.sourcePage !== null && (
+                <div className="mt-1 text-xs font-bold text-[#93a49a]">
+                  教材 Page {question.sourcePage}
+                </div>
+              )}
             </div>
 
             <button
@@ -230,7 +466,7 @@ export default function MaterialQuizPage() {
 
               return (
                 <div
-                  key={option}
+                  key={`${question.id}-${optionIndex}`}
                   className={[
                     "flex items-stretch rounded-2xl border transition",
                     selected
@@ -264,7 +500,9 @@ export default function MaterialQuizPage() {
 
                   <button
                     type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
+                    onClick={() =>
+                      toggleStrike(question.id, optionIndex)
+                    }
                     className={[
                       "flex-1 px-3 py-4 text-left font-bold text-[#466a58]",
                       struck ? "line-through opacity-45" : "",
@@ -311,18 +549,20 @@ export default function MaterialQuizPage() {
             <button
               type="button"
               disabled={index === 0}
-              onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              onClick={() =>
+                setIndex((current) => Math.max(0, current - 1))
+              }
               className="rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45] disabled:cursor-not-allowed disabled:opacity-40"
             >
               ← 上一題
             </button>
 
-            {index < mockQuestions.length - 1 ? (
+            {index < questions.length - 1 ? (
               <button
                 type="button"
                 onClick={() =>
                   setIndex((current) =>
-                    Math.min(mockQuestions.length - 1, current + 1),
+                    Math.min(questions.length - 1, current + 1),
                   )
                 }
                 className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
@@ -352,8 +592,12 @@ export default function MaterialQuizPage() {
             {unansweredCount > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unansweredCount} 題未作答。
-                <br />
-                確定仍要交卷嗎？
+                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2">
+                  未作答題號：{unansweredNumbers.join("、")}
+                </div>
+                <div className="mt-3">
+                  確定仍要交卷嗎？
+                </div>
               </div>
             ) : (
               <p className="mt-3 text-sm font-bold text-[#70877a]">
@@ -398,7 +642,7 @@ function QuestionProgress({
 }) {
   return (
     <section className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         {questions.map((item, questionIndex) => (
           <button
             key={item.id}
@@ -409,7 +653,6 @@ function QuestionProgress({
             <SimpleSlime
               status={getStatus(item.id)}
               active={questionIndex === currentIndex}
-              large={(questionIndex + 1) % 10 === 0}
             />
 
             <span className="text-[10px] font-black text-[#789083]">
@@ -425,66 +668,68 @@ function QuestionProgress({
 function SimpleSlime({
   status,
   active,
-  large,
 }: {
   status: "green" | "yellow" | "red" | "gray";
   active: boolean;
-  large: boolean;
 }) {
   const colors = {
-    green: ["#b9efd1", "#55b97b", "#315b45"],
-    yellow: ["#ffe8a3", "#e2b94f", "#6f5a1d"],
-    red: ["#ffc9cf", "#de7777", "#7c3d46"],
-    gray: ["#eef6f1", "#d6e5dc", "#759184"],
+    green: {
+      body: "#b9efd1",
+      border: "#55b97b",
+      face: "#315b45",
+    },
+    yellow: {
+      body: "#ffe8a3",
+      border: "#e2b94f",
+      face: "#6f5a1d",
+    },
+    red: {
+      body: "#ffc9cf",
+      border: "#de7777",
+      face: "#7c3d46",
+    },
+    gray: {
+      body: "#eef6f1",
+      border: "#d6e5dc",
+      face: "#759184",
+    },
   }[status];
 
   return (
     <div
-      className={active ? "scale-110 transition" : "transition"}
+      className={[
+        "relative flex h-[29px] w-[38px] items-center justify-center transition",
+        active ? "scale-110" : "",
+      ].join(" ")}
       style={{
-        width: large ? 58 : 38,
-        height: large ? 42 : 29,
         borderRadius: "48% 48% 42% 42% / 56% 56% 42% 42%",
-        background: colors[0],
-        border: `2px solid ${colors[1]}`,
+        background: colors.body,
+        border: `2px solid ${colors.border}`,
         boxShadow: active
           ? "0 0 0 4px rgba(49,201,120,0.13)"
-          : "none",
-        position: "relative",
+          : "0 2px 6px rgba(31,83,53,0.06)",
       }}
     >
       <span
+        className="absolute h-[5px] w-[3.5px] rounded-full"
         style={{
-          position: "absolute",
-          width: large ? 5 : 3.5,
-          height: large ? 7 : 5,
-          borderRadius: 999,
-          background: colors[2],
-          left: large ? 17 : 11,
-          top: large ? 15 : 10,
+          background: colors.face,
+          left: 11,
+          top: 10,
         }}
       />
       <span
+        className="absolute h-[5px] w-[3.5px] rounded-full"
         style={{
-          position: "absolute",
-          width: large ? 5 : 3.5,
-          height: large ? 7 : 5,
-          borderRadius: 999,
-          background: colors[2],
-          right: large ? 17 : 11,
-          top: large ? 15 : 10,
+          background: colors.face,
+          right: 11,
+          top: 10,
         }}
       />
       <span
+        className="absolute bottom-[6px] h-[4px] w-[8px] rounded-b-full border-b-2"
         style={{
-          position: "absolute",
-          width: large ? 11 : 8,
-          height: large ? 6 : 4,
-          borderBottom: `2px solid ${colors[2]}`,
-          borderRadius: "0 0 999px 999px",
-          bottom: large ? 8 : 6,
-          left: "50%",
-          transform: "translateX(-50%)",
+          borderColor: colors.face,
         }}
       />
     </div>
@@ -500,8 +745,27 @@ function ResultCard({
 }) {
   return (
     <div className="rounded-[20px] border border-[#dfece4] bg-[#f8fcf9] p-5">
-      <div className="text-sm font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
+      <div className="text-sm font-bold text-[#789083]">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-black">
+        {value}
+      </div>
     </div>
+  );
+}
+
+function LoadingQuiz() {
+  return (
+    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+      <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-5">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-[#b9efd1]" />
+          <div className="mt-4 font-black">
+            正在準備教材測驗...
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }

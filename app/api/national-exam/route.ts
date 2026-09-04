@@ -33,7 +33,9 @@ function asString(value: unknown) {
 }
 
 function asNullableString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  return typeof value === "string" && value.trim()
+    ? value.trim()
+    : null;
 }
 
 function asNumber(value: unknown) {
@@ -68,8 +70,43 @@ function normalizeText(value: string) {
 }
 
 /*
+ * 舊資料庫的 has_image_hint 有部分是由題目文字關鍵字推測，
+ * 因此「心電圖變化」「心電圖圖形」這類純文字題也可能被誤判。
+ *
+ * 新版只把「明確要求看圖」的句型視為圖片題。
+ * 若資料庫本身已有實際 image URL，也一定視為圖片題。
+ */
+function hasExplicitVisualReference(
+  questionText: string,
+  imageUrl: string | null,
+) {
+  if (imageUrl) return true;
+
+  const text = questionText
+    .replace(/\s+/g, "")
+    .replace(/[「」『』]/g, "");
+
+  const patterns = [
+    /如下圖/,
+    /如圖(?:\d+|[一二三四五六七八九十]+)?(?:所示|顯示|中|為)?/,
+    /下圖(?:中|為|所示|顯示)?/,
+    /上圖(?:中|為|所示|顯示)?/,
+    /附圖(?:中|為|所示|顯示)?/,
+    /圖(?:\d+|[一二三四五六七八九十]+)(?:中|為|所示|顯示)/,
+    /圖中(?:所示|顯示|箭頭|標示)/,
+    /圖示(?:中|為|所示)?/,
+    /影像(?:中|如下|所示)/,
+    /照片(?:中|如下|所示)/,
+    /顯微鏡下(?:圖|影像|照片)/,
+    /箭頭所指/,
+  ];
+
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+/*
  * 前端顯示名稱與舊 Supabase subject 文字不一定完全相同。
- * 不再用「完整字串完全相等」查 subject。
+ * 不再用完整字串完全相等查 subject。
  * 改成先抓同年度＋同梯次的 6 科，再依科目關鍵字分類。
  */
 function getSubjectKey(value: string) {
@@ -125,8 +162,12 @@ function getSubjectKey(value: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const rocYear = Number(request.nextUrl.searchParams.get("year"));
-    const session = Number(request.nextUrl.searchParams.get("session"));
+    const rocYear = Number(
+      request.nextUrl.searchParams.get("year"),
+    );
+    const session = Number(
+      request.nextUrl.searchParams.get("session"),
+    );
     const requestedSubject = String(
       request.nextUrl.searchParams.get("subject") ?? "",
     ).trim();
@@ -145,7 +186,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const supabaseUrl = cleanEnv(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
     const supabaseKey = cleanEnv(
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     );
@@ -162,7 +205,10 @@ export async function GET(request: NextRequest) {
     let restUrl: URL;
 
     try {
-      restUrl = new URL("/rest/v1/national_exam_questions", supabaseUrl);
+      restUrl = new URL(
+        "/rest/v1/national_exam_questions",
+        supabaseUrl,
+      );
     } catch {
       return NextResponse.json(
         {
@@ -173,29 +219,36 @@ export async function GET(request: NextRequest) {
     }
 
     const examYear = rocYear + 1911;
-    const examRound = session === 1 ? "第一次" : "第二次";
+    const examRound =
+      session === 1 ? "第一次" : "第二次";
 
-    /*
-     * 重要：
-     * 這裡故意不再用 subject=eq.xxx。
-     * 因為舊資料庫 subject 名稱與新前端顯示名稱有些不同。
-     * 一份年度＋梯次最多約 480 題，先抓回來再分類非常小。
-     */
     restUrl.searchParams.set("select", "*");
-    restUrl.searchParams.set("exam_year", `eq.${examYear}`);
-    restUrl.searchParams.set("exam_round", `eq.${examRound}`);
-    restUrl.searchParams.set("order", "question_number.asc");
+    restUrl.searchParams.set(
+      "exam_year",
+      `eq.${examYear}`,
+    );
+    restUrl.searchParams.set(
+      "exam_round",
+      `eq.${examRound}`,
+    );
+    restUrl.searchParams.set(
+      "order",
+      "question_number.asc",
+    );
     restUrl.searchParams.set("limit", "1000");
 
-    const response = await fetch(restUrl.toString(), {
-      method: "GET",
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Accept: "application/json",
+    const response = await fetch(
+      restUrl.toString(),
+      {
+        method: "GET",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
 
     const rawText = await response.text();
 
@@ -223,24 +276,39 @@ export async function GET(request: NextRequest) {
     }
 
     const allRows = Array.isArray(data) ? data : [];
-    const requestedKey = getSubjectKey(requestedSubject);
+    const requestedKey =
+      getSubjectKey(requestedSubject);
 
     const rows = allRows.filter((rawRow) => {
-      const row = rawRow as Record<string, unknown>;
-      const databaseSubject = asString(row.subject);
-      return getSubjectKey(databaseSubject) === requestedKey;
+      const row =
+        rawRow as Record<string, unknown>;
+      const databaseSubject =
+        asString(row.subject);
+
+      return (
+        getSubjectKey(databaseSubject) ===
+        requestedKey
+      );
     });
 
     if (rows.length === 0) {
-      const availableSubjects = Array.from(
-        new Set(
-          allRows
-            .map((rawRow) =>
-              asString((rawRow as Record<string, unknown>).subject),
-            )
-            .filter(Boolean),
-        ),
-      );
+      const availableSubjects =
+        Array.from(
+          new Set(
+            allRows
+              .map((rawRow) =>
+                asString(
+                  (
+                    rawRow as Record<
+                      string,
+                      unknown
+                    >
+                  ).subject,
+                ),
+              )
+              .filter(Boolean),
+          ),
+        );
 
       return NextResponse.json({
         meta: {
@@ -257,9 +325,12 @@ export async function GET(request: NextRequest) {
 
     const questions = rows
       .map((rawRow) => {
-        const row = rawRow as Record<string, unknown>;
+        const row =
+          rawRow as Record<string, unknown>;
 
-        const rawOptions = normalizeOptions(row.options);
+        const rawOptions =
+          normalizeOptions(row.options);
+
         const sourceOnlyMode =
           asString(row.parse_status) !== "ok" ||
           rawOptions.length !== 4 ||
@@ -269,29 +340,59 @@ export async function GET(request: NextRequest) {
           ? ["A", "B", "C", "D"]
           : rawOptions;
 
-        const questionNumber = asNumber(row.question_number);
+        const questionNumber =
+          asNumber(row.question_number);
 
         const questionText =
           asString(row.question).trim() ||
           `官方第 ${questionNumber} 題（題目內容請查看官方原題）`;
 
+        const imageUrl = firstImageUrl(row);
+
         return {
-          id: String(row.id ?? questionNumber),
+          id: String(
+            row.id ?? questionNumber,
+          ),
           questionNumber,
           stem: questionText,
           options,
-          correctIndex: normalizeCorrectIndex(row.correct_answers),
+          correctIndex:
+            normalizeCorrectIndex(
+              row.correct_answers,
+            ),
           sourceOnlyMode,
-          hasImageHint: Boolean(row.has_image_hint),
-          imageUrl: firstImageUrl(row),
-          questionPdfUrl: asNullableString(row.question_pdf_url),
-          sourcePageUrl: asNullableString(row.source_page_url),
+
+          // 不再直接相信舊的 row.has_image_hint，
+          // 改用實際 image URL 或明確的看圖句型。
+          hasImageHint:
+            hasExplicitVisualReference(
+              questionText,
+              imageUrl,
+            ),
+
+          imageUrl,
+          questionPdfUrl:
+            asNullableString(
+              row.question_pdf_url,
+            ),
+          sourcePageUrl:
+            asNullableString(
+              row.source_page_url,
+            ),
           sourceUrl:
-            asNullableString(row.source_page_url) ??
-            asNullableString(row.question_pdf_url),
+            asNullableString(
+              row.source_page_url,
+            ) ??
+            asNullableString(
+              row.question_pdf_url,
+            ),
         };
       })
-      .sort((a, b) => a.questionNumber - b.questionNumber);
+      .sort(
+        (a, b) =>
+          a.questionNumber -
+          b.questionNumber,
+      );
 
     return NextResponse.json({
       meta: {

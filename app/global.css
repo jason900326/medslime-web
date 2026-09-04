@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /*
+     * MedSlime brand palette
+     *
+     * Brand Green   #6EBE8B
+     * Lemon Silk    #F6F7D9
+     * CTA Green     #31C978
+     * Deep Green    #17372A
+     */
+    --brand-primary: #6ebe8b;
+    --brand-primary-hover: #5eae7b;
+    --brand-primary-soft: #eef7f1;
+    --brand-accent: #f6f7d9;
+    --brand-accent-soft: #fffdf0;
+    --brand-cta: #31c978;
+    --brand-cta-hover: #2dbc70;
+
+    --brand-bg: #f8fcf9;
+    --brand-surface: #ffffff;
+    --brand-text: #17372a;
+    --brand-text-muted: #70877a;
+    --brand-text-soft: #789083;
+    --brand-border: #d7e7de;
+    --brand-border-soft: #dfece4;
+
+    --background: 135 40% 98%;
+    --foreground: 156 41% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 156 41% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 156 41% 15%;
+    --primary: 142 38% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 62 65% 91%;
+    --secondary-foreground: 156 41% 15%;
+    --muted: 140 36% 95%;
+    --muted-foreground: 146 9% 48%;
+    --accent: 62 65% 91%;
+    --accent-foreground: 156 41% 15%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 146 25% 88%;
+    --input: 146 25% 88%;
+    --ring: 142 38% 59%;
+    --chart-1: 142 38% 59%;
+    --chart-2: 148 61% 49%;
+    --chart-3: 62 65% 91%;
+    --chart-4: 156 41% 15%;
+    --chart-5: 146 9% 48%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 156 30% 9%;
+    --foreground: 135 40% 98%;
+    --card: 156 25% 12%;
+    --card-foreground: 135 40% 98%;
+    --popover: 156 25% 12%;
+    --popover-foreground: 135 40% 98%;
+    --primary: 142 38% 59%;
+    --primary-foreground: 156 41% 15%;
+    --secondary: 62 30% 24%;
+    --secondary-foreground: 62 65% 91%;
+    --muted: 155 20% 17%;
+    --muted-foreground: 146 13% 70%;
+    --accent: 62 30% 24%;
+    --accent-foreground: 62 65% 91%;
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 155 18% 24%;
+    --input: 155 18% 24%;
+    --ring: 142 38% 59%;
+    --chart-1: 142 38% 59%;
+    --chart-2: 148 61% 49%;
+    --chart-3: 62 65% 72%;
+    --chart-4: 135 40% 90%;
+    --chart-5: 146 13% 70%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+html {
+  background: var(--brand-bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at 8% 3%,
+      color-mix(in srgb, var(--brand-primary) 18%, transparent),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 94% 10%,
+      color-mix(in srgb, var(--brand-accent) 56%, transparent),
+      transparent 24%
+    ),
+    var(--brand-bg);
+  color: var(--brand-text);
+  font-family:
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    Arial,
+    sans-serif;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--brand-accent);
+  color: var(--brand-text);
+}

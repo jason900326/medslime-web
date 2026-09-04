@@ -10,6 +10,9 @@ import {
 import { SLIME_BY_ID } from "@/lib/slime-data";
 import { useAuthUser } from "@/hooks/use-auth-user";
 
+const mainActionClass =
+  "block w-full rounded-2xl bg-[var(--brand-primary)] px-5 py-4 text-center text-base font-black text-white transition hover:-translate-y-[1px] hover:bg-[var(--brand-primary-hover)]";
+
 export default function Home() {
   const auth = useAuthUser();
   const game = useGameState();
@@ -71,7 +74,7 @@ export default function Home() {
     auth.isLoggedIn ? href : "/auth/login";
 
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+    <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-text)]">
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
         <TopBar />
 
@@ -100,7 +103,7 @@ export default function Home() {
 
             <Link
               href="/study"
-              className="mt-7 block w-full rounded-2xl bg-[#31c978] px-5 py-4 text-center text-base font-black text-white transition hover:-translate-y-[1px] hover:bg-[#2dbc70]"
+              className={`mt-7 ${mainActionClass}`}
             >
               🧠 開始學習
             </Link>
@@ -108,14 +111,14 @@ export default function Home() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Link
                 href={protectedHref("/slimes")}
-                className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
+                className={mainActionClass}
               >
                 🐾 我的史萊姆
               </Link>
 
               <Link
                 href={protectedHref("/achievements")}
-                className="block rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-center text-base font-black text-[#244c39] transition hover:bg-[#f5faf7]"
+                className={mainActionClass}
               >
                 🏆 成就
               </Link>
@@ -135,8 +138,8 @@ export default function Home() {
                   {getPlayerDisplayName(companion.id, playerSlime)}
                 </div>
 
-                <div className="mt-1 text-sm font-bold text-[#789083]">
-                  陪伴中
+                <div className="mt-1 rounded-full border border-[#cfe7d8] bg-[#eefaf2] px-3 py-1 text-sm font-bold text-[#237849]">
+                  ✓ 陪伴中
                 </div>
               </div>
             </div>
@@ -153,15 +156,15 @@ export default function Home() {
               {tasks.map((task) => (
                 <div
                   key={task.title}
-                  className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]"
+                  className="rounded-[24px] border border-[var(--brand-border-soft)] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-2xl">
                     {task.icon}
                   </div>
                   <div className="mt-4 text-lg font-black">
                     {task.title}
                   </div>
-                  <div className="mt-1 text-sm font-medium text-[#789083]">
+                  <div className="mt-1 text-sm font-medium text-[var(--brand-text-soft)]">
                     {task.progress}
                   </div>
                   <div className="mt-4 font-black text-[#2a9d5e]">
@@ -173,7 +176,7 @@ export default function Home() {
 
             <Link
               href="/tasks"
-              className="mt-4 block w-full rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
+              className="mt-4 block w-full rounded-2xl border border-[var(--brand-border)] bg-white px-5 py-3 text-center font-bold text-[var(--brand-text-secondary)] transition hover:bg-[#f5faf7]"
             >
               查看每日／每週任務
             </Link>

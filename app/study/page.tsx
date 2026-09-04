@@ -1,4 +1,5 @@
 import Link from "next/link";
+import TopBar from "@/components/top-bar";
 
 const studyItems = [
   {
@@ -29,20 +30,13 @@ const studyItems = [
 
 export default function StudyPage() {
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+    <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-text)]">
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
-        <div className="flex items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="inline-flex rounded-xl border border-[#d7e7de] bg-white px-4 py-2 font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
-          >
-            ← 返回首頁
-          </Link>
-
-          <div className="text-2xl font-black tracking-[-0.04em]">
-            MedSlime.
-          </div>
-        </div>
+        <TopBar
+          showBack
+          backHref="/"
+          backLabel="返回首頁"
+        />
 
         <section className="mt-8">
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
@@ -53,7 +47,7 @@ export default function StudyPage() {
             今天想怎麼學？
           </h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
+          <p className="mt-3 max-w-2xl leading-7 text-[var(--brand-text-muted)]">
             選擇你現在最需要的學習方式。
           </p>
         </section>
@@ -65,7 +59,7 @@ export default function StudyPage() {
               href={item.href}
               className="rounded-[26px] border border-[#dceae2] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(30,78,50,0.09)]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-2xl">
                 {item.icon}
               </div>
 
@@ -73,7 +67,7 @@ export default function StudyPage() {
                 {item.title}
               </div>
 
-              <div className="mt-2 leading-7 text-[#70877a]">
+              <div className="mt-2 leading-7 text-[var(--brand-text-muted)]">
                 {item.copy}
               </div>
             </Link>

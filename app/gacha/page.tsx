@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import TopBar from "@/components/top-bar";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
@@ -17,21 +17,6 @@ export default function GachaPage() {
   const game = useGameState();
   const [results, setResults] = useState<Result[]>([]);
   const [pulling, setPulling] = useState(false);
-
-  useEffect(() => {
-    if (!auth.userId) return;
-
-    const grantKey = `medslime_dev_gacha_grant_${auth.userId}`;
-
-    if (window.localStorage.getItem(grantKey)) {
-      return;
-    }
-
-    // 開發測試用：每個登入帳號只發一次。
-    game.addCoins(5000);
-    game.addTickets(50);
-    window.localStorage.setItem(grantKey, "1");
-  }, [auth.userId, game]);
 
   if (auth.loading) {
     return <main className="min-h-screen bg-[#f8fcf9]" />;

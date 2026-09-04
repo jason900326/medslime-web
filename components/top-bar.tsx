@@ -35,7 +35,7 @@ export default function TopBar({
           <button
             type="button"
             onClick={() => router.push(backHref)}
-            className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
+            className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-bold text-[var(--brand-text-secondary)] transition hover:bg-[#f5faf7]"
           >
             ← {backLabel}
           </button>
@@ -44,7 +44,7 @@ export default function TopBar({
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="relative z-50 border-0 bg-transparent p-0 text-3xl font-black tracking-[-0.04em] text-[#17372a]"
+          className="relative z-50 border-0 bg-transparent p-0 text-3xl font-black tracking-[-0.04em] text-[var(--brand-text)]"
           aria-label="回到 MedSlime 首頁"
         >
           MedSlime.
@@ -64,7 +64,7 @@ export default function TopBar({
           (auth.isLoggedIn ? (
             <>
               <div
-                className="hidden max-w-[190px] truncate rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#557768] shadow-sm sm:block"
+                className="hidden max-w-[190px] truncate rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[#557768] shadow-sm sm:block"
                 title={auth.email ?? ""}
               >
                 {auth.email}
@@ -73,7 +73,7 @@ export default function TopBar({
               <button
                 type="button"
                 onClick={logout}
-                className="rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#315b45] shadow-sm transition hover:bg-[#f5faf7]"
+                className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7]"
               >
                 登出
               </button>
@@ -81,7 +81,7 @@ export default function TopBar({
           ) : (
             <Link
               href="/auth/login"
-              className="rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#315b45] shadow-sm transition hover:bg-[#f5faf7]"
+              className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7]"
             >
               登入
             </Link>
@@ -93,7 +93,7 @@ export default function TopBar({
 
 function ResourcePill({ label }: { label: string }) {
   return (
-    <div className="rounded-full border border-[#dfece4] bg-white px-4 py-2 text-sm font-black text-[#17372a] shadow-sm">
+    <div className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[var(--brand-text)] shadow-sm">
       {label}
     </div>
   );

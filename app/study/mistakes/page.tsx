@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import OfficialQuestionCrop from "@/components/official-question-crop";
+import AIExplanationButton from "@/components/ai-explanation-button";
 import { useGameState } from "@/components/game-state-provider";
 import {
   MistakeRecord,
@@ -10,15 +12,46 @@ import {
   setMistakeReviewed,
 } from "@/lib/mistake-store";
 
-type Filter = "全部" | "國考" | "教材";
+type Filter = "全部" | "國考" | "教材" | "已複習";
 
 export default function MistakesPage() {
   const game = useGameState();
   const [items, setItems] = useState<MistakeRecord[]>([]);
   const [filter, setFilter] = useState<Filter>("全部");
+  const [officialItem, setOfficialItem] = useState<MistakeRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    setItems(readMistakes());
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const next = await readMistakes();
+
+        if (!cancelled) {
+          setItems(next);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "錯題庫讀取失敗。",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -26,7 +59,8 @@ export default function MistakesPage() {
       .filter((item) => {
         if (filter === "全部") return true;
         if (filter === "國考") return item.source === "national-exam";
-        return item.source === "material";
+        if (filter === "教材") return item.source === "material";
+        return item.reviewed;
       })
       .sort((a, b) => {
         if (a.reviewed !== b.reviewed) {
@@ -67,7 +101,7 @@ export default function MistakesPage() {
         </section>
 
         <section className="mt-6 flex flex-wrap gap-2">
-          {(["全部", "國考", "教材"] as Filter[]).map((item) => (
+          {(["全部", "國考", "教材", "已複習"] as Filter[]).map((item) => (
             <button
               key={item}
               type="button"
@@ -84,8 +118,21 @@ export default function MistakesPage() {
           ))}
         </section>
 
+        {errorMessage && (
+          <div className="mt-6 rounded-[18px] border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
+            {errorMessage}
+          </div>
+        )}
+
         <section className="mt-6 space-y-5">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="rounded-[26px] border border-[#dfece4] bg-white p-8 text-center">
+              <div className="mx-auto h-9 w-11 animate-pulse rounded-[50%_50%_42%_42%/56%_56%_42%_42%] border-2 border-[#8fd0a9] bg-[#d9f3e4]" />
+              <div className="mt-3 font-black text-[#789083]">
+                正在讀取你的錯題庫...
+              </div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="rounded-[26px] border border-[#dfece4] bg-white p-8 text-center">
               <div className="text-4xl">📘</div>
               <div className="mt-4 text-xl font-black">
@@ -100,19 +147,78 @@ export default function MistakesPage() {
               <MistakeCard
                 key={item.id}
                 item={item}
-                onReviewed={(reviewed) => {
-                  if (reviewed && !item.reviewed) {
-                    game.recordMistakesReviewed(1);
-                  }
+                onReviewed={async (reviewed) => {
+                  try {
+                    if (reviewed && !item.reviewed) {
+                      game.recordMistakesReviewed(1);
+                    }
 
-                  setItems(setMistakeReviewed(item.id, reviewed));
+                    setItems(
+                      await setMistakeReviewed(item.id, reviewed),
+                    );
+                  } catch (error) {
+                    setErrorMessage(
+                      error instanceof Error
+                        ? error.message
+                        : "錯題狀態更新失敗。",
+                    );
+                  }
                 }}
-                onRemove={() => setItems(removeMistake(item.id))}
+                onRemove={async () => {
+                  try {
+                    setItems(await removeMistake(item.id));
+                  } catch (error) {
+                    setErrorMessage(
+                      error instanceof Error
+                        ? error.message
+                        : "移除錯題失敗。",
+                    );
+                  }
+                }}
+                onShowOfficial={() => setOfficialItem(item)}
               />
             ))
           )}
         </section>
       </div>
+
+      {officialItem &&
+        officialItem.source === "national-exam" &&
+        officialItem.officialPdfUrl &&
+        officialItem.questionNumber && (
+          <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/35 px-5 py-8">
+            <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl md:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+                    OFFICIAL QUESTION
+                  </div>
+                  <div className="mt-1 text-2xl font-black">
+                    官方原題 · 第 {officialItem.questionNumber} 題
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-[#789083]">
+                    {officialItem.sourceLabel}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOfficialItem(null)}
+                  className="rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-black text-[#60786c]"
+                >
+                  關閉
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <OfficialQuestionCrop
+                  pdfUrl={officialItem.officialPdfUrl}
+                  questionNumber={officialItem.questionNumber}
+                />
+              </div>
+            </div>
+          </div>
+        )}
     </main>
   );
 }
@@ -121,11 +227,18 @@ function MistakeCard({
   item,
   onReviewed,
   onRemove,
+  onShowOfficial,
 }: {
   item: MistakeRecord;
   onReviewed: (reviewed: boolean) => void;
   onRemove: () => void;
+  onShowOfficial: () => void;
 }) {
+  const canShowOfficial =
+    item.source === "national-exam" &&
+    Boolean(item.officialPdfUrl) &&
+    Boolean(item.questionNumber);
+
   return (
     <article
       className={[
@@ -207,15 +320,14 @@ function MistakeCard({
           {item.reviewed ? "取消已複習" : "✓ 標記已複習"}
         </button>
 
-        {item.officialPdfUrl && (
-          <a
-            href={item.officialPdfUrl}
-            target="_blank"
-            rel="noreferrer"
+        {canShowOfficial && (
+          <button
+            type="button"
+            onClick={onShowOfficial}
             className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45]"
           >
-            📄 官方來源
-          </a>
+            📄 官方原題
+          </button>
         )}
 
         <button
@@ -226,6 +338,24 @@ function MistakeCard({
           移除
         </button>
       </div>
+
+      {item.correctIndex !== null && (
+        <AIExplanationButton
+          payload={{
+            questionKey: item.id,
+            source: item.source,
+            sourceLabel: item.sourceLabel,
+            stem: item.stem,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            userAnswer: item.userAnswer,
+            uncertain: item.uncertain,
+            existingExplanation:
+              item.explanation ?? null,
+          }}
+        />
+      )}
+
     </article>
   );
 }

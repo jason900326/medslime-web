@@ -1,55 +1,239 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import { useAuthUser } from "@/hooks/use-auth-user";
 
-type AnalysisState = "idle" | "analyzing" | "ready";
+type AnalysisState = "idle" | "reading" | "analyzing" | "ready" | "error";
+
+type GeneratedQuestion = {
+  stem: string;
+  options: string[];
+  answer: number;
+  explanation: string;
+  sourcePage: number | null;
+};
+
+type MaterialAnalysisResult = {
+  analysis: {
+    title: string;
+    summary: string;
+    keyPoints: string[];
+  };
+  questions: GeneratedQuestion[];
+};
+
+const QUIZ_STORAGE_KEY = "medslime_material_quiz_v2";
+
+async function readPdfText(file: File) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
+
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
+
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(arrayBuffer),
+    isEvalSupported: false,
+  });
+
+  const pdf = await loadingTask.promise;
+  const pages: string[] = [];
+
+  try {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const stream = page.streamTextContent();
+      const reader = stream.getReader();
+      const parts: string[] = [];
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) break;
+
+          if (value?.items && Array.isArray(value.items)) {
+            for (const item of value.items) {
+              if (
+                item &&
+                typeof item === "object" &&
+                "str" in item &&
+                typeof item.str === "string"
+              ) {
+                const text = item.str.trim();
+                if (text) parts.push(text);
+              }
+            }
+          }
+        }
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch {
+          // iPad Safari 某些版本 releaseLock 失敗不影響已讀到的文字。
+        }
+      }
+
+      const pageText = parts.join(" ").replace(/\s+/g, " ").trim();
+
+      if (pageText) {
+        pages.push(`[Page ${pageNumber}]\n${pageText}`);
+      }
+    }
+  } finally {
+    await loadingTask.destroy();
+  }
+
+  return pages.join("\n\n");
+}
 
 export default function MaterialPage() {
   const router = useRouter();
+  const auth = useAuthUser();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [analysisState, setAnalysisState] =
     useState<AnalysisState>("idle");
+  const [result, setResult] = useState<MaterialAnalysisResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    // 每次重新進入教材上傳頁都回到初始狀態。
+    // 這樣從測驗頁返回時，不會留下上一份教材與分析完成畫面。
+    setFile(null);
+    setAnalysisState("idle");
+    setResult(null);
+    setErrorMessage("");
+
+    try {
+      sessionStorage.removeItem(QUIZ_STORAGE_KEY);
+    } catch {
+      // sessionStorage 不可用時不影響頁面顯示。
+    }
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }, []);
 
   const chooseFile = () => {
     inputRef.current?.click();
   };
 
-  const analyzeFile = async () => {
-    if (!file || analysisState === "analyzing") return;
-
-    setAnalysisState("analyzing");
-
-    await new Promise((resolve) => setTimeout(resolve, 1800));
-
-    setAnalysisState("ready");
-  };
-
-  const startQuiz = () => {
-    if (!file) return;
-
-    localStorage.setItem(
-      "medslime_material_quiz_source",
-      JSON.stringify({
-        fileName: file.name,
-        fileSize: file.size,
-      }),
-    );
-
-    router.push("/study/material/quiz");
-  };
-
   const resetFile = () => {
     setFile(null);
     setAnalysisState("idle");
+    setResult(null);
+    setErrorMessage("");
 
     if (inputRef.current) {
       inputRef.current.value = "";
     }
+
+    try {
+      sessionStorage.removeItem(QUIZ_STORAGE_KEY);
+    } catch {
+      // 不影響重新選檔。
+    }
   };
+
+  const analyzeFile = async () => {
+    if (
+      !file ||
+      analysisState === "reading" ||
+      analysisState === "analyzing"
+    ) {
+      return;
+    }
+
+    setErrorMessage("");
+    setResult(null);
+
+    try {
+      setAnalysisState("reading");
+
+      const extractedText = await readPdfText(file);
+
+      if (extractedText.trim().length < 300) {
+        throw new Error(
+          "這份 PDF 可讀取的文字太少。若教材主要是掃描圖片，目前這一版還不支援 OCR。",
+        );
+      }
+
+      setAnalysisState("analyzing");
+
+      const response = await fetch("/api/material-analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          text: extractedText.slice(0, 120_000),
+        }),
+      });
+
+      const payload = (await response.json()) as
+        | MaterialAnalysisResult
+        | { error?: string };
+
+      if (!response.ok || !("analysis" in payload)) {
+        throw new Error(
+          "error" in payload && payload.error
+            ? payload.error
+            : "教材分析失敗，請再試一次。",
+        );
+      }
+
+      if (!Array.isArray(payload.questions) || payload.questions.length !== 10) {
+        throw new Error("AI 沒有產生完整的 10 題測驗，請再分析一次。");
+      }
+
+      const nextResult: MaterialAnalysisResult = {
+        analysis: payload.analysis,
+        questions: payload.questions.map((question) => ({
+          stem: question.stem,
+          options: question.options,
+          answer: question.answer,
+          explanation: question.explanation,
+          sourcePage: question.sourcePage,
+        })),
+      };
+
+      setResult(nextResult);
+
+      sessionStorage.setItem(
+        QUIZ_STORAGE_KEY,
+        JSON.stringify({
+          ownerUserId: auth.userId ?? null,
+          fileName: file.name,
+          createdAt: new Date().toISOString(),
+          ...nextResult,
+        }),
+      );
+
+      setAnalysisState("ready");
+    } catch (error) {
+      console.error("教材分析失敗：", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "教材分析失敗，請再試一次。",
+      );
+      setAnalysisState("error");
+    }
+  };
+
+  const startQuiz = () => {
+    if (!result) return;
+    router.push("/study/material/quiz");
+  };
+
+  const busy =
+    analysisState === "reading" || analysisState === "analyzing";
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -66,7 +250,8 @@ export default function MaterialPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            上傳 PDF，分析內容後直接產生 10 題選擇題。
+            上傳 PDF，MedSlime 會讀取教材內容、整理重點，並產生 10
+            題四選一測驗。
           </p>
         </section>
 
@@ -80,6 +265,8 @@ export default function MaterialPage() {
               const selected = event.target.files?.[0] ?? null;
               setFile(selected);
               setAnalysisState("idle");
+              setResult(null);
+              setErrorMessage("");
             }}
           />
 
@@ -98,7 +285,7 @@ export default function MaterialPage() {
               </div>
 
               <div className="mt-2 text-sm font-bold text-[#789083]">
-                點這裡選擇電腦中的 PDF 檔案
+                PDF 會先在你的瀏覽器擷取文字，再送去 AI 分析。
               </div>
             </button>
           ) : (
@@ -121,7 +308,7 @@ export default function MaterialPage() {
                 <button
                   type="button"
                   onClick={resetFile}
-                  disabled={analysisState === "analyzing"}
+                  disabled={busy}
                   className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#60786c] transition hover:bg-[#f5faf7] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   更換檔案
@@ -138,40 +325,39 @@ export default function MaterialPage() {
                 </button>
               )}
 
-              {analysisState === "analyzing" && (
-                <DigestingSlime fileName={file.name} />
+              {busy && (
+                <AnalysisLoading
+                  fileName={file.name}
+                  stage={analysisState}
+                />
               )}
 
-              {analysisState === "ready" && (
-                <div className="mt-5 rounded-[24px] border border-[#cfe7d8] bg-[#f3fbf6] p-6">
-                  <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-                    ANALYSIS COMPLETE
+              {analysisState === "error" && (
+                <div className="mt-5 rounded-[22px] border border-[#f0dddd] bg-[#fff8f8] p-5">
+                  <div className="font-black text-[#9b5050]">
+                    教材分析失敗
                   </div>
-
-                  <h2 className="mt-2 text-2xl font-black">
-                    教材分析完成
-                  </h2>
-
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <InfoCard
-                      title="內容概況"
-                      text="已成功讀取教材內容，現在可以依照文件內容產生測驗。"
-                    />
-
-                    <InfoCard
-                      title="測驗設定"
-                      text="第一版固定產生 10 題單選題，專有名詞維持原文。"
-                    />
+                  <div className="mt-2 text-sm font-bold leading-6 text-[#9b5050]">
+                    {errorMessage}
                   </div>
-
                   <button
                     type="button"
-                    onClick={startQuiz}
-                    className="mt-6 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
+                    onClick={analyzeFile}
+                    className="mt-4 rounded-xl bg-[#31c978] px-4 py-2 text-sm font-black text-white"
                   >
-                    產生 10 題測驗 →
+                    再試一次
                   </button>
                 </div>
+              )}
+
+              {analysisState === "ready" && result && (
+                <button
+                  type="button"
+                  onClick={startQuiz}
+                  className="mt-5 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
+                >
+                  開始 10 題測驗 →
+                </button>
               )}
             </>
           )}
@@ -179,12 +365,11 @@ export default function MaterialPage() {
 
         <section className="mt-6 rounded-[22px] border border-[#dfece4] bg-white p-5">
           <div className="text-sm font-black text-[#315b45]">
-            目前階段
+            PDF 注意事項
           </div>
-
           <p className="mt-2 text-sm font-bold leading-7 text-[#789083]">
-            這一版先完成正式前端上傳與測驗流程；目前不會真的把 PDF
-            傳給 OpenAI。之後接回既有 API 邏輯時，這個頁面可以直接沿用。
+            目前支援含可選取文字的 PDF。若是整份掃描圖片型講義，因為尚未加入
+            OCR，可能無法讀取內容。
           </p>
         </section>
       </div>
@@ -192,196 +377,84 @@ export default function MaterialPage() {
   );
 }
 
-function DigestingSlime({ fileName }: { fileName: string }) {
+function AnalysisLoading({
+  fileName,
+  stage,
+}: {
+  fileName: string;
+  stage: "reading" | "analyzing";
+}) {
   return (
-    <div className="mt-5 overflow-hidden rounded-[26px] border border-[#cfe7d8] bg-gradient-to-br from-[#effaf3] via-white to-[#eef8fb] px-6 py-8 text-center">
-      <div className="mx-auto flex max-w-xl flex-col items-center">
-        <div className="relative h-[170px] w-[240px]">
-          <div className="digest-paper absolute left-[24px] top-[44px] flex h-[72px] w-[58px] items-center justify-center rounded-lg border-2 border-[#d5dfd9] bg-white text-2xl shadow-sm">
-            📄
-          </div>
-
-          <div className="paper-bit bit-one absolute left-[94px] top-[66px] h-3 w-3 rounded-sm bg-white shadow-sm" />
-          <div className="paper-bit bit-two absolute left-[112px] top-[54px] h-2.5 w-2.5 rounded-sm bg-white shadow-sm" />
-          <div className="paper-bit bit-three absolute left-[127px] top-[72px] h-2 w-2 rounded-sm bg-white shadow-sm" />
-
-          <div className="digest-slime absolute bottom-[12px] right-[22px] h-[108px] w-[126px]">
-            <div className="absolute inset-0 rounded-[50%_50%_42%_42%/58%_58%_42%_42%] border-[3px] border-[#69c88f] bg-[#b9efd1] shadow-[0_10px_24px_rgba(49,124,78,0.14)]">
-              <div className="absolute left-[31px] top-[38px] h-[10px] w-[7px] rounded-full bg-[#315b45]" />
-              <div className="absolute right-[31px] top-[38px] h-[10px] w-[7px] rounded-full bg-[#315b45]" />
-              <div className="mouth absolute left-1/2 top-[62px] h-[12px] w-[24px] -translate-x-1/2 rounded-b-full border-b-[3px] border-[#315b45]" />
-              <div className="absolute left-[18px] top-[53px] h-2 w-3 rounded-full bg-[#f5aeb8]/70" />
-              <div className="absolute right-[18px] top-[53px] h-2 w-3 rounded-full bg-[#f5aeb8]/70" />
-            </div>
-          </div>
+    <div className="mt-5 overflow-hidden rounded-[24px] border border-[#dce9e1] bg-[#fbfefc] p-6">
+      <div className="flex flex-col items-center text-center">
+        <div className="slime-float relative h-24 w-24">
+          <img
+            src="/slimes/apple.PNG"
+            alt="綠色史萊姆正在處理教材"
+            className="h-full w-full object-contain"
+          />
         </div>
 
-        <div className="mt-1 text-xl font-black text-[#245a3e]">
-          史萊姆正在消化教材
-          <span className="loading-dots">...</span>
+        <div className="mt-2 text-lg font-black text-[#245a3e]">
+          {stage === "reading"
+            ? "史萊姆正在讀取教材文字"
+            : "史萊姆正在反覆咀嚼教材"}
         </div>
 
-        <div className="mt-2 max-w-md truncate text-sm font-bold text-[#789083]">
+        <div className="mt-1 max-w-full truncate text-sm font-bold text-[#789083]">
           {fileName}
         </div>
 
-        <div className="mt-5 h-2.5 w-full max-w-md overflow-hidden rounded-full bg-[#e4efe8]">
-          <div className="digest-progress h-full rounded-full bg-[#55b97b]" />
+        <div className="mt-5 h-2 w-full max-w-md overflow-hidden rounded-full bg-[#e4efe8]">
+          <div className="analysis-bar h-full w-1/3 rounded-full bg-[#55b97b]" />
         </div>
 
-        <div className="mt-3 text-sm font-bold text-[#789083]">
-          正在把內容變成史萊姆看得懂的知識
+        <div className="mt-3 text-xs font-bold text-[#93a49a]">
+          {stage === "reading"
+            ? "正在擷取 PDF 中可讀取的文字"
+            : "若後台找到相同或高度相似教材，會直接使用已快取的分析結果"}
         </div>
       </div>
 
       <style jsx>{`
-        .digest-slime {
-          animation: slimeChew 0.9s ease-in-out infinite;
-          transform-origin: center bottom;
+        .slime-float {
+          animation: slimeFloat 1.5s ease-in-out infinite;
         }
 
-        .mouth {
-          animation: mouthChew 0.45s ease-in-out infinite alternate;
+        .analysis-bar {
+          animation: analysisMove 1.4s ease-in-out infinite;
         }
 
-        .digest-paper {
-          animation: paperFeed 1.8s ease-in-out infinite;
-        }
-
-        .paper-bit {
-          opacity: 0;
-          animation: paperBite 1.8s ease-in-out infinite;
-        }
-
-        .bit-two {
-          animation-delay: 0.18s;
-        }
-
-        .bit-three {
-          animation-delay: 0.36s;
-        }
-
-        .digest-progress {
-          width: 38%;
-          animation: digestProgress 1.5s ease-in-out infinite;
-        }
-
-        .loading-dots {
-          display: inline-block;
-          width: 1.4em;
-          overflow: hidden;
-          vertical-align: bottom;
-          animation: dots 1.2s steps(4, end) infinite;
-        }
-
-        @keyframes slimeChew {
+        @keyframes slimeFloat {
           0%,
           100% {
-            transform: scaleY(1) translateY(0);
+            transform: translateY(0);
           }
           50% {
-            transform: scaleY(0.94) translateY(4px);
+            transform: translateY(-6px);
           }
         }
 
-        @keyframes mouthChew {
-          from {
-            height: 7px;
-            width: 19px;
-          }
-          to {
-            height: 15px;
-            width: 25px;
-          }
-        }
-
-        @keyframes paperFeed {
-          0% {
-            transform: translateX(0) rotate(-5deg) scale(1);
-            opacity: 1;
-          }
-          55% {
-            transform: translateX(42px) rotate(4deg) scale(0.9);
-            opacity: 1;
-          }
-          72% {
-            transform: translateX(65px) rotate(7deg) scale(0.55);
-            opacity: 0;
-          }
-          73%,
-          100% {
-            transform: translateX(0) rotate(-5deg) scale(1);
-            opacity: 0;
-          }
-        }
-
-        @keyframes paperBite {
-          0%,
-          35% {
-            opacity: 0;
-            transform: translate(0, 0) rotate(0);
-          }
-          48% {
-            opacity: 1;
-          }
-          72% {
-            opacity: 0;
-            transform: translate(25px, 18px) rotate(45deg);
-          }
-          100% {
-            opacity: 0;
-          }
-        }
-
-        @keyframes digestProgress {
+        @keyframes analysisMove {
           0% {
             transform: translateX(-110%);
           }
-          50% {
-            transform: translateX(85%);
-          }
           100% {
-            transform: translateX(260%);
-          }
-        }
-
-        @keyframes dots {
-          0% {
-            width: 0;
-          }
-          100% {
-            width: 1.4em;
+            transform: translateX(310%);
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .digest-slime,
-          .mouth,
-          .digest-paper,
-          .paper-bit,
-          .digest-progress,
-          .loading-dots {
+          .slime-float,
+          .analysis-bar {
             animation: none;
+          }
+
+          .analysis-bar {
+            width: 100%;
           }
         }
       `}</style>
-    </div>
-  );
-}
-
-function InfoCard({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="rounded-[20px] border border-[#dfece4] bg-white p-5">
-      <div className="font-black">{title}</div>
-      <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        {text}
-      </div>
     </div>
   );
 }

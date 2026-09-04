@@ -21,6 +21,7 @@ export default function FocusPage() {
   const [mode, setMode] = useState<TimerMode>("idle");
   const [earnedCoins, setEarnedCoins] = useState(0);
   const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -76,7 +77,7 @@ export default function FocusPage() {
 
     setEarnedCoins(reward);
     setMode("finished");
-  }, [mode, secondsLeft, plannedMinutes, startedAt]);
+  }, [mode, secondsLeft, plannedMinutes, startedAt, game]);
 
   const applyMinutes = (minutes: number) => {
     if (mode === "running" || mode === "paused") return;
@@ -107,16 +108,15 @@ export default function FocusPage() {
     setStartedAt(new Date().toISOString());
     setMode("running");
   };
-const stopEarly = () => {
-  const confirmed = window.confirm(
-    "確定要提前結束這次專注嗎？\n\n提前結束可能會影響本輪可獲得的金幣。",
-  );
 
-  if (!confirmed) {
-    return;
-  }
+  const requestStopEarly = () => {
+    setShowStopConfirm(true);
+  };
 
-  const endedAt = new Date().toISOString();
+  const confirmStopEarly = () => {
+    setShowStopConfirm(false);
+
+    const endedAt = new Date().toISOString();
 
     game.recordFocusSession({
       plannedMinutes,
@@ -148,7 +148,6 @@ const stopEarly = () => {
       : 0;
 
   const slimeProgressPosition = progress;
-
   const recentHistory = game.focusHistory.slice(0, 5);
 
   return (
@@ -293,7 +292,7 @@ const stopEarly = () => {
                   </button>
 
                   <button
-                    onClick={stopEarly}
+                    onClick={requestStopEarly}
                     className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-6 py-4 font-black text-[#9b5050]"
                   >
                     提前結束
@@ -311,7 +310,7 @@ const stopEarly = () => {
                   </button>
 
                   <button
-                    onClick={stopEarly}
+                    onClick={requestStopEarly}
                     className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-6 py-4 font-black text-[#9b5050]"
                   >
                     提前結束
@@ -406,6 +405,46 @@ const stopEarly = () => {
           </aside>
         </section>
       </div>
+
+      {showStopConfirm && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 px-5">
+          <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+              FOCUS
+            </div>
+
+            <div className="mt-2 text-2xl font-black">
+              確定要提前結束嗎？
+            </div>
+
+            <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
+              提前結束會把這次專注記錄為「未完成」，本輪也不會獲得金幣。
+            </p>
+
+            <div className="mt-4 rounded-2xl border border-[#dfece4] bg-[#f8fcf9] px-4 py-3 text-sm font-black text-[#557768]">
+              目前已專注 {Math.floor(elapsedSeconds / 60)} 分鐘
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowStopConfirm(false)}
+                className="rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-black text-[#315b45]"
+              >
+                繼續專注
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmStopEarly}
+                className="rounded-xl border border-[#ead8d8] bg-[#fff7f7] px-4 py-3 font-black text-[#9b5050]"
+              >
+                提前結束
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -419,8 +458,12 @@ function SummaryCard({
 }) {
   return (
     <div className="rounded-[22px] border border-[#dfece4] bg-white p-5">
-      <div className="text-sm font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
+      <div className="text-sm font-bold text-[#789083]">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-black">
+        {value}
+      </div>
     </div>
   );
 }

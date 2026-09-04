@@ -1,5 +1,7 @@
 "use client";
 
+import { createClient } from "@/lib/supabase/client";
+
 export type MistakeSource = "national-exam" | "material";
 
 export type MistakeRecord = {
@@ -16,30 +18,38 @@ export type MistakeRecord = {
   userAnswer: number | null;
   uncertain: boolean;
   officialPdfUrl?: string | null;
+  explanation?: string;
   createdAt: string;
   reviewed: boolean;
 };
 
+type MistakeRow = {
+  mistake_id: string;
+  record: MistakeRecord;
+};
+
 const LEGACY_STORAGE_KEY = "medslime_mistakes_v1";
-const ACTIVE_USER_KEY = "medslime_active_user_id";
-const ANONYMOUS_KEY = "anonymous";
 
-function getMistakeStorageKey() {
-  if (typeof window === "undefined") {
-    return `${LEGACY_STORAGE_KEY}:${ANONYMOUS_KEY}`;
-  }
+async function getCurrentUserId() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const userId =
-    window.sessionStorage.getItem(ACTIVE_USER_KEY) ?? ANONYMOUS_KEY;
-
-  return `${LEGACY_STORAGE_KEY}:${userId}`;
+  return {
+    supabase,
+    userId: user?.id ?? null,
+  };
 }
 
-export function readMistakes(): MistakeRecord[] {
+function readLegacyMistakes(userId: string): MistakeRecord[] {
   if (typeof window === "undefined") return [];
 
   try {
-    const raw = window.localStorage.getItem(getMistakeStorageKey());
+    const raw = window.localStorage.getItem(
+      `${LEGACY_STORAGE_KEY}:${userId}`,
+    );
+
     if (!raw) return [];
 
     const parsed = JSON.parse(raw);
@@ -49,47 +59,182 @@ export function readMistakes(): MistakeRecord[] {
   }
 }
 
-export function writeMistakes(records: MistakeRecord[]) {
+function removeLegacyMistakes(userId: string) {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(
-    getMistakeStorageKey(),
-    JSON.stringify(records),
-  );
+  try {
+    window.localStorage.removeItem(
+      `${LEGACY_STORAGE_KEY}:${userId}`,
+    );
+  } catch {
+    // 舊資料清除失敗不影響 Supabase 正式資料。
+  }
 }
 
-export function upsertMistakes(records: MistakeRecord[]) {
-  const current = readMistakes();
-  const map = new Map<string, MistakeRecord>();
+export async function readMistakes(): Promise<MistakeRecord[]> {
+  const { supabase, userId } = await getCurrentUserId();
 
-  for (const item of current) {
-    map.set(item.id, item);
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from("player_mistakes")
+    .select("mistake_id, record")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("讀取錯題庫失敗：", error);
+    throw new Error("錯題庫讀取失敗，請稍後再試。");
   }
 
-  for (const item of records) {
-    const previous = map.get(item.id);
+  const rows = (data ?? []) as MistakeRow[];
 
-    map.set(item.id, {
+  if (rows.length > 0) {
+    return rows
+      .map((row) => row.record)
+      .filter(Boolean);
+  }
+
+  // 一次性搬移目前瀏覽器裡舊的帳號專屬 localStorage 錯題。
+  const legacy = readLegacyMistakes(userId);
+
+  if (legacy.length > 0) {
+    await upsertMistakes(legacy);
+    removeLegacyMistakes(userId);
+    return legacy;
+  }
+
+  return [];
+}
+
+export async function upsertMistakes(
+  records: MistakeRecord[],
+): Promise<void> {
+  if (records.length === 0) return;
+
+  const { supabase, userId } = await getCurrentUserId();
+
+  // 未登入時仍允許刷題，但不建立個人錯題庫。
+  if (!userId) return;
+
+  const ids = records.map((item) => item.id);
+
+  const { data: existingData, error: existingError } = await supabase
+    .from("player_mistakes")
+    .select("mistake_id, record")
+    .eq("user_id", userId)
+    .in("mistake_id", ids);
+
+  if (existingError) {
+    console.error("讀取既有錯題失敗：", existingError);
+    throw new Error("錯題儲存失敗，請稍後再試。");
+  }
+
+  const existingMap = new Map<string, MistakeRecord>();
+
+  for (const row of (existingData ?? []) as MistakeRow[]) {
+    if (row.record) {
+      existingMap.set(row.mistake_id, row.record);
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  const rows = records.map((item) => {
+    const previous = existingMap.get(item.id);
+
+    const merged: MistakeRecord = {
       ...previous,
       ...item,
       reviewed: previous?.reviewed ?? item.reviewed ?? false,
+    };
+
+    return {
+      user_id: userId,
+      mistake_id: item.id,
+      record: merged,
+      created_at: previous?.createdAt ?? item.createdAt ?? now,
+      updated_at: now,
+    };
+  });
+
+  const { error } = await supabase
+    .from("player_mistakes")
+    .upsert(rows, {
+      onConflict: "user_id,mistake_id",
     });
+
+  if (error) {
+    console.error("儲存錯題失敗：", error);
+    throw new Error("錯題儲存失敗，請稍後再試。");
+  }
+}
+
+export async function setMistakeReviewed(
+  id: string,
+  reviewed: boolean,
+): Promise<MistakeRecord[]> {
+  const { supabase, userId } = await getCurrentUserId();
+
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from("player_mistakes")
+    .select("record")
+    .eq("user_id", userId)
+    .eq("mistake_id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("讀取錯題狀態失敗：", error);
+    throw new Error("錯題狀態更新失敗。");
   }
 
-  writeMistakes(Array.from(map.values()));
+  const current = data?.record as MistakeRecord | undefined;
+
+  if (!current) {
+    return readMistakes();
+  }
+
+  const next: MistakeRecord = {
+    ...current,
+    reviewed,
+  };
+
+  const { error: updateError } = await supabase
+    .from("player_mistakes")
+    .update({
+      record: next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("mistake_id", id);
+
+  if (updateError) {
+    console.error("更新錯題狀態失敗：", updateError);
+    throw new Error("錯題狀態更新失敗。");
+  }
+
+  return readMistakes();
 }
 
-export function setMistakeReviewed(id: string, reviewed: boolean) {
-  const next = readMistakes().map((item) =>
-    item.id === id ? { ...item, reviewed } : item,
-  );
+export async function removeMistake(
+  id: string,
+): Promise<MistakeRecord[]> {
+  const { supabase, userId } = await getCurrentUserId();
 
-  writeMistakes(next);
-  return next;
-}
+  if (!userId) return [];
 
-export function removeMistake(id: string) {
-  const next = readMistakes().filter((item) => item.id !== id);
-  writeMistakes(next);
-  return next;
+  const { error } = await supabase
+    .from("player_mistakes")
+    .delete()
+    .eq("user_id", userId)
+    .eq("mistake_id", id);
+
+  if (error) {
+    console.error("移除錯題失敗：", error);
+    throw new Error("移除錯題失敗。");
+  }
+
+  return readMistakes();
 }

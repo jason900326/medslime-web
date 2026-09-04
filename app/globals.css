@@ -2,75 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-}
+    /*
+     * MedSlime original visual palette
+     * 保留 CSS variables，之後若要微調色彩只改這裡。
+     */
+    --brand-primary: #31c978;
+    --brand-primary-hover: #2dbc70;
+    --brand-primary-soft: #eefaf2;
+    --brand-primary-soft-2: #f3fbf6;
 
-@layer base {
+    --brand-accent: #fff8df;
+    --brand-accent-border: #e2b94f;
+
+    --brand-bg: #f8fcf9;
+    --brand-surface: #ffffff;
+    --brand-text: #17372a;
+    --brand-text-secondary: #315b45;
+    --brand-text-muted: #70877a;
+    --brand-text-soft: #789083;
+
+    --brand-border: #d7e7de;
+    --brand-border-soft: #dfece4;
+
+    --background: 135 40% 98%;
+    --foreground: 156 41% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 156 41% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 156 41% 15%;
+    --primary: 148 61% 49%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 55% 96%;
+    --secondary-foreground: 156 41% 15%;
+    --muted: 140 36% 95%;
+    --muted-foreground: 146 9% 48%;
+    --accent: 46 100% 94%;
+    --accent-foreground: 42 66% 27%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 146 25% 88%;
+    --input: 146 25% 88%;
+    --ring: 148 61% 49%;
+    --chart-1: 148 61% 49%;
+    --chart-2: 145 56% 41%;
+    --chart-3: 46 100% 94%;
+    --chart-4: 156 41% 15%;
+    --chart-5: 146 9% 48%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 156 30% 9%;
+    --foreground: 135 40% 98%;
+    --card: 156 25% 12%;
+    --card-foreground: 135 40% 98%;
+    --popover: 156 25% 12%;
+    --popover-foreground: 135 40% 98%;
+    --primary: 148 61% 49%;
+    --primary-foreground: 156 41% 15%;
+    --secondary: 155 20% 17%;
+    --secondary-foreground: 135 40% 98%;
+    --muted: 155 20% 17%;
+    --muted-foreground: 146 13% 70%;
+    --accent: 42 30% 24%;
+    --accent-foreground: 46 100% 94%;
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 155 18% 24%;
+    --input: 155 18% 24%;
+    --ring: 148 61% 49%;
+    --chart-1: 148 61% 49%;
+    --chart-2: 145 56% 41%;
+    --chart-3: 46 70% 70%;
+    --chart-4: 135 40% 90%;
+    --chart-5: 146 13% 70%;
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 html {
-  background: #f8fcf9;
+  background: var(--brand-bg);
 }
 
 body {
@@ -79,8 +99,8 @@ body {
   background:
     radial-gradient(circle at 8% 3%, rgba(130, 239, 173, 0.16), transparent 24%),
     radial-gradient(circle at 93% 13%, rgba(118, 220, 255, 0.13), transparent 23%),
-    #f8fcf9;
-  color: #17372a;
+    var(--brand-bg);
+  color: var(--brand-text);
   font-family:
     "Noto Sans TC",
     "Microsoft JhengHei",
@@ -90,4 +110,9 @@ body {
 
 button {
   cursor: pointer;
+}
+
+::selection {
+  background: rgba(49, 201, 120, 0.18);
+  color: var(--brand-text);
 }

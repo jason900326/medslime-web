@@ -32,16 +32,6 @@ function matchesQuestionNumber(text: string, questionNumber: number) {
 }
 
 async function getTextItemsSafariSafe(page: any) {
-  /*
-   * Safari 26.x 與新版 pdf.js 的已知相容性問題：
-   * page.getTextContent() 內部使用 for-await-of 讀 ReadableStream，
-   * 但部分 Safari 的 ReadableStream 沒有 Symbol.asyncIterator，
-   * 會噴出：
-   * "undefined is not a function (near '...value of readableStream...')"
-   *
-   * 改成直接使用 streamTextContent().getReader()，
-   * 避開 pdf.js 內部那段 for-await-of。
-   */
   const stream = page.streamTextContent();
   const reader = stream.getReader();
   const items: any[] = [];
@@ -60,7 +50,7 @@ async function getTextItemsSafariSafe(page: any) {
     try {
       reader.releaseLock();
     } catch {
-      // Safari 上 releaseLock 失敗也不影響結果。
+      // Safari 上 releaseLock 失敗不影響已取得的文字。
     }
   }
 
@@ -112,6 +102,89 @@ async function findAnchor(
   return null;
 }
 
+function rowHasVisibleContent(
+  pixels: Uint8ClampedArray,
+  width: number,
+  y: number,
+) {
+  let visible = 0;
+
+  // 每 2 px 掃一次，避免手機上成本太高。
+  for (let x = 0; x < width; x += 2) {
+    const index = (y * width + x) * 4;
+    const r = pixels[index];
+    const g = pixels[index + 1];
+    const b = pixels[index + 2];
+    const a = pixels[index + 3];
+
+    // 不是接近純白就視為內容。
+    if (a > 10 && (r < 248 || g < 248 || b < 248)) {
+      visible += 1;
+
+      // 只要有少量內容即可，不要求整列很密，
+      // 這樣圖片、線條、標本圖都不容易被漏掉。
+      if (visible >= 5) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function findLastQuestionBottom(
+  source: HTMLCanvasElement,
+  cropTop: number,
+) {
+  const context = source.getContext("2d", {
+    willReadFrequently: true,
+  });
+
+  if (!context) {
+    return source.height - 18;
+  }
+
+  // 忽略最底下約 4%：很多官方 PDF 的頁碼 / footer 會在這裡。
+  const scanBottom = Math.max(
+    cropTop + 40,
+    Math.floor(source.height * 0.96),
+  );
+
+  const scanHeight = Math.max(1, scanBottom - cropTop);
+
+  const imageData = context.getImageData(
+    0,
+    cropTop,
+    source.width,
+    scanHeight,
+  );
+
+  const pixels = imageData.data;
+  let lastContentRow = -1;
+
+  for (let y = 0; y < scanHeight; y += 1) {
+    if (
+      rowHasVisibleContent(
+        pixels,
+        source.width,
+        y,
+      )
+    ) {
+      lastContentRow = y;
+    }
+  }
+
+  if (lastContentRow < 0) {
+    return source.height - 18;
+  }
+
+  // 留一點底部空間，不要貼著最後一行文字 / 圖片。
+  return Math.min(
+    source.height - 18,
+    cropTop + lastContentRow + 24,
+  );
+}
+
 function canvasToDataUrl(
   source: HTMLCanvasElement,
   sx: number,
@@ -150,10 +223,6 @@ async function renderQuestionCrops(
   pdfUrl: string,
   questionNumber: number,
 ) {
-  /*
-   * iPad Safari 對 pdf.js 的串流讀取相容性比較差。
-   * 先把整份 PDF 下載成 ArrayBuffer，再交給 pdf.js。
-   */
   const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
 
   const response = await fetch(proxyUrl, {
@@ -168,10 +237,6 @@ async function renderQuestionCrops(
   const arrayBuffer = await response.arrayBuffer();
   const pdfBytes = new Uint8Array(arrayBuffer);
 
-  /*
-   * 動態 import 只在瀏覽器執行。
-   * 使用 modern build，但完全不讓 pdf.js 自己 fetch PDF。
-   */
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -182,6 +247,19 @@ async function renderQuestionCrops(
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
     isEvalSupported: false,
+
+    // PDF.js v5 的部分圖片格式（尤其 JPEG2000 / JPX）
+    // 需要 OpenJPEG WASM 才能解碼。
+    // 如果沒提供 wasmUrl，常見症狀就是：
+    // 題幹和選項正常，但中間的圖片完全空白。
+    wasmUrl: "/pdfjs/wasm/",
+
+    // 一併提供 PDF.js 常用輔助資源，
+    // 避免不同年份官方 PDF 的字型 / CMap / ICC 差異造成缺字或色彩問題。
+    cMapUrl: "/pdfjs/cmaps/",
+    cMapPacked: true,
+    standardFontDataUrl: "/pdfjs/standard_fonts/",
+    iccUrl: "/pdfjs/iccs/",
   });
 
   const pdf = await loadingTask.promise;
@@ -190,7 +268,9 @@ async function renderQuestionCrops(
     const start = await findAnchor(pdf, questionNumber);
 
     if (!start) {
-      throw new Error(`找不到第 ${questionNumber} 題在官方 PDF 中的位置。`);
+      throw new Error(
+        `找不到第 ${questionNumber} 題在官方 PDF 中的位置。`,
+      );
     }
 
     const next = await findAnchor(pdf, questionNumber + 1);
@@ -243,7 +323,35 @@ async function renderQuestionCrops(
           next.x,
           next.y,
         );
-        cropBottom = Math.min(canvas.height, viewportY - 12);
+        cropBottom = Math.min(
+          canvas.height,
+          viewportY - 12,
+        );
+      }
+
+      /*
+       * 重點：
+       * 有下一題時，完全相信「下一題題號」當作裁切下界。
+       * 不再用內部空白區判斷題目是否結束。
+       *
+       * 圖片題常常是：
+       * 題幹
+       * ↓
+       * 一大段白底圖片區
+       * ↓
+       * 選項
+       *
+       * 如果看到長空白就裁掉，圖片會消失或只剩一部分。
+       *
+       * 只有最後一題（通常第 80 題）沒有下一題 anchor，
+       * 才用整張已 render 的 canvas 找「最後一個實際內容 row」，
+       * 去掉頁底巨大空白。
+       */
+      if (!next) {
+        cropBottom = findLastQuestionBottom(
+          canvas,
+          cropTop,
+        );
       }
 
       if (cropBottom <= cropTop + 20) continue;
@@ -265,7 +373,9 @@ async function renderQuestionCrops(
     }
 
     if (images.length === 0) {
-      throw new Error("已找到題號，但沒有產生可顯示的題目裁切圖。");
+      throw new Error(
+        "已找到題號，但沒有產生可顯示的題目裁切圖。",
+      );
     }
 
     return images;
@@ -335,7 +445,10 @@ export default function OfficialQuestionCrop({
     };
   }, [pdfUrl, questionNumber]);
 
-  if (state.status === "idle" || state.status === "loading") {
+  if (
+    state.status === "idle" ||
+    state.status === "loading"
+  ) {
     return (
       <div
         className={[
@@ -344,7 +457,9 @@ export default function OfficialQuestionCrop({
         ].join(" ")}
       >
         <div className="mx-auto h-8 w-10 animate-pulse rounded-[50%_50%_42%_42%/56%_56%_42%_42%] border-2 border-[#8fd0a9] bg-[#d9f3e4]" />
-        <div className="mt-3">正在定位官方第 {questionNumber} 題…</div>
+        <div className="mt-3">
+          正在定位官方第 {questionNumber} 題…
+        </div>
       </div>
     );
   }
@@ -369,7 +484,9 @@ export default function OfficialQuestionCrop({
           <img
             src={image}
             alt={`官方第 ${questionNumber} 題${
-              images.length > 1 ? `第 ${index + 1} 段` : ""
+              images.length > 1
+                ? `第 ${index + 1} 段`
+                : ""
             }`}
             className="h-auto w-full object-contain"
           />
