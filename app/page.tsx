@@ -94,6 +94,11 @@ export default function Home() {
 
   const companion = SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
+  const companionImage =
+    playerSlime?.accessoryUnlocked &&
+    playerSlime?.accessoryEquipped
+      ? companion.accessoryImage
+      : companion.image;
 
   const today = todayKey
     ? game.activityByDate[todayKey] ?? {
@@ -230,7 +235,7 @@ export default function Home() {
                     aria-label={`戳一下${getPlayerDisplayName(companion.id, playerSlime)}`}
                   >
                     <img
-                      src={companion.image}
+                      src={companionImage}
                       alt={getPlayerDisplayName(companion.id, playerSlime)}
                       className="h-[120px] w-[120px] object-contain drop-shadow-[0_10px_18px_rgba(31,83,53,0.12)] sm:h-[140px] sm:w-[140px]"
                     />

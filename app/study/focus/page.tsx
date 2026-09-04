@@ -28,6 +28,11 @@ export default function FocusPage() {
   const companion =
     SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
+  const companionImage =
+    playerSlime?.accessoryUnlocked &&
+    playerSlime?.accessoryEquipped
+      ? companion.accessoryImage
+      : companion.image;
 
   const totalSeconds = plannedMinutes * 60;
   const elapsedSeconds = Math.max(0, totalSeconds - secondsLeft);
@@ -222,7 +227,7 @@ export default function FocusPage() {
                   style={{ left: `${progress}%` }}
                 >
                   <img
-                    src={companion.image}
+                    src={companionImage}
                     alt={getPlayerDisplayName(companion.id, playerSlime)}
                     className="h-14 w-14 max-w-none object-contain drop-shadow-sm sm:h-16 sm:w-16"
                   />

@@ -20,6 +20,7 @@ type PlayerSlimeState = {
   owned: boolean;
   fragments: number;
   accessoryUnlocked: boolean;
+  accessoryEquipped: boolean;
   nickname?: string;
 };
 
@@ -84,6 +85,10 @@ type GameStateContextValue = GameState & {
   pullOne: () => PullOutcome;
 
   unlockAccessory: (slimeId: string) => boolean;
+  setAccessoryEquipped: (
+    slimeId: string,
+    equipped: boolean,
+  ) => boolean;
   setCompanion: (slimeId: string) => void;
   setNickname: (slimeId: string, nickname: string) => void;
 
@@ -144,6 +149,7 @@ const starterState: GameState = {
       owned: true,
       fragments: 0,
       accessoryUnlocked: false,
+      accessoryEquipped: false,
     },
   },
 };
@@ -442,10 +448,36 @@ function normalizeState(
         ? parsed.focusHistory
         : [],
 
-    slimes: {
-      ...starterState.slimes,
-      ...(parsed.slimes ?? {}),
-    },
+    slimes: Object.fromEntries(
+      Object.entries({
+        ...starterState.slimes,
+        ...(parsed.slimes ?? {}),
+      }).map(([slimeId, value]) => {
+        const item =
+          value as Partial<PlayerSlimeState>;
+
+        return [
+          slimeId,
+          {
+            owned:
+              item.owned === true,
+            fragments:
+              typeof item.fragments === "number" &&
+              Number.isFinite(item.fragments)
+                ? Math.max(0, item.fragments)
+                : 0,
+            accessoryUnlocked:
+              item.accessoryUnlocked === true,
+            accessoryEquipped:
+              item.accessoryUnlocked === true &&
+              item.accessoryEquipped === true,
+            ...(typeof item.nickname === "string"
+              ? { nickname: item.nickname }
+              : {}),
+          },
+        ];
+      }),
+    ) as Record<string, PlayerSlimeState>,
   };
 
   normalized.streak =
@@ -1022,6 +1054,8 @@ export function GameStateProvider({
               fragments: 0,
               accessoryUnlocked:
                 false,
+              accessoryEquipped:
+                false,
             },
           },
         };
@@ -1216,6 +1250,61 @@ export function GameStateProvider({
 
               accessoryUnlocked:
                 true,
+              accessoryEquipped:
+                false,
+            },
+          },
+        };
+      },
+    );
+
+    return true;
+  };
+
+  const setAccessoryEquipped = (
+    slimeId: string,
+    equipped: boolean,
+  ) => {
+    if (!userId) {
+      return false;
+    }
+
+    const current =
+      stateRef.current.slimes[
+        slimeId
+      ];
+
+    if (
+      !current?.owned ||
+      !current.accessoryUnlocked
+    ) {
+      return false;
+    }
+
+    updateState(
+      (latest) => {
+        const latestSlime =
+          latest.slimes[
+            slimeId
+          ];
+
+        if (
+          !latestSlime?.owned ||
+          !latestSlime.accessoryUnlocked
+        ) {
+          return latest;
+        }
+
+        return {
+          ...latest,
+
+          slimes: {
+            ...latest.slimes,
+
+            [slimeId]: {
+              ...latestSlime,
+              accessoryEquipped:
+                equipped,
             },
           },
         };
@@ -1718,6 +1807,7 @@ export function GameStateProvider({
         pullOne,
 
         unlockAccessory,
+        setAccessoryEquipped,
         setCompanion,
         setNickname,
 

@@ -269,6 +269,8 @@ function SlimeCard({
   const fragments = player?.fragments ?? 0;
   const accessoryUnlocked =
     player?.accessoryUnlocked ?? false;
+  const accessoryEquipped =
+    player?.accessoryEquipped ?? false;
 
   const hiddenSSR =
     slime.rarity === "SSR" && !owned;
@@ -277,7 +279,13 @@ function SlimeCard({
     getPlayerDisplayName(slime.id, player);
 
   const cardImage =
-    hiddenSSR ? LOCKED_SSR_PLACEHOLDER : slime.image;
+    hiddenSSR
+      ? LOCKED_SSR_PLACEHOLDER
+      : owned &&
+          accessoryUnlocked &&
+          accessoryEquipped
+        ? slime.accessoryImage
+        : slime.image;
 
   const startNicknameEdit = () => {
     setNicknameDraft(player?.nickname ?? "");
@@ -441,9 +449,25 @@ function SlimeCard({
                 />
 
                 {accessoryUnlocked ? (
-                  <div className="mt-3 rounded-xl border border-[#cfe9da] bg-[#e9f8ef] px-3 py-3 text-center text-sm font-black text-[#28754b]">
-                    ✓ 專屬飾品已解鎖
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      game.setAccessoryEquipped(
+                        slime.id,
+                        !accessoryEquipped,
+                      )
+                    }
+                    className={[
+                      "mt-3 w-full rounded-xl py-2.5 font-black transition",
+                      accessoryEquipped
+                        ? "border border-[#d7e7de] bg-white text-[#466a58] hover:bg-[#f5faf7]"
+                        : "bg-[#31c978] text-white hover:bg-[#2dbc70]",
+                    ].join(" ")}
+                  >
+                    {accessoryEquipped
+                      ? "取下專屬飾品"
+                      : "戴上專屬飾品"}
+                  </button>
                 ) : fragments >= 30 ? (
                   <button
                     type="button"
@@ -512,7 +536,7 @@ function AccessoryPreview({
   return (
     <div className="mt-4 rounded-xl border border-[#e0e9e3] bg-[#f7faf8] px-3 py-3">
       <div className="text-xs font-black tracking-[0.05em] text-[#789083]">
-        專屬飾品預覽
+        專屬飾品
       </div>
 
       <div className="mt-1 text-sm font-black text-[#315b45]">
