@@ -16,7 +16,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "N",
     image: "/slimes/n-green.png",
     description: "最普通，也最理直氣壯地陪你從第一題開始。",
-    accessory: "四葉草髮夾",
+    accessory: "嫩芽小帽",
   },
   {
     id: "n-blue",
@@ -24,7 +24,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "N",
     image: "/slimes/n-blue.png",
     description: "看起來很冷靜，其實只是還沒讀到不會的。",
-    accessory: "水滴髮夾",
+    accessory: "迷你水手帽",
   },
   {
     id: "n-pink",
@@ -32,7 +32,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "N",
     image: "/slimes/n-pink.png",
     description: "讀書可以慢慢來，但可愛要先到位。",
-    accessory: "愛心髮夾",
+    accessory: "愛心領結",
   },
   {
     id: "n-purple",
@@ -40,7 +40,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "N",
     image: "/slimes/n-purple.png",
     description: "有點神秘，據說很會在考前突然想起重點。",
-    accessory: "星星髮夾",
+    accessory: "星月魔法帽",
   },
 
   {
@@ -49,7 +49,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-insomnia.png",
     description: "眼睛還開著，腦袋已經進入待機模式。",
-    accessory: "睡眠眼罩",
+    accessory: "歪戴睡眠眼罩",
   },
   {
     id: "r-cat",
@@ -57,7 +57,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-cat.png",
     description: "你讀書牠監工；你分心牠也假裝沒看到。",
-    accessory: "貓鈴項圈",
+    accessory: "金色貓鈴項圈",
   },
   {
     id: "r-dog",
@@ -65,7 +65,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-dog.png",
     description: "不一定懂題目，但每次翻頁都替你開心。",
-    accessory: "骨頭髮夾",
+    accessory: "紅色三角領巾",
   },
   {
     id: "r-panda",
@@ -73,7 +73,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-panda.png",
     description: "黑眼圈是天生的，所以熬夜完全看不出來。",
-    accessory: "竹葉髮飾",
+    accessory: "竹葉斗笠",
   },
   {
     id: "r-tired",
@@ -81,7 +81,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-tired.png",
     description: "不是不想讀，只是今天對世界的耐心比較少。",
-    accessory: "厭世墨鏡",
+    accessory: "黑色圓框墨鏡",
   },
   {
     id: "r-melting",
@@ -89,7 +89,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "R",
     image: "/slimes/r-melting.png",
     description: "再多一題就要沿著桌邊流下去了。",
-    accessory: "冰敷袋",
+    accessory: "大冰杯",
   },
 
   {
@@ -98,7 +98,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SR",
     image: "/slimes/sr-sushi.png",
     description: "看起來很精緻，腦袋裡想的只有下一餐。",
-    accessory: "醬油魚瓶",
+    accessory: "魚卵小帽",
   },
   {
     id: "sr-riceball",
@@ -106,7 +106,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SR",
     image: "/slimes/sr-riceball.png",
     description: "樸實可靠，適合陪你撐過最餓的那一章。",
-    accessory: "梅子髮夾",
+    accessory: "梅子徽章",
   },
   {
     id: "sr-takoyaki",
@@ -114,7 +114,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SR",
     image: "/slimes/sr-takoyaki.png",
     description: "外表圓滾滾，遇到難題也會燙到縮一下。",
-    accessory: "章魚燒竹籤",
+    accessory: "章魚小頭巾",
   },
   {
     id: "sr-burger",
@@ -130,7 +130,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SR",
     image: "/slimes/sr-boba.png",
     description: "每讀完一頁，都想獎勵自己吸一口。",
-    accessory: "珍珠吸管",
+    accessory: "奶泡小帽",
   },
   {
     id: "sr-latte",
@@ -138,7 +138,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SR",
     image: "/slimes/sr-latte.png",
     description: "負責營造很認真讀書的氣氛，醒不醒另說。",
-    accessory: "拉花小帽",
+    accessory: "咖啡師圍裙",
   },
 
   {
@@ -147,7 +147,7 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SSR",
     image: "/slimes/ssr-404.png",
     description: "ERROR 404：剛剛背過的內容目前找不到。",
-    accessory: "故障警示光環",
+    accessory: "故障電腦艙",
   },
 ];
 

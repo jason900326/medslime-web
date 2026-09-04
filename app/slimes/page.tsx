@@ -16,6 +16,8 @@ import {
   type SlimeDefinition,
 } from "@/lib/slime-data";
 
+const LOCKED_SSR_PLACEHOLDER = "/slimes/n-green.png";
+
 export default function SlimesPage() {
   const auth = useAuthUser();
   const game = useGameState();
@@ -190,6 +192,7 @@ export default function SlimesPage() {
               (rarity) => (
                 <button
                   key={rarity}
+                  type="button"
                   onClick={() => setRarityFilter(rarity)}
                   className={[
                     "rounded-full border px-4 py-2 text-sm font-black transition",
@@ -273,6 +276,9 @@ function SlimeCard({
   const displayName =
     getPlayerDisplayName(slime.id, player);
 
+  const cardImage =
+    hiddenSSR ? LOCKED_SSR_PLACEHOLDER : slime.image;
+
   const startNicknameEdit = () => {
     setNicknameDraft(player?.nickname ?? "");
     setEditingNickname(true);
@@ -305,7 +311,7 @@ function SlimeCard({
     >
       <div className="relative flex min-h-[150px] items-center justify-center">
         <img
-          src={slime.image}
+          src={cardImage}
           alt={hiddenSSR ? "???" : displayName}
           className={[
             "h-auto w-full object-contain transition-all duration-300",
@@ -440,6 +446,7 @@ function SlimeCard({
                   </div>
                 ) : fragments >= 30 ? (
                   <button
+                    type="button"
                     onClick={() =>
                       game.unlockAccessory(slime.id)
                     }
@@ -455,6 +462,7 @@ function SlimeCard({
 
                 {!companion && (
                   <button
+                    type="button"
                     onClick={() =>
                       game.setCompanion(slime.id)
                     }
@@ -482,6 +490,7 @@ function SlimeCard({
       </div>
 
       <button
+        type="button"
         onClick={onToggle}
         className="mt-4 w-full rounded-xl border border-[#d7e7de] bg-white py-2.5 font-bold transition hover:bg-[#f5faf7]"
       >
@@ -510,11 +519,6 @@ function AccessoryPreview({
         ✨ {hiddenSSR ? "???" : slime.accessory}
       </div>
 
-      {!unlocked && (
-        <div className="mt-1 text-xs font-bold text-[#93a49a]">
-          未解鎖也可以先看看
-        </div>
-      )}
     </div>
   );
 }
