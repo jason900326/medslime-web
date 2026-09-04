@@ -35,12 +35,8 @@ export default function Home() {
   const [showBubble, setShowBubble] = useState(false);
   const [poking, setPoking] = useState(false);
   const [hopping, setHopping] = useState(false);
-  const [roomPosition, setRoomPosition] = useState<RoomPosition>({
-    x: 50,
-    y: 58,
-  });
+  const [roomPosition, setRoomPosition] = useState<RoomPosition>({ x: 50, y: 60 });
 
-  const roomRef = useRef<HTMLDivElement | null>(null);
   const bubbleTimeoutRef = useRef<number | null>(null);
   const pokeTimeoutRef = useRef<number | null>(null);
   const hopTimeoutRef = useRef<number | null>(null);
@@ -58,95 +54,49 @@ export default function Home() {
 
     const move = () => {
       setHopping(true);
-
       setRoomPosition({
-        x: 18 + Math.random() * 64,
-        y: 46 + Math.random() * 20,
+        x: 24 + Math.random() * 52,
+        y: 55 + Math.random() * 10,
       });
 
-      if (hopTimeoutRef.current) {
-        window.clearTimeout(hopTimeoutRef.current);
-      }
-
-      hopTimeoutRef.current = window.setTimeout(() => {
-        setHopping(false);
-      }, 900);
+      if (hopTimeoutRef.current) window.clearTimeout(hopTimeoutRef.current);
+      hopTimeoutRef.current = window.setTimeout(() => setHopping(false), 900);
     };
 
-    const firstMove = window.setTimeout(move, 2800);
-    const interval = window.setInterval(move, 7600);
+    const firstMove = window.setTimeout(move, 3200);
+    const interval = window.setInterval(move, 8200);
 
     return () => {
       window.clearTimeout(firstMove);
       window.clearInterval(interval);
-
-      if (hopTimeoutRef.current) {
-        window.clearTimeout(hopTimeoutRef.current);
-      }
+      if (hopTimeoutRef.current) window.clearTimeout(hopTimeoutRef.current);
     };
   }, [auth.isLoggedIn, game.isReady]);
 
   useEffect(() => {
     return () => {
-      if (bubbleTimeoutRef.current) {
-        window.clearTimeout(bubbleTimeoutRef.current);
-      }
-
-      if (pokeTimeoutRef.current) {
-        window.clearTimeout(pokeTimeoutRef.current);
-      }
+      if (bubbleTimeoutRef.current) window.clearTimeout(bubbleTimeoutRef.current);
+      if (pokeTimeoutRef.current) window.clearTimeout(pokeTimeoutRef.current);
     };
   }, []);
 
-  const companion =
-    SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
-
+  const companion = SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
 
-  const today =
-    todayKey
-      ? game.activityByDate[todayKey] ?? {
-          questionsAnswered: 0,
-          mistakesReviewed: 0,
-          focusSeconds: 0,
-        }
-      : {
-          questionsAnswered: 0,
-          mistakesReviewed: 0,
-          focusSeconds: 0,
-        };
-
-  const tasks = [
-    {
-      icon: "🧠",
-      title: "完成 5 題",
-      progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
-      reward:
-        today.questionsAnswered >= 5 ? "✓ 已完成" : "🪙 10",
-    },
-    {
-      icon: "🔍",
-      title: "訂正 1 題",
-      progress: `${Math.min(today.mistakesReviewed, 1)} / 1 題`,
-      reward:
-        today.mistakesReviewed >= 1 ? "✓ 已完成" : "🪙 10",
-    },
-    {
-      icon: "⏱️",
-      title: "專注 20 分鐘",
-      progress: `${Math.min(
-        Math.floor(today.focusSeconds / 60),
-        20,
-      )} / 20 分鐘`,
-      reward:
-        today.focusSeconds >= 20 * 60 ? "✓ 已完成" : "🪙 10",
-    },
-  ];
+  const today = todayKey
+    ? game.activityByDate[todayKey] ?? {
+        questionsAnswered: 0,
+        mistakesReviewed: 0,
+        focusSeconds: 0,
+      }
+    : {
+        questionsAnswered: 0,
+        mistakesReviewed: 0,
+        focusSeconds: 0,
+      };
 
   const ownedCount = useMemo(
-    () =>
-      Object.values(game.slimes).filter((item) => item.owned)
-        .length,
+    () => Object.values(game.slimes).filter((item) => item.owned).length,
     [game.slimes],
   );
 
@@ -154,115 +104,83 @@ export default function Home() {
     auth.isLoggedIn ? href : "/auth/login";
 
   const pokeCompanion = () => {
-    const next =
-      sillyMessages[Math.floor(Math.random() * sillyMessages.length)];
-
+    const next = sillyMessages[Math.floor(Math.random() * sillyMessages.length)];
     setBubbleText(next);
     setShowBubble(true);
     setPoking(true);
 
-    if (pokeTimeoutRef.current) {
-      window.clearTimeout(pokeTimeoutRef.current);
-    }
+    if (pokeTimeoutRef.current) window.clearTimeout(pokeTimeoutRef.current);
+    pokeTimeoutRef.current = window.setTimeout(() => setPoking(false), 520);
 
-    pokeTimeoutRef.current = window.setTimeout(() => {
-      setPoking(false);
-    }, 520);
-
-    if (bubbleTimeoutRef.current) {
-      window.clearTimeout(bubbleTimeoutRef.current);
-    }
-
-    bubbleTimeoutRef.current = window.setTimeout(() => {
-      setShowBubble(false);
-    }, 3200);
+    if (bubbleTimeoutRef.current) window.clearTimeout(bubbleTimeoutRef.current);
+    bubbleTimeoutRef.current = window.setTimeout(() => setShowBubble(false), 3200);
   };
+
+  const tasks = [
+    {
+      icon: "🧠",
+      label: "完成 5 題",
+      progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
+      complete: today.questionsAnswered >= 5,
+      reward: "🪙 10",
+    },
+    {
+      icon: "🔍",
+      label: "訂正 1 題",
+      progress: `${Math.min(today.mistakesReviewed, 1)} / 1 題`,
+      complete: today.mistakesReviewed >= 1,
+      reward: "🪙 10",
+    },
+    {
+      icon: "⏱️",
+      label: "專注 20 分鐘",
+      progress: `${Math.min(Math.floor(today.focusSeconds / 60), 20)} / 20 分`,
+      complete: today.focusSeconds >= 20 * 60,
+      reward: "🪙 10",
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar />
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-[30px] border border-[#d8e9df] bg-gradient-to-br from-[#e7f9ee] via-white to-[#ebf8fc] p-7 shadow-[0_18px_44px_rgba(40,106,69,0.08)]">
-            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-              TODAY&apos;S STUDY
-            </div>
-
-            <h1 className="mt-2 max-w-xl text-4xl font-black leading-tight tracking-[-0.05em] md:text-5xl">
-              把今天的知識
-              <br />
-              餵給你的史萊姆。
-            </h1>
-
-            <p className="mt-4 max-w-xl text-base leading-8 text-[#6f887b]">
-              做題、訂正與專注學習都會讓 MedSlime 的收藏系統慢慢前進。
-            </p>
-
-            <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              <Link
-                href="/study"
-                className="block rounded-2xl bg-[#31c978] px-5 py-4 text-center text-base font-black text-white transition hover:-translate-y-[1px] hover:bg-[#2dbc70]"
-              >
-                🧠 開始學習
-              </Link>
-
-              <Link
-                href={protectedHref("/slimes")}
-                className="block rounded-2xl bg-[#31c978] px-5 py-4 text-center text-base font-black text-white transition hover:-translate-y-[1px] hover:bg-[#2dbc70]"
-              >
-                🐾 我的史萊姆
-              </Link>
-
-              <Link
-                href={protectedHref("/achievements")}
-                className="block rounded-2xl bg-[#31c978] px-5 py-4 text-center text-base font-black text-white transition hover:-translate-y-[1px] hover:bg-[#2dbc70]"
-              >
-                🏆 成就
-              </Link>
-            </div>
-
-            {auth.isLoggedIn && game.isReady ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#dfece4] bg-white/80 px-4 py-3">
-                  <div className="text-xs font-bold text-[#789083]">
-                    已收藏
-                  </div>
-                  <div className="mt-1 text-lg font-black">
-                    {ownedCount} / 17
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#dfece4] bg-white/80 px-4 py-3">
-                  <div className="text-xs font-bold text-[#789083]">
-                    連續學習
-                  </div>
-                  <div className="mt-1 text-lg font-black">
-                    🔥 {game.streak} 天
-                  </div>
-                </div>
-              </div>
-            ) : null}
+        <section className="mt-5 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#e7f9ee] via-white to-[#ebf8fc] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.07)] md:p-7">
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
+            TODAY&apos;S STUDY
           </div>
+          <h1 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] md:text-5xl">
+            把今天的知識
+            <br />
+            餵給你的史萊姆。
+          </h1>
+          <p className="mt-3 text-sm font-bold leading-6 text-[#6f887b] md:text-base">
+            做題、訂正與專注學習都會讓收藏慢慢前進。
+          </p>
+          <Link
+            href="/study"
+            className="mt-5 block w-full rounded-2xl bg-[#31c978] px-5 py-4 text-center text-base font-black text-white transition hover:bg-[#2dbc70]"
+          >
+            🧠 開始學習
+          </Link>
+        </section>
 
-          {auth.isLoggedIn && game.isReady ? (
-            <div
-              ref={roomRef}
-              className="relative min-h-[360px] overflow-hidden rounded-[30px] border border-[#d8e9df] bg-gradient-to-b from-[#f5fbf7] via-white to-[#edf8f1] shadow-[0_14px_36px_rgba(40,106,69,0.06)] md:min-h-[420px]"
-            >
-              <div className="absolute left-5 top-5 z-10">
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
-                  MY ROOM
-                </div>
-                <div className="mt-1 text-sm font-bold text-[#789083]">
-                  戳一下看看
-                </div>
+        {auth.isLoggedIn && game.isReady ? (
+          <section className="mt-4 overflow-hidden rounded-[26px] border border-[#d8e9df] bg-white shadow-[0_10px_26px_rgba(31,83,53,0.05)]">
+            <div className="flex items-center justify-between px-5 pt-5">
+              <div>
+                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">MY ROOM</div>
+                <div className="mt-1 text-sm font-bold text-[#789083]">戳一下看看</div>
               </div>
+              <div className="rounded-full border border-[#cfe7d8] bg-[#eefaf2] px-3 py-1 text-xs font-black text-[#237849]">
+                {getPlayerDisplayName(companion.id, playerSlime)}
+              </div>
+            </div>
 
-              <div className="absolute inset-x-6 bottom-5 h-10 rounded-[50%] bg-[#dfece4]/55 blur-[1px]" />
-
+            <div className="relative min-h-[280px] overflow-hidden bg-gradient-to-b from-white via-[#fbfefc] to-[#edf8f1] sm:min-h-[320px]">
+              <div className="absolute inset-x-8 bottom-6 h-8 rounded-[50%] bg-[#dfece4]/55" />
               <div
-                className="absolute z-20 transition-[left,top] duration-[5200ms] ease-in-out motion-reduce:transition-none"
+                className="absolute z-20 transition-[left,top] duration-[5600ms] ease-in-out motion-reduce:transition-none"
                 style={{
                   left: `${roomPosition.x}%`,
                   top: `${roomPosition.y}%`,
@@ -271,11 +189,10 @@ export default function Home() {
               >
                 <div className="relative flex flex-col items-center">
                   {showBubble && (
-                    <div className="pointer-events-none absolute bottom-[148px] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-5 py-3 text-sm font-black text-[#315b45] shadow-[0_10px_24px_rgba(31,83,53,0.10)]">
+                    <div className="pointer-events-none absolute bottom-[136px] left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-2.5 text-xs font-black text-[#315b45] shadow-[0_8px_20px_rgba(31,83,53,0.10)] sm:text-sm">
                       {bubbleText}
                     </div>
                   )}
-
                   <button
                     type="button"
                     onClick={pokeCompanion}
@@ -287,106 +204,166 @@ export default function Home() {
                           ? "animate-[medslime-hop_900ms_ease-in-out]"
                           : "",
                     ].join(" ")}
-                    aria-label={`戳一下${getPlayerDisplayName(
-                      companion.id,
-                      playerSlime,
-                    )}`}
-                    title="戳一下"
+                    aria-label={`戳一下${getPlayerDisplayName(companion.id, playerSlime)}`}
                   >
                     <img
                       src={companion.image}
                       alt={getPlayerDisplayName(companion.id, playerSlime)}
-                      className="h-[132px] w-[132px] object-contain drop-shadow-[0_10px_18px_rgba(31,83,53,0.12)] md:h-[150px] md:w-[150px]"
+                      className="h-[120px] w-[120px] object-contain drop-shadow-[0_10px_18px_rgba(31,83,53,0.12)] sm:h-[140px] sm:w-[140px]"
                     />
                   </button>
-
-                  <div className="mt-1 rounded-full border border-[#cfe7d8] bg-white/90 px-3 py-1 text-xs font-black text-[#237849] shadow-sm">
-                    {getPlayerDisplayName(companion.id, playerSlime)}
-                  </div>
                 </div>
               </div>
             </div>
-          ) : null}
-        </section>
-
-        {auth.isLoggedIn && game.isReady ? (
-          <section className="mt-10">
-            <div className="mb-4 text-2xl font-black tracking-[-0.03em]">
-              今日任務
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {tasks.map((task) => (
-                <div
-                  key={task.title}
-                  className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">
-                    {task.icon}
-                  </div>
-
-                  <div className="mt-4 text-lg font-black">
-                    {task.title}
-                  </div>
-
-                  <div className="mt-1 text-sm font-medium text-[#789083]">
-                    {task.progress}
-                  </div>
-
-                  <div className="mt-4 font-black text-[#2a9d5e]">
-                    {task.reward}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Link
-              href="/tasks"
-              className="mt-4 block w-full rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-bold text-[#315b45] transition hover:bg-[#f5faf7]"
-            >
-              查看每日／每週任務
-            </Link>
           </section>
         ) : null}
+
+        {auth.isLoggedIn && game.isReady ? (
+          <>
+            <section className="mt-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xl font-black tracking-[-0.03em]">今日任務</h2>
+                <Link href="/tasks" className="text-sm font-black text-[#2ba962]">
+                  查看全部 →
+                </Link>
+              </div>
+
+              <div className="rounded-[24px] border border-[#dfece4] bg-white px-4 py-2 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+                {tasks.map((task, index) => (
+                  <div
+                    key={task.label}
+                    className={[
+                      "flex items-center gap-3 py-3.5",
+                      index !== tasks.length - 1 ? "border-b border-[#edf2ef]" : "",
+                    ].join(" ")}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eefaf2] text-lg">
+                      {task.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-black">{task.label}</div>
+                      <div className="mt-0.5 text-xs font-bold text-[#8a9c92]">{task.progress}</div>
+                    </div>
+                    <div className={[
+                      "shrink-0 text-sm font-black",
+                      task.complete ? "text-[#2ba962]" : "text-[#8b6c2f]",
+                    ].join(" ")}>
+                      {task.complete ? "✓" : task.reward}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="mt-5">
+              <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">今日學習</h2>
+              <div className="grid grid-cols-4 gap-2">
+                <StatCard label="作答" value={`${today.questionsAnswered}`} />
+                <StatCard label="訂正" value={`${today.mistakesReviewed}`} />
+                <StatCard label="專注" value={`${Math.floor(today.focusSeconds / 60)}`} suffix="分" />
+                <StatCard label="連續" value={`${game.streak}`} suffix="天" />
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <section className="mt-6">
+          <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">學習工具</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <FeatureCard href="/study/exam" icon="📝" title="國考題庫" subtitle="刷歷屆國考題" />
+            <FeatureCard href="/study/material" icon="📄" title="教材測驗" subtitle="PDF → AI 測驗" />
+            <FeatureCard href={protectedHref("/study/mistakes")} icon="🔍" title="錯題庫" subtitle="回頭複習弱點" />
+            <FeatureCard href={protectedHref("/study/focus")} icon="⏱️" title="專心讀書" subtitle="計時累積專注" />
+          </div>
+        </section>
+
+        <section className="mt-6 pb-8">
+          <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">史萊姆生活</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <MiniGameCard
+              href={protectedHref("/slimes")}
+              icon="🐾"
+              title="收藏"
+              value={auth.isLoggedIn && game.isReady ? `${ownedCount} / 17` : "登入查看"}
+            />
+            <MiniGameCard
+              href={protectedHref("/gacha")}
+              icon="🎟️"
+              title="抽卡"
+              value={auth.isLoggedIn && game.isReady ? (game.canUseFreePull ? "免費 1 抽" : "今日已抽") : "登入查看"}
+            />
+            <MiniGameCard
+              href={protectedHref("/achievements")}
+              icon="🏆"
+              title="成就"
+              value={auth.isLoggedIn && game.isReady ? `${game.claimedAchievementIds.length} 已領` : "登入查看"}
+              wide
+            />
+          </div>
+        </section>
       </div>
 
       <style jsx global>{`
         @keyframes medslime-poke {
-          0% {
-            transform: translateY(0) scale(1);
-          }
-          28% {
-            transform: translateY(-24px) scale(0.94, 1.08);
-          }
-          55% {
-            transform: translateY(0) scale(1.08, 0.92);
-          }
-          75% {
-            transform: translateY(-8px) scale(0.97, 1.03);
-          }
-          100% {
-            transform: translateY(0) scale(1);
-          }
+          0% { transform: translateY(0) scale(1); }
+          28% { transform: translateY(-24px) scale(0.94, 1.08); }
+          55% { transform: translateY(0) scale(1.08, 0.92); }
+          75% { transform: translateY(-8px) scale(0.97, 1.03); }
+          100% { transform: translateY(0) scale(1); }
         }
-
         @keyframes medslime-hop {
-          0% {
-            transform: translateY(0);
-          }
-          22% {
-            transform: translateY(-18px);
-          }
-          44% {
-            transform: translateY(0);
-          }
-          66% {
-            transform: translateY(-10px);
-          }
-          100% {
-            transform: translateY(0);
-          }
+          0% { transform: translateY(0); }
+          22% { transform: translateY(-18px); }
+          44% { transform: translateY(0); }
+          66% { transform: translateY(-10px); }
+          100% { transform: translateY(0); }
         }
       `}</style>
     </main>
+  );
+}
+
+function FeatureCard({ href, icon, title, subtitle }: { href: string; icon: string; title: string; subtitle: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[22px] border border-[#dfece4] bg-white p-4 shadow-[0_8px_22px_rgba(31,83,53,0.04)] transition active:scale-[0.99]"
+    >
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eefaf2] text-2xl">{icon}</div>
+      <div className="mt-4 text-base font-black">{title}</div>
+      <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">{subtitle}</div>
+    </Link>
+  );
+}
+
+function MiniGameCard({ href, icon, title, value, wide = false }: { href: string; icon: string; title: string; value: string; wide?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "rounded-[22px] border border-[#dfece4] bg-white p-4 shadow-[0_8px_22px_rgba(31,83,53,0.04)] transition active:scale-[0.99]",
+        wide ? "col-span-2" : "",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eefaf2] text-xl">{icon}</div>
+        <div>
+          <div className="text-sm font-black">{title}</div>
+          <div className="mt-0.5 text-xs font-bold text-[#789083]">{value}</div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function StatCard({ label, value, suffix }: { label: string; value: string; suffix?: string }) {
+  return (
+    <div className="rounded-[18px] border border-[#dfece4] bg-white px-2 py-3 text-center">
+      <div className="text-[11px] font-bold text-[#8a9c92]">{label}</div>
+      <div className="mt-1 text-lg font-black leading-none">
+        {value}
+        {suffix && <span className="ml-0.5 text-[10px] font-bold text-[#789083]">{suffix}</span>}
+      </div>
+    </div>
   );
 }
