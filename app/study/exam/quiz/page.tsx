@@ -36,7 +36,7 @@ type LoadState =
   | { status: "ready"; questions: Question[] };
 
 const TUTORIAL_STORAGE_KEY =
-  "medslime_exam_tutorial_seen_v1";
+  "medslime_exam_tutorial_seen_v2";
 
 export default function ExamQuizPage() {
   return (
@@ -614,7 +614,7 @@ function ExamQuizContent() {
             </button>
           </div>
 
-          <div className="mt-6 text-xl font-black leading-9">
+          <div className="mt-5 text-base font-black leading-7 sm:text-lg sm:leading-8">
             {question.stem}
           </div>
 
@@ -708,7 +708,7 @@ function ExamQuizContent() {
                         )
                       }
                       className={[
-                        "flex-1 px-3 py-4 text-left font-bold text-[#466a58]",
+                        "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
                         struck
                           ? "line-through opacity-45"
                           : "",
@@ -1074,14 +1074,14 @@ function SimpleSlime({
     },
   }[status];
 
-  const width = large ? 58 : 38;
-  const height = large ? 42 : 29;
+  const width = large ? 42 : 26;
+  const height = large ? 30 : 20;
 
   return (
     <div
       className={[
         "relative flex items-center justify-center transition",
-        active ? "scale-110" : "",
+        active ? "scale-105" : "",
       ].join(" ")}
       style={{
         width,
@@ -1099,33 +1099,33 @@ function SimpleSlime({
       <span
         className="absolute rounded-full"
         style={{
-          width: large ? 5 : 3.5,
-          height: large ? 7 : 5,
+          width: large ? 4 : 2.5,
+          height: large ? 5 : 3.5,
           background:
             colors.face,
-          left: large ? 17 : 11,
-          top: large ? 15 : 10,
+          left: large ? 12 : 7.5,
+          top: large ? 10 : 6.5,
         }}
       />
       <span
         className="absolute rounded-full"
         style={{
-          width: large ? 5 : 3.5,
-          height: large ? 7 : 5,
+          width: large ? 4 : 2.5,
+          height: large ? 5 : 3.5,
           background:
             colors.face,
-          right: large ? 17 : 11,
-          top: large ? 15 : 10,
+          right: large ? 12 : 7.5,
+          top: large ? 10 : 6.5,
         }}
       />
       <span
         className="absolute rounded-b-full border-b-2"
         style={{
-          width: large ? 11 : 8,
-          height: large ? 6 : 4,
+          width: large ? 8 : 5.5,
+          height: large ? 4 : 3,
           borderColor:
             colors.face,
-          bottom: large ? 8 : 6,
+          bottom: large ? 6 : 4,
         }}
       />
     </div>
@@ -1194,8 +1194,48 @@ function ExamTutorial({
             />
           </div>
 
-          <div className="mt-6 border-t border-[#e4ece7] pt-5 text-sm font-bold leading-7 text-[#789083]">
-            綠色＝已作答、黃色＝已作答＋不確定、紅色＝只有不確定。
+          <div className="mt-6 border-t border-[#e4ece7] pt-5">
+            <div className="text-sm font-black text-[#315b45]">
+              上方的史萊姆可以快速跳題
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-3 rounded-2xl bg-[#f8fcf9] px-4 py-3">
+                <SimpleSlime
+                  status="gray"
+                  large
+                  active={false}
+                />
+                <div>
+                  <div className="text-sm font-black text-[#315b45]">
+                    大史萊姆
+                  </div>
+                  <div className="mt-0.5 text-xs font-bold leading-5 text-[#789083]">
+                    每 10 題一個區段，點一下快速切換。
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl bg-[#f8fcf9] px-4 py-3">
+                <SimpleSlime
+                  status="gray"
+                  large={false}
+                  active={false}
+                />
+                <div>
+                  <div className="text-sm font-black text-[#315b45]">
+                    小史萊姆
+                  </div>
+                  <div className="mt-0.5 text-xs font-bold leading-5 text-[#789083]">
+                    代表單一題目，點一下直接跳到那一題。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 text-sm font-bold leading-6 text-[#789083]">
+              綠色＝已作答、黃色＝已作答＋不確定、紅色＝只有不確定。
+            </div>
           </div>
         </div>
 
