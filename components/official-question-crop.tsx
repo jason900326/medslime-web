@@ -504,7 +504,7 @@ export default function OfficialQuestionCrop({
             className={[
               "h-auto object-contain",
               largePreview
-                ? "w-[175%] max-w-none sm:w-full sm:max-w-full"
+                ? "w-[150%] max-w-none sm:w-full sm:max-w-full"
                 : "w-full",
             ].join(" ")}
           />
