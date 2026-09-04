@@ -388,10 +388,12 @@ export default function OfficialQuestionCrop({
   pdfUrl,
   questionNumber,
   compact = false,
+  largePreview = false,
 }: {
   pdfUrl: string | null;
   questionNumber: number;
   compact?: boolean;
+  largePreview?: boolean;
 }) {
   const [state, setState] = useState<CropState>({
     status: "idle",
@@ -476,10 +478,21 @@ export default function OfficialQuestionCrop({
 
   return (
     <div className="space-y-3">
+      {largePreview && (
+        <div className="text-xs font-bold text-[#8a9c92] sm:hidden">
+          圖片可以左右滑動查看
+        </div>
+      )}
+
       {images.map((image, index) => (
         <div
           key={`${questionNumber}-${index}`}
-          className="overflow-hidden rounded-[16px] border border-[#dde7e1] bg-white"
+          className={[
+            "rounded-[16px] border border-[#dde7e1] bg-white",
+            largePreview
+              ? "overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : "overflow-hidden",
+          ].join(" ")}
         >
           <img
             src={image}
@@ -488,7 +501,12 @@ export default function OfficialQuestionCrop({
                 ? `第 ${index + 1} 段`
                 : ""
             }`}
-            className="h-auto w-full object-contain"
+            className={[
+              "h-auto object-contain",
+              largePreview
+                ? "w-[175%] max-w-none sm:w-full sm:max-w-full"
+                : "w-full",
+            ].join(" ")}
           />
         </div>
       ))}

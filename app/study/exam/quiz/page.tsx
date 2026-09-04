@@ -874,14 +874,14 @@ function ExamQuizContent() {
       )}
 
       {showOriginalQuestion && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/35 px-5 py-8">
-          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl md:p-8">
-            <div className="flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/35 px-2 py-3 sm:px-5 sm:py-8">
+          <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-[22px] border border-[#dce9e1] bg-white p-4 shadow-2xl sm:rounded-[28px] sm:p-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+                <div className="text-[10px] font-black tracking-[0.1em] text-[#2ba962] sm:text-xs">
                   OFFICIAL QUESTION
                 </div>
-                <div className="mt-1 text-2xl font-black">
+                <div className="mt-1 text-lg font-black sm:text-xl">
                   官方原題 · 第 {question.questionNumber} 題
                 </div>
               </div>
@@ -889,16 +889,17 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={() => setShowOriginalQuestion(false)}
-                className="rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-black text-[#60786c]"
+                className="shrink-0 rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-xs font-black text-[#60786c] sm:text-sm"
               >
                 關閉
               </button>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <OfficialQuestionCrop
                 pdfUrl={question.questionPdfUrl}
                 questionNumber={question.questionNumber}
+                largePreview
               />
             </div>
           </div>
@@ -949,7 +950,10 @@ function QuestionProgress({
     const statuses = segmentQuestions.map((item) => getStatus(item.id));
 
     if (statuses.every((status) => status === "green")) return "green";
-    if (statuses.every((status) => status !== "gray") && statuses.some((status) => status === "yellow")) {
+    if (
+      statuses.every((status) => status !== "gray") &&
+      statuses.some((status) => status === "yellow")
+    ) {
       return "yellow";
     }
     if (statuses.some((status) => status === "red")) return "red";
@@ -957,54 +961,64 @@ function QuestionProgress({
   };
 
   return (
-    <section className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
-      <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-black text-[#70877a]">
-        <span className="flex items-center gap-2">
+    <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-3 py-4 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:px-4">
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 text-[11px] font-black text-[#70877a] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <span className="flex shrink-0 items-center gap-1.5">
           <LegendDot color="green" />
           已作答
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex shrink-0 items-center gap-1.5">
           <LegendDot color="yellow" />
-          已作答＋不確定
+          作答＋不確定
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex shrink-0 items-center gap-1.5">
           <LegendDot color="red" />
           只有不確定
         </span>
       </div>
 
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {Array.from({ length: segmentCount }, (_, segmentIndex) => {
           const active = segmentIndex === currentSegment;
           const status = getSegmentStatus(segmentIndex);
           const firstQuestionIndex = segmentIndex * segmentSize;
+          const lastQuestionNumber = Math.min(
+            firstQuestionIndex + segmentSize,
+            questions.length,
+          );
 
           return (
             <button
               key={segmentIndex}
               type="button"
               onClick={() => onJump(firstQuestionIndex)}
-              className="flex flex-col items-center"
-              title={`第 ${firstQuestionIndex + 1}–${Math.min(
-                firstQuestionIndex + segmentSize,
-                questions.length,
-              )} 題`}
+              className={[
+                "flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 transition",
+                active
+                  ? "border-[#8fd9aa] bg-[#eefaf2]"
+                  : "border-[#e0e9e3] bg-white",
+              ].join(" ")}
+              title={`第 ${firstQuestionIndex + 1}–${lastQuestionNumber} 題`}
             >
               <SimpleSlime
                 status={status}
-                large
+                size="segment"
                 active={active}
               />
+              <span
+                className={[
+                  "text-[11px] font-black",
+                  active ? "text-[#237849]" : "text-[#789083]",
+                ].join(" ")}
+              >
+                {firstQuestionIndex + 1}–{lastQuestionNumber}
+              </span>
             </button>
           );
         })}
       </div>
 
-      <div className="my-5 text-center text-base font-black text-[#607c6d]">
-        目前區段：第 {segmentStart + 1}–{segmentEnd} 題
-      </div>
-
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="mt-3 grid grid-cols-10 gap-1">
         {visibleQuestions.map((item, offset) => {
           const questionIndex = segmentStart + offset;
           const current = questionIndex === currentIndex;
@@ -1014,17 +1028,20 @@ function QuestionProgress({
               key={item.id}
               type="button"
               onClick={() => onJump(questionIndex)}
-              className="flex flex-col items-center gap-1"
+              className={[
+                "flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1 transition",
+                current ? "bg-[#f0faf4]" : "",
+              ].join(" ")}
+              aria-label={`跳到第 ${item.questionNumber} 題`}
             >
               <SimpleSlime
                 status={getStatus(item.id)}
-                large={false}
+                size="question"
                 active={current}
               />
-
               <span
                 className={[
-                  "text-[11px] font-black",
+                  "text-[10px] font-black leading-none",
                   current ? "text-[#17372a]" : "text-[#8a9c92]",
                 ].join(" ")}
               >
@@ -1040,7 +1057,7 @@ function QuestionProgress({
 
 function SimpleSlime({
   status,
-  large,
+  size,
   active,
 }: {
   status:
@@ -1048,7 +1065,7 @@ function SimpleSlime({
     | "yellow"
     | "red"
     | "gray";
-  large: boolean;
+  size: "segment" | "question";
   active: boolean;
 }) {
   const colors = {
@@ -1074,58 +1091,54 @@ function SimpleSlime({
     },
   }[status];
 
-  const width = large ? 42 : 26;
-  const height = large ? 30 : 20;
+  const segment = size === "segment";
+  const width = segment ? 26 : 20;
+  const height = segment ? 19 : 15;
 
   return (
     <div
-      className={[
-        "relative flex items-center justify-center transition",
-        active ? "scale-105" : "",
-      ].join(" ")}
+      className="relative shrink-0 transition"
       style={{
         width,
         height,
         borderRadius:
           "48% 48% 42% 42% / 56% 56% 42% 42%",
-        background:
-          colors.body,
-        border: `2px solid ${colors.border}`,
+        background: colors.body,
+        border: `1.5px solid ${colors.border}`,
         boxShadow: active
-          ? "0 0 0 4px rgba(49,201,120,0.13)"
-          : "0 2px 6px rgba(31,83,53,0.06)",
+          ? "0 0 0 3px rgba(49,201,120,0.12)"
+          : "none",
       }}
     >
       <span
         className="absolute rounded-full"
         style={{
-          width: large ? 4 : 2.5,
-          height: large ? 5 : 3.5,
-          background:
-            colors.face,
-          left: large ? 12 : 7.5,
-          top: large ? 10 : 6.5,
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          left: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
         }}
       />
       <span
         className="absolute rounded-full"
         style={{
-          width: large ? 4 : 2.5,
-          height: large ? 5 : 3.5,
-          background:
-            colors.face,
-          right: large ? 12 : 7.5,
-          top: large ? 10 : 6.5,
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          right: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
         }}
       />
       <span
-        className="absolute rounded-b-full border-b-2"
+        className="absolute rounded-b-full border-b"
         style={{
-          width: large ? 8 : 5.5,
-          height: large ? 4 : 3,
-          borderColor:
-            colors.face,
-          bottom: large ? 6 : 4,
+          width: segment ? 5.5 : 4.5,
+          height: segment ? 3 : 2.5,
+          borderColor: colors.face,
+          left: "50%",
+          bottom: segment ? 3.5 : 2.5,
+          transform: "translateX(-50%)",
         }}
       />
     </div>
@@ -1196,44 +1209,12 @@ function ExamTutorial({
 
           <div className="mt-6 border-t border-[#e4ece7] pt-5">
             <div className="text-sm font-black text-[#315b45]">
-              上方的史萊姆可以快速跳題
+              上方導覽列可以自由跳題
             </div>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="flex items-center gap-3 rounded-2xl bg-[#f8fcf9] px-4 py-3">
-                <SimpleSlime
-                  status="gray"
-                  large
-                  active={false}
-                />
-                <div>
-                  <div className="text-sm font-black text-[#315b45]">
-                    大史萊姆
-                  </div>
-                  <div className="mt-0.5 text-xs font-bold leading-5 text-[#789083]">
-                    每 10 題一個區段，點一下快速切換。
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-2xl bg-[#f8fcf9] px-4 py-3">
-                <SimpleSlime
-                  status="gray"
-                  large={false}
-                  active={false}
-                />
-                <div>
-                  <div className="text-sm font-black text-[#315b45]">
-                    小史萊姆
-                  </div>
-                  <div className="mt-0.5 text-xs font-bold leading-5 text-[#789083]">
-                    代表單一題目，點一下直接跳到那一題。
-                  </div>
-                </div>
-              </div>
+            <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
+              第一排切換每 10 題的區段，第二排直接跳到單一題目；史萊姆的顏色會保留你的作答與「不確定」標記。
             </div>
-
-            <div className="mt-4 text-sm font-bold leading-6 text-[#789083]">
+            <div className="mt-3 text-xs font-bold leading-5 text-[#8a9c92]">
               綠色＝已作答、黃色＝已作答＋不確定、紅色＝只有不確定。
             </div>
           </div>
