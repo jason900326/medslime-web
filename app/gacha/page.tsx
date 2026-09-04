@@ -26,7 +26,7 @@ export default function GachaPage() {
     return (
       <LoginRequired
         title="登入後才能抽卡"
-        description="抽卡會消耗金幣或抽卡券，並改變你的史萊姆收藏，因此需要先登入帳號。"
+        description="登入後就能使用金幣、抽卡券和每日免費抽卡。"
         backHref="/"
         backLabel="返回首頁"
       />
@@ -64,37 +64,36 @@ export default function GachaPage() {
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar
           showBack
           backHref="/slimes"
           backLabel="返回史萊姆圖鑑"
         />
 
-        <section className="mt-8 rounded-[30px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-7 shadow-[0_18px_44px_rgba(40,106,69,0.08)]">
-          <div className="text-sm font-black tracking-[0.08em] text-[#c58a2d]">
+        <section className="mt-6 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.06)] md:p-7">
+          <div className="text-xs font-black tracking-[0.1em] text-[#c58a2d]">
             GACHA
           </div>
 
-          <div className="mt-2 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h1 className="text-4xl font-black tracking-[-0.04em]">
-                抽一隻新的史萊姆。
-              </h1>
-              <p className="mt-3 leading-7 text-[#70877a]">
-                N 32% · R 38% · SR 27% · SSR 3%
-              </p>
-            </div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <h1 className="whitespace-nowrap text-2xl font-black tracking-[-0.04em] sm:text-3xl md:text-4xl">
+              抽一隻新的史萊姆。
+            </h1>
 
             <Link
               href="/slimes"
-              className="inline-flex rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45] transition hover:bg-[#f5faf7]"
+              className="shrink-0 rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-xs font-black text-[#315b45] sm:px-4 sm:text-sm"
             >
               查看圖鑑
             </Link>
           </div>
 
-          <div className="mt-7 grid gap-4 md:grid-cols-3">
+          <div className="mt-3 text-xs font-bold text-[#8a9c92] sm:text-sm">
+            抽卡機率：N 32% · R 38% · SR 27% · SSR 3%
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             <PullOption
               title="每日免費"
               subtitle={
@@ -131,20 +130,18 @@ export default function GachaPage() {
           </div>
         </section>
 
-        <section className="mt-8">
-          <div className="text-2xl font-black">抽卡結果</div>
+        <section className="mt-6 pb-8">
+          <div className="text-xl font-black">抽卡結果</div>
 
-          <div className="mt-5">
+          <div className="mt-4">
             {pulling ? (
-              <div className="rounded-[26px] border border-[#dceae2] bg-white p-10 text-center">
-                <div className="text-5xl">🫧</div>
-                <div className="mt-4 text-lg font-black">
-                  史萊姆生成中...
-                </div>
+              <div className="rounded-[24px] border border-[#dceae2] bg-white p-8 text-center">
+                <div className="text-4xl">🫧</div>
+                <div className="mt-3 font-black">史萊姆生成中...</div>
               </div>
             ) : results.length === 0 ? (
-              <div className="rounded-[26px] border border-dashed border-[#cfded5] bg-white/70 p-10 text-center text-[#789083]">
-                還沒有抽卡結果。
+              <div className="rounded-[24px] border border-dashed border-[#cfded5] bg-white/70 p-7 text-center text-sm font-bold text-[#789083]">
+                抽完之後，結果會出現在這裡。
               </div>
             ) : (
               <>
@@ -152,7 +149,7 @@ export default function GachaPage() {
                   className={
                     results.length === 1
                       ? "mx-auto grid max-w-sm grid-cols-1 gap-4"
-                      : "grid grid-cols-2 gap-4 md:grid-cols-5"
+                      : "grid grid-cols-2 gap-3 md:grid-cols-5"
                   }
                 >
                   {results.map((result, index) => {
@@ -161,21 +158,20 @@ export default function GachaPage() {
                     return (
                       <article
                         key={`${result.slimeId}-${index}`}
-                        className="rounded-[24px] border border-[#dfe9e3] bg-white p-4 text-center shadow-[0_10px_24px_rgba(31,83,53,0.05)]"
+                        className="rounded-[22px] border border-[#dfe9e3] bg-white p-4 text-center shadow-[0_8px_20px_rgba(31,83,53,0.04)]"
                       >
-                        <div className="flex min-h-[150px] items-center justify-center">
+                        <div className="flex min-h-[130px] items-center justify-center">
                           <img
                             src={slime.image}
                             alt={slime.defaultName}
-                            className="h-auto w-full max-w-[150px] object-contain"
+                            className="h-auto w-full max-w-[135px] object-contain"
                           />
                         </div>
 
-                        <div className="mt-2 text-sm font-black text-[#789083]">
+                        <div className="mt-2 text-xs font-black text-[#789083]">
                           {slime.rarity}
                         </div>
-
-                        <div className="mt-1 font-black">
+                        <div className="mt-1 text-sm font-black">
                           {slime.defaultName}
                         </div>
 
@@ -187,7 +183,7 @@ export default function GachaPage() {
 
                 <Link
                   href="/slimes"
-                  className="mx-auto mt-5 block max-w-sm rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center font-black text-[#315b45] transition hover:bg-[#f5faf7]"
+                  className="mx-auto mt-4 block max-w-sm rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center text-sm font-black text-[#315b45]"
                 >
                   🐾 回圖鑑看看
                 </Link>
@@ -222,14 +218,14 @@ function ResultReward({ result }: { result: Result }) {
   if (result.duplicateReward.type === "fragments_full") {
     return (
       <div className="mt-3 rounded-xl bg-[#f4f8f5] px-3 py-2 text-xs font-black text-[#557768]">
-        碎片已滿 · 可解鎖專屬飾品
+        碎片已滿 · 可解鎖飾品
       </div>
     );
   }
 
   return (
     <div className="mt-3 rounded-xl bg-[#f4f8f5] px-3 py-2 text-xs font-black text-[#557768]">
-      重複角色 · +{result.duplicateReward.amount} 專屬碎片
+      重複角色 · +{result.duplicateReward.amount} 碎片
     </div>
   );
 }
@@ -254,17 +250,15 @@ function PullOption({
   onSecondary?: () => void;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#e3e9e5] bg-white p-5">
-      <div className="text-lg font-black">{title}</div>
-      <div className="mt-1 text-sm font-medium text-[#789083]">
-        {subtitle}
-      </div>
+    <article className="rounded-[22px] border border-[#e3e9e5] bg-white p-4">
+      <div className="text-base font-black">{title}</div>
+      <div className="mt-1 text-sm font-medium text-[#789083]">{subtitle}</div>
 
       <button
         disabled={disabled}
         onClick={onClick}
         className={[
-          "mt-5 w-full rounded-xl px-4 py-3 font-black transition",
+          "mt-4 w-full rounded-xl px-4 py-3 text-sm font-black transition",
           disabled
             ? "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]"
             : "bg-[#31c978] text-white hover:bg-[#2dbc70]",
@@ -278,10 +272,10 @@ function PullOption({
           disabled={secondaryDisabled}
           onClick={onSecondary}
           className={[
-            "mt-2 w-full rounded-xl border px-4 py-3 font-black transition",
+            "mt-2 w-full rounded-xl border px-4 py-3 text-sm font-black transition",
             secondaryDisabled
               ? "cursor-not-allowed border-[#e3e9e5] bg-[#f7faf8] text-[#a8b7ad]"
-              : "border-[#d7e7de] bg-white text-[#315b45] hover:bg-[#f5faf7]",
+              : "border-[#d7e7de] bg-white text-[#315b45]",
           ].join(" ")}
         >
           {secondaryLabel}

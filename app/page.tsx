@@ -175,8 +175,16 @@ export default function Home() {
                 <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">MY ROOM</div>
                 <div className="mt-1 text-sm font-bold text-[#789083]">戳一下看看</div>
               </div>
-              <div className="rounded-full border border-[#cfe7d8] bg-[#eefaf2] px-3 py-1 text-xs font-black text-[#237849]">
-                {getPlayerDisplayName(companion.id, playerSlime)}
+              <div className="flex items-center gap-2">
+                <div className="hidden rounded-full border border-[#cfe7d8] bg-[#eefaf2] px-3 py-1 text-xs font-black text-[#237849] sm:block">
+                  {getPlayerDisplayName(companion.id, playerSlime)}
+                </div>
+                <Link
+                  href="/slimes"
+                  className="rounded-full border border-[#cfe7d8] bg-white px-3 py-1.5 text-xs font-black text-[#237849]"
+                >
+                  前往圖鑑 →
+                </Link>
               </div>
             </div>
 

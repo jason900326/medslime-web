@@ -18,6 +18,7 @@ export default function MistakesPage() {
   const game = useGameState();
   const [items, setItems] = useState<MistakeRecord[]>([]);
   const [filter, setFilter] = useState<Filter>("全部");
+  const [subjectFilter, setSubjectFilter] = useState("全部科目");
   const [officialItem, setOfficialItem] = useState<MistakeRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -28,22 +29,15 @@ export default function MistakesPage() {
     const load = async () => {
       try {
         const next = await readMistakes();
-
-        if (!cancelled) {
-          setItems(next);
-        }
+        if (!cancelled) setItems(next);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "錯題庫讀取失敗。",
+            error instanceof Error ? error.message : "錯題庫讀取失敗。",
           );
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -54,13 +48,39 @@ export default function MistakesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (filter !== "國考") {
+      setSubjectFilter("全部科目");
+    }
+  }, [filter]);
+
+  const nationalSubjects = useMemo(() => {
+    return Array.from(
+      new Set(
+        items
+          .filter((item) => item.source === "national-exam")
+          .map((item) => item.subject?.trim())
+          .filter((subject): subject is string => Boolean(subject)),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  }, [items]);
+
   const filtered = useMemo(() => {
     return items
       .filter((item) => {
-        if (filter === "全部") return true;
-        if (filter === "國考") return item.source === "national-exam";
-        if (filter === "教材") return item.source === "material";
-        return item.reviewed;
+        if (filter === "國考" && item.source !== "national-exam") return false;
+        if (filter === "教材" && item.source !== "material") return false;
+        if (filter === "已複習" && !item.reviewed) return false;
+
+        if (
+          filter === "國考" &&
+          subjectFilter !== "全部科目" &&
+          item.subject !== subjectFilter
+        ) {
+          return false;
+        }
+
+        return true;
       })
       .sort((a, b) => {
         if (a.reviewed !== b.reviewed) {
@@ -72,35 +92,35 @@ export default function MistakesPage() {
           new Date(a.createdAt).getTime()
         );
       });
-  }, [items, filter]);
+  }, [items, filter, subjectFilter]);
 
   const unreviewedCount = items.filter((item) => !item.reviewed).length;
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
-        <section className="mt-8">
-          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+        <section className="mt-6">
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
             MISTAKES
           </div>
 
-          <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
             錯題庫
           </h1>
 
-          <p className="mt-3 leading-7 text-[#70877a]">
-            答錯或標記「我不確定」的題目會自動收進這裡。
+          <p className="mt-3 text-sm font-bold leading-6 text-[#70877a]">
+            答錯或標記「我不確定」的題目，都會收在這裡。
           </p>
         </section>
 
-        <section className="mt-6 grid gap-4 sm:grid-cols-2">
+        <section className="mt-5 grid grid-cols-2 gap-3">
           <SummaryCard label="全部題目" value={`${items.length} 題`} />
           <SummaryCard label="待複習" value={`${unreviewedCount} 題`} />
         </section>
 
-        <section className="mt-6 flex flex-wrap gap-2">
+        <section className="mt-5 flex flex-wrap gap-2">
           {(["全部", "國考", "教材", "已複習"] as Filter[]).map((item) => (
             <button
               key={item}
@@ -118,28 +138,50 @@ export default function MistakesPage() {
           ))}
         </section>
 
+        {filter === "國考" && nationalSubjects.length > 0 && (
+          <section className="mt-3">
+            <label className="block">
+              <span className="mb-2 block text-xs font-black text-[#789083]">
+                科目
+              </span>
+              <select
+                value={subjectFilter}
+                onChange={(event) => setSubjectFilter(event.target.value)}
+                className="w-full rounded-2xl border border-[#d7e7de] bg-white px-4 py-3 text-sm font-black text-[#315b45] outline-none focus:border-[#65d795]"
+              >
+                <option value="全部科目">全部科目</option>
+                {nationalSubjects.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+        )}
+
         {errorMessage && (
-          <div className="mt-6 rounded-[18px] border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
+          <div className="mt-5 rounded-[18px] border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
             {errorMessage}
           </div>
         )}
 
-        <section className="mt-6 space-y-5">
+        <section className="mt-5 space-y-5">
           {loading ? (
             <div className="rounded-[26px] border border-[#dfece4] bg-white p-8 text-center">
               <div className="mx-auto h-9 w-11 animate-pulse rounded-[50%_50%_42%_42%/56%_56%_42%_42%] border-2 border-[#8fd0a9] bg-[#d9f3e4]" />
               <div className="mt-3 font-black text-[#789083]">
-                正在讀取你的錯題庫...
+                正在整理你的錯題...
               </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-[26px] border border-[#dfece4] bg-white p-8 text-center">
               <div className="text-4xl">📘</div>
               <div className="mt-4 text-xl font-black">
-                目前沒有錯題
+                這個分類目前沒有題目
               </div>
               <div className="mt-2 text-sm font-bold text-[#789083]">
-                做題後，答錯或標記不確定的題目會出現在這裡。
+                換個分類或科目看看。
               </div>
             </div>
           ) : (
@@ -153,14 +195,12 @@ export default function MistakesPage() {
                       game.recordMistakesReviewed(1);
                     }
 
-                    setItems(
-                      await setMistakeReviewed(item.id, reviewed),
-                    );
+                    setItems(await setMistakeReviewed(item.id, reviewed));
                   } catch (error) {
                     setErrorMessage(
                       error instanceof Error
                         ? error.message
-                        : "錯題狀態更新失敗。",
+                        : "更新失敗，請再試一次。",
                     );
                   }
                 }}
@@ -171,7 +211,7 @@ export default function MistakesPage() {
                     setErrorMessage(
                       error instanceof Error
                         ? error.message
-                        : "移除錯題失敗。",
+                        : "移除失敗，請再試一次。",
                     );
                   }
                 }}
@@ -242,7 +282,7 @@ function MistakeCard({
   return (
     <article
       className={[
-        "rounded-[26px] border bg-white p-6 shadow-[0_10px_26px_rgba(31,83,53,0.05)]",
+        "rounded-[24px] border bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]",
         item.reviewed ? "border-[#e5ebe7] opacity-75" : "border-[#dce9e1]",
       ].join(" ")}
     >
@@ -350,12 +390,10 @@ function MistakeCard({
             correctIndex: item.correctIndex,
             userAnswer: item.userAnswer,
             uncertain: item.uncertain,
-            existingExplanation:
-              item.explanation ?? null,
+            existingExplanation: item.explanation ?? null,
           }}
         />
       )}
-
     </article>
   );
 }
@@ -368,9 +406,9 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-[#dfece4] bg-white p-5">
-      <div className="text-sm font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
+    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
+      <div className="text-xs font-bold text-[#789083]">{label}</div>
+      <div className="mt-1 text-xl font-black">{value}</div>
     </div>
   );
 }

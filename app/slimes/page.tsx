@@ -173,17 +173,15 @@ export default function SlimesPage() {
           </Link>
         </section>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2">
+        <section className="mt-6 grid grid-cols-2 gap-3">
           <SummaryCard
             label="已收藏"
             value={`${ownedCount} / ${SLIMES.length}`}
           />
-
           <SummaryCard
             label="專屬飾品"
             value={`${accessoryCount} / ${SLIMES.length}`}
           />
-
         </section>
 
         <section className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -529,14 +527,9 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-[#dfece4] bg-white p-5">
-      <div className="text-sm font-bold text-[#789083]">
-        {label}
-      </div>
-
-      <div className="mt-1 text-xl font-black">
-        {value}
-      </div>
+    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
+      <div className="text-xs font-bold text-[#789083]">{label}</div>
+      <div className="mt-1 text-lg font-black">{value}</div>
     </div>
   );
 }
