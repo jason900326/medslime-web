@@ -261,7 +261,7 @@ export default function AIExplanationButton({
 
           <div className="border-t border-[#dfece4] pt-4">
             <div className="text-sm font-black text-[#315b45]">
-              這個解析有幫助嗎？
+              這份解析對你有幫助嗎？
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -296,7 +296,7 @@ export default function AIExplanationButton({
 
             {feedback && (
               <div className="mt-2 text-xs font-bold text-[#789083]">
-                已收到你的回饋。
+                收到，謝謝你的回饋。
               </div>
             )}
           </div>
@@ -317,10 +317,6 @@ export default function AIExplanationButton({
             <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
               MedSlime 會整理這題的考點、正解理由、其他選項與國考記憶點。
             </p>
-
-            <div className="mt-4 rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-3 text-sm font-black text-[#237849]">
-              朋友測試期間：AI 詳解不限次數
-            </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button

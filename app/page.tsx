@@ -122,21 +122,24 @@ export default function Home() {
       label: "完成 5 題",
       progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
       complete: today.questionsAnswered >= 5,
-      reward: "🪙 10",
+      reward: { type: "coins" as const, amount: 10 },
+      claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
       icon: "🔍",
       label: "訂正 1 題",
       progress: `${Math.min(today.mistakesReviewed, 1)} / 1 題`,
       complete: today.mistakesReviewed >= 1,
-      reward: "🪙 10",
+      reward: { type: "coins" as const, amount: 10 },
+      claimId: `daily:${todayKey ?? "loading"}:review`,
     },
     {
       icon: "⏱️",
       label: "專注 20 分鐘",
       progress: `${Math.min(Math.floor(today.focusSeconds / 60), 20)} / 20 分`,
       complete: today.focusSeconds >= 20 * 60,
-      reward: "🪙 10",
+      reward: { type: "coins" as const, amount: 10 },
+      claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
 
@@ -233,16 +236,6 @@ export default function Home() {
         ) : null}
 
         <section className="mt-6">
-          <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">學習工具</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <FeatureCard href="/study/exam" icon="📝" title="國考題庫" subtitle="刷歷屆國考題" />
-            <FeatureCard href="/study/material" icon="📄" title="教材測驗" subtitle="PDF → AI 測驗" />
-            <FeatureCard href={protectedHref("/study/mistakes")} icon="🔍" title="錯題庫" subtitle="回頭複習弱點" />
-            <FeatureCard href={protectedHref("/study/focus")} icon="⏱️" title="專心讀書" subtitle="計時累積專注" />
-          </div>
-        </section>
-
-        <section className="mt-6">
           <h2 className="mb-3 text-xl font-black tracking-[-0.03em]">史萊姆生活</h2>
           <div className="grid grid-cols-2 gap-3">
             <MiniGameCard
@@ -292,12 +285,34 @@ export default function Home() {
                     <div className="text-sm font-black">{task.label}</div>
                     <div className="mt-0.5 text-xs font-bold text-[#8a9c92]">{task.progress}</div>
                   </div>
-                  <div className={[
-                    "shrink-0 text-sm font-black",
-                    task.complete ? "text-[#2ba962]" : "text-[#8b6c2f]",
-                  ].join(" ")}>
-                    {task.complete ? "✓" : task.reward}
-                  </div>
+                  {(() => {
+                    const claimed = game.claimedTaskIds.includes(task.claimId);
+                    const claimable = task.complete && !claimed;
+
+                    return (
+                      <button
+                        type="button"
+                        disabled={!claimable}
+                        onClick={() =>
+                          game.claimTaskReward(task.claimId, task.reward)
+                        }
+                        className={[
+                          "shrink-0 rounded-xl px-3 py-2 text-xs font-black transition",
+                          claimed
+                            ? "cursor-default bg-[#eef4f0] text-[#789083]"
+                            : claimable
+                              ? "bg-[#31c978] text-white hover:bg-[#2dbc70]"
+                              : "cursor-not-allowed bg-[#f4f7f5] text-[#a0aea5]",
+                        ].join(" ")}
+                      >
+                        {claimed
+                          ? "已領取"
+                          : claimable
+                            ? `領取 🪙${task.reward.amount}`
+                            : `🪙${task.reward.amount}`}
+                      </button>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

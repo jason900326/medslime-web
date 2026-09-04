@@ -15,7 +15,7 @@ const steps = [
     icon: "🪙",
     title: "完成任務拿資源",
     description:
-      "每日／每週任務會給金幣與抽卡券。學習不是額外的負擔，它就是遊戲進度。",
+      "每日／每週任務會送金幣與抽卡券，平常的學習也會慢慢累積遊戲進度。",
   },
   {
     icon: "🐾",
@@ -52,7 +52,7 @@ export default function FirstLoginOnboarding() {
           </h2>
 
           <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-[#6f887b]">
-            不用先研究整個網站。記住這三件事就可以開始。
+            不用一次搞懂全部功能，先記住這三件事就好。
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export default function FirstLoginOnboarding() {
             onClick={game.completeOnboarding}
             className="mt-5 w-full rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70]"
           >
-            好，開始使用 MedSlime
+            好，開始吧
           </button>
         </div>
       </div>

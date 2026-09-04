@@ -161,7 +161,7 @@ export default function MaterialPage() {
 
       if (extractedText.trim().length < 300) {
         throw new Error(
-          "這份 PDF 可讀取的文字太少。若教材主要是掃描圖片，目前這一版還不支援 OCR。",
+          "這份 PDF 目前讀不到足夠的文字。可以換一份文字型 PDF 再試一次。",
         );
       }
 
@@ -285,7 +285,7 @@ export default function MaterialPage() {
               </div>
 
               <div className="mt-2 text-sm font-bold text-[#789083]">
-                PDF 會先在你的瀏覽器擷取文字，再送去 AI 分析。
+                選好教材後，MedSlime 會幫你整理成 10 題測驗。
               </div>
             </button>
           ) : (
@@ -365,11 +365,10 @@ export default function MaterialPage() {
 
         <section className="mt-6 rounded-[22px] border border-[#dfece4] bg-white p-5">
           <div className="text-sm font-black text-[#315b45]">
-            PDF 注意事項
+            小提醒
           </div>
           <p className="mt-2 text-sm font-bold leading-7 text-[#789083]">
-            目前支援含可選取文字的 PDF。若是整份掃描圖片型講義，因為尚未加入
-            OCR，可能無法讀取內容。
+            文字型 PDF 的讀取效果最好。若教材主要是掃描圖片，可能暫時無法產生測驗。
           </p>
         </section>
       </div>
@@ -411,8 +410,8 @@ function AnalysisLoading({
 
         <div className="mt-3 text-xs font-bold text-[#93a49a]">
           {stage === "reading"
-            ? "正在擷取 PDF 中可讀取的文字"
-            : "若後台找到相同或高度相似教材，會直接使用已快取的分析結果"}
+            ? "先把教材內容讀進來"
+            : "再等一下，測驗快準備好了"}
         </div>
       </div>
 
