@@ -41,9 +41,9 @@ export default function Home() {
   });
 
   const roomRef = useRef<HTMLDivElement | null>(null);
-  const bubbleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pokeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bubbleTimeoutRef = useRef<number | null>(null);
+  const pokeTimeoutRef = useRef<number | null>(null);
+  const hopTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const now = new Date();
