@@ -4,6 +4,7 @@ import { GameStateProvider } from "@/components/game-state-provider";
 import ScrollJumpButtons from "@/components/scroll-jump-buttons";
 import FirstLoginOnboarding from "@/components/first-login-onboarding";
 import BetaFeedbackButton from "@/components/beta-feedback-button";
+import RouteUtilities from "@/components/route-utilities";
 
 export const metadata: Metadata = {
   title: "MedSlime",
@@ -23,6 +24,7 @@ export default function RootLayout({
           <FirstLoginOnboarding />
           <BetaFeedbackButton />
           <ScrollJumpButtons />
+          <RouteUtilities />
         </GameStateProvider>
       </body>
     </html>
