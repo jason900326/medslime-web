@@ -108,8 +108,7 @@ type GameStateContextValue = GameState & {
 
 const FOCUS_COIN_CAP = 30;
 const ACCESSORY_FRAGMENT_COST = 30;
-const DUPLICATE_FRAGMENT_REWARD = 10;
-const SSR_PITY_PULLS = 200;
+const SSR_PITY_PULLS = 50;
 
 const starterState: GameState = {
   coins: 0,
@@ -293,18 +292,45 @@ function duplicateCoinRefund(rarity: SlimeRarity) {
   return 150;
 }
 
-function pickWeightedSlime(forceSSR: boolean) {
-  let rarity: SlimeRarity;
-  if (forceSSR) {
-    rarity = "SSR";
-  } else {
-    const roll = Math.random() * 100;
-    if (roll < 44) rarity = "N";
-    else if (roll < 82) rarity = "R";
-    else if (roll < 99.5) rarity = "SR";
-    else rarity = "SSR";
-  }
+function duplicateFragmentReward(rarity: SlimeRarity) {
+  if (rarity === "N") return 10;
+  if (rarity === "R") return 15;
+  return 30;
+}
+
+function rollRarity(forceSSR: boolean): SlimeRarity {
+  if (forceSSR) return "SSR";
+  const roll = Math.random() * 100;
+  if (roll < 44) return "N";
+  if (roll < 81.5) return "R";
+  if (roll < 99.5) return "SR";
+  return "SSR";
+}
+
+function pickWeightedSlime(forceSSR: boolean, state: GameState) {
+  const rarity = rollRarity(forceSSR);
   const pool = SLIMES.filter((slime) => slime.rarity === rarity);
+
+  // 100 抽左右完成「角色 + 飾品」的收集保護：
+  // 先補同稀有度尚未擁有的角色，再優先補尚未解鎖飾品、碎片最少的角色。
+  const unowned = pool.filter((slime) => !state.slimes[slime.id]?.owned);
+  if (unowned.length > 0) {
+    return unowned[Math.floor(Math.random() * unowned.length)];
+  }
+
+  const incomplete = pool.filter(
+    (slime) => !state.slimes[slime.id]?.accessoryUnlocked,
+  );
+  if (incomplete.length > 0) {
+    const minimumFragments = Math.min(
+      ...incomplete.map((slime) => state.slimes[slime.id]?.fragments ?? 0),
+    );
+    const candidates = incomplete.filter(
+      (slime) => (state.slimes[slime.id]?.fragments ?? 0) === minimumFragments,
+    );
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -459,7 +485,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   const pullOne = (): PullOutcome => {
     const current = stateRef.current;
-    const slime = pickWeightedSlime(current.pity >= SSR_PITY_PULLS - 1);
+    const slime = pickWeightedSlime(current.pity >= SSR_PITY_PULLS - 1, current);
     const playerSlime = current.slimes[slime.id];
     const owned = playerSlime?.owned ?? false;
     const nextPity = slime.rarity === "SSR" ? 0 : current.pity + 1;
@@ -510,9 +536,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       };
     }
 
+    const fragmentReward = duplicateFragmentReward(slime.rarity);
     const nextFragments = Math.min(
       ACCESSORY_FRAGMENT_COST,
-      playerSlime.fragments + DUPLICATE_FRAGMENT_REWARD,
+      playerSlime.fragments + fragmentReward,
     );
     const added = nextFragments - playerSlime.fragments;
     replaceState({
