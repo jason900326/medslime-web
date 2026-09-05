@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+function getSafeRedirect() {
+  if (typeof window === "undefined") return "/";
+
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get("redirect")?.trim() ?? "";
+
+  if (!redirect.startsWith("/") || redirect.startsWith("//")) {
+    return "/";
+  }
+
+  return redirect;
+}
+
 export function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +46,10 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/");
-    router.refresh();
+    // 這裡使用完整頁面導向，而不是只做 client-side push。
+    // 可確保 Supabase 剛寫入的 session cookie 會立刻帶到下一個受保護頁面，
+    // 避免從錯題庫被導到登入頁後又被判定成未登入。
+    window.location.assign(getSafeRedirect());
   };
 
   return (
