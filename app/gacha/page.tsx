@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/top-bar";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
@@ -12,6 +12,26 @@ type Result = ReturnType<typeof useGameState>["pullOne"] extends () => infer R
   ? R
   : never;
 
+const FOUNDERS_GIFT_CLAIM_ID = "promo:initial-people:2026-09";
+const FOUNDERS_GIFT_COINS = 5_000;
+const FOUNDERS_GIFT_TICKETS = 20;
+const FOUNDERS_SIGNUP_START = new Date("2026-09-05T16:00:00.000Z");
+const FOUNDERS_SIGNUP_END = new Date("2026-09-12T15:59:59.999Z");
+const OWNER_EMAIL = "s0916540326@gmail.com";
+
+function isFoundersWeekEligible(createdAt: string | null) {
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  const now = new Date();
+
+  return (
+    Number.isFinite(created.getTime()) &&
+    created >= FOUNDERS_SIGNUP_START &&
+    created <= FOUNDERS_SIGNUP_END &&
+    now <= FOUNDERS_SIGNUP_END
+  );
+}
+
 export default function GachaPage() {
   const auth = useAuthUser();
   const game = useGameState();
@@ -19,8 +39,84 @@ export default function GachaPage() {
   const [pulling, setPulling] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [pullCount, setPullCount] = useState<1 | 10>(1);
+  const [foundersGiftOpen, setFoundersGiftOpen] = useState(false);
+  const [ownerResetChecking, setOwnerResetChecking] = useState(false);
+  const [ownerResetError, setOwnerResetError] = useState("");
 
-  if (auth.loading) {
+  useEffect(() => {
+    if (auth.loading || !auth.isLoggedIn) return;
+    if (auth.email?.toLowerCase() !== OWNER_EMAIL) return;
+
+    let cancelled = false;
+    setOwnerResetChecking(true);
+    setOwnerResetError("");
+
+    const resetOwnerAccount = async () => {
+      try {
+        const response = await fetch("/api/owner-test-reset", {
+          method: "POST",
+          cache: "no-store",
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "測試帳號重置失敗。");
+        }
+
+        if (cancelled) return;
+
+        if (payload?.applied) {
+          if (auth.userId) {
+            window.localStorage.removeItem(
+              `medslime_mistakes_v1:${auth.userId}`,
+            );
+          }
+          window.location.reload();
+          return;
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setOwnerResetError(
+            error instanceof Error ? error.message : "測試帳號重置失敗。",
+          );
+        }
+      } finally {
+        if (!cancelled) setOwnerResetChecking(false);
+      }
+    };
+
+    void resetOwnerAccount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.loading, auth.isLoggedIn, auth.email, auth.userId]);
+
+  useEffect(() => {
+    if (auth.loading || !auth.isLoggedIn || !game.isReady) return;
+    if (ownerResetChecking) return;
+    if (!isFoundersWeekEligible(auth.createdAt)) return;
+    if (game.claimedTaskIds.includes(FOUNDERS_GIFT_CLAIM_ID)) return;
+
+    const claimed = game.claimTaskReward(FOUNDERS_GIFT_CLAIM_ID, {
+      type: "coins",
+      amount: FOUNDERS_GIFT_COINS,
+    });
+
+    if (!claimed) return;
+
+    game.addTickets(FOUNDERS_GIFT_TICKETS);
+    setFoundersGiftOpen(true);
+  }, [
+    auth.loading,
+    auth.isLoggedIn,
+    auth.createdAt,
+    game.isReady,
+    game.claimedTaskIds,
+    ownerResetChecking,
+  ]);
+
+  if (auth.loading || ownerResetChecking) {
     return <main className="min-h-screen bg-[#f8fcf9]" />;
   }
 
@@ -83,6 +179,12 @@ export default function GachaPage() {
           backHref="/slimes"
           backLabel="返回史萊姆圖鑑"
         />
+
+        {ownerResetError && (
+          <div className="mt-5 rounded-2xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
+            測試帳號重置沒有完成：{ownerResetError}
+          </div>
+        )}
 
         <section className="mt-6 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.06)] md:p-7">
           <div className="text-xs font-black tracking-[0.1em] text-[#c58a2d]">
@@ -150,6 +252,44 @@ export default function GachaPage() {
           抽卡後會直接進入揭曉畫面。單抽可以翻牌；十連抽可以把卡片一張一張滑開，也可以直接全部揭曉。
         </section>
       </div>
+
+      {foundersGiftOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#102019]/55 px-5 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[30px] border border-[#d9eadf] bg-white p-6 text-center shadow-2xl sm:p-8">
+            <div className="text-5xl">🌱</div>
+            <div className="mt-4 text-xs font-black tracking-[0.14em] text-[#2ba962]">
+              EARLY TESTER GIFT
+            </div>
+            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
+              初始的人們
+            </h2>
+            <p className="mt-4 text-sm font-bold leading-7 text-[#6f887b]">
+              你是 MedSlime 最早一批測試者之一。這週先多給你一點資源，盡量抽、盡量玩，也盡量把奇怪的地方找出來。
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-[#fff8df] px-4 py-4">
+                <div className="text-2xl">🪙</div>
+                <div className="mt-1 text-xl font-black">5,000</div>
+                <div className="mt-1 text-xs font-bold text-[#8b7a49]">金幣</div>
+              </div>
+              <div className="rounded-2xl bg-[#eefaf2] px-4 py-4">
+                <div className="text-2xl">🎫</div>
+                <div className="mt-1 text-xl font-black">20</div>
+                <div className="mt-1 text-xs font-bold text-[#557768]">抽卡券</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setFoundersGiftOpen(false)}
+              className="mt-6 w-full rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70]"
+            >
+              收下，開始測試
+            </button>
+          </div>
+        </div>
+      )}
 
       <GachaRevealOverlay
         open={overlayOpen}
