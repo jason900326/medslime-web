@@ -221,19 +221,26 @@ export default function FocusPage() {
             </div>
 
             <div className="mt-8">
-              <div className="relative mx-10 pt-[74px] sm:mx-12">
+              <div className="relative mx-auto h-[190px] w-full max-w-[680px] overflow-hidden rounded-[24px] border border-[#cfe2d5] bg-[#dcefdc] shadow-inner sm:h-[230px]">
+                <img
+                  src="/backgrounds/slime-forest.png"
+                  alt="史萊姆森林"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/5" />
+
                 <div
-                  className="absolute bottom-[8px] z-10 -translate-x-1/2 transition-[left] duration-500 ease-out"
-                  style={{ left: `${progress}%` }}
+                  className="absolute bottom-[15%] z-10 -translate-x-1/2 transition-[left] duration-500 ease-out"
+                  style={{ left: `clamp(8%, ${8 + progress * 0.84}%, 92%)` }}
                 >
                   <img
                     src={companionImage}
                     alt={getPlayerDisplayName(companion.id, playerSlime)}
-                    className="h-14 w-14 max-w-none object-contain drop-shadow-sm sm:h-16 sm:w-16"
+                    className="h-20 w-20 max-w-none object-contain drop-shadow-[0_5px_6px_rgba(0,0,0,0.22)] sm:h-24 sm:w-24"
                   />
                 </div>
 
-                <div className="h-3 overflow-hidden rounded-full bg-[#e7efe9]">
+                <div className="absolute inset-x-4 bottom-3 z-20 h-2 overflow-hidden rounded-full bg-white/55 shadow-sm sm:inset-x-6">
                   <div
                     className="h-full rounded-full bg-[#55b97b] transition-[width] duration-500"
                     style={{ width: `${progress}%` }}
