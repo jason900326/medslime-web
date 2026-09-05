@@ -27,12 +27,7 @@ function getLocalDateKey(date: Date) {
 }
 
 function getMonday(date: Date) {
-  const copy = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  );
-
+  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = copy.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   copy.setDate(copy.getDate() + diff);
@@ -98,16 +93,23 @@ export default function TasksPage() {
         0,
       ),
       focusMinutes: Math.floor(
-        activities.reduce(
-          (sum, item) => sum + item.focusSeconds,
-          0,
-        ) / 60,
+        activities.reduce((sum, item) => sum + item.focusSeconds, 0) / 60,
       ),
     };
   }, [game.activityByDate, weekKeys]);
 
   const weekId = weekKeys[0] ?? "loading";
 
+  /*
+   * 經濟 v2：
+   * - 免費抽：1 抽 / 日
+   * - 三個每日任務：共 75 金幣（0.75 抽）
+   * - 每日全清：再送 1 張抽卡券
+   * - 每週全清：5 張抽卡券
+   *
+   * 完整活躍玩家在不含專注獎勵、成就的情況下，
+   * 平均每天約 3.46 抽；有讀書計時與成就時會再稍高一些。
+   */
   const dailyTasks: Task[] = [
     {
       id: "daily-questions",
@@ -115,7 +117,7 @@ export default function TasksPage() {
       progress: today.questionsAnswered,
       target: 5,
       unit: "題",
-      reward: { type: "coins", amount: 10 },
+      reward: { type: "coins", amount: 25 },
       claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
@@ -124,7 +126,7 @@ export default function TasksPage() {
       progress: today.mistakesReviewed,
       target: 1,
       unit: "題",
-      reward: { type: "coins", amount: 10 },
+      reward: { type: "coins", amount: 25 },
       claimId: `daily:${todayKey ?? "loading"}:review`,
     },
     {
@@ -133,10 +135,14 @@ export default function TasksPage() {
       progress: Math.floor(today.focusSeconds / 60),
       target: 20,
       unit: "分鐘",
-      reward: { type: "coins", amount: 10 },
+      reward: { type: "coins", amount: 25 },
       claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
+
+  const dailyComplete = dailyTasks.every((task) => task.progress >= task.target);
+  const dailyBonusClaimId = `daily:${todayKey ?? "loading"}:all`;
+  const dailyBonusClaimed = game.claimedTaskIds.includes(dailyBonusClaimId);
 
   const weeklyItems = [
     {
@@ -165,13 +171,9 @@ export default function TasksPage() {
     },
   ];
 
-  const weeklyComplete = weeklyItems.every(
-    (item) => item.progress >= item.target,
-  );
-
+  const weeklyComplete = weeklyItems.every((item) => item.progress >= item.target);
   const weeklyClaimId = `weekly:${weekId}:all`;
-  const weeklyClaimed =
-    game.claimedTaskIds.includes(weeklyClaimId);
+  const weeklyClaimed = game.claimedTaskIds.includes(weeklyClaimId);
 
   if (!game.isReady || !todayKey || weekKeys.length === 0) {
     return <main className="min-h-screen bg-[#f8fcf9]" />;
@@ -192,27 +194,50 @@ export default function TasksPage() {
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {dailyTasks.map((task) => {
-              const status: TaskStatus =
-                game.claimedTaskIds.includes(task.claimId)
-                  ? "claimed"
-                  : task.progress >= task.target
-                    ? "claimable"
-                    : "in_progress";
+              const status: TaskStatus = game.claimedTaskIds.includes(task.claimId)
+                ? "claimed"
+                : task.progress >= task.target
+                  ? "claimable"
+                  : "in_progress";
 
               return (
                 <TaskCard
                   key={task.id}
                   task={task}
                   status={status}
-                  onClaim={() =>
-                    game.claimTaskReward(
-                      task.claimId,
-                      task.reward,
-                    )
-                  }
+                  onClaim={() => game.claimTaskReward(task.claimId, task.reward)}
                 />
               );
             })}
+          </div>
+
+          <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
+            <div className="text-lg font-black">每日全清獎勵：🎫 ×1</div>
+            <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
+              三個每日任務都完成後再領 1 抽，讓每天的學習循環更有回饋感。
+            </div>
+
+            <button
+              disabled={!dailyComplete || dailyBonusClaimed}
+              onClick={() =>
+                game.claimTaskReward(dailyBonusClaimId, {
+                  type: "tickets",
+                  amount: 1,
+                })
+              }
+              className={[
+                "mt-4 rounded-xl px-5 py-3 font-black",
+                dailyComplete && !dailyBonusClaimed
+                  ? "bg-[#31c978] text-white"
+                  : "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]",
+              ].join(" ")}
+            >
+              {dailyBonusClaimed
+                ? "已領取"
+                : dailyComplete
+                  ? "領取抽卡券"
+                  : "完成全部每日任務後領取"}
+            </button>
           </div>
         </section>
 
@@ -220,40 +245,33 @@ export default function TasksPage() {
           <h2 className="text-2xl font-black">每週任務</h2>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {weeklyItems.map(
-              ({ title, progress, target, unit }) => (
-                <div
-                  key={title}
-                  className="rounded-[24px] border border-[#dfece4] bg-white p-5"
-                >
-                  <div className="text-lg font-black">
-                    {title}
-                  </div>
+            {weeklyItems.map(({ title, progress, target, unit }) => (
+              <div
+                key={title}
+                className="rounded-[24px] border border-[#dfece4] bg-white p-5"
+              >
+                <div className="text-lg font-black">{title}</div>
 
-                  <div className="mt-4 text-sm font-bold text-[#557768]">
-                    {Math.min(progress, target)} / {target}{" "}
-                    {unit}
-                  </div>
-
-                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7efe9]">
-                    <div
-                      className="h-full rounded-full bg-[#55b97b]"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          (progress / target) * 100,
-                        )}%`,
-                      }}
-                    />
-                  </div>
+                <div className="mt-4 text-sm font-bold text-[#557768]">
+                  {Math.min(progress, target)} / {target} {unit}
                 </div>
-              ),
-            )}
+
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7efe9]">
+                  <div
+                    className="h-full rounded-full bg-[#55b97b]"
+                    style={{
+                      width: `${Math.min(100, (progress / target) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
-            <div className="text-lg font-black">
-              本週最終獎勵：🎫 ×1
+            <div className="text-lg font-black">本週最終獎勵：🎫 ×5</div>
+            <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
+              完整維持一週的學習節奏，可以一次拿到 5 抽。
             </div>
 
             <button
@@ -261,7 +279,7 @@ export default function TasksPage() {
               onClick={() =>
                 game.claimTaskReward(weeklyClaimId, {
                   type: "tickets",
-                  amount: 1,
+                  amount: 5,
                 })
               }
               className={[
@@ -274,7 +292,7 @@ export default function TasksPage() {
               {weeklyClaimed
                 ? "已領取"
                 : weeklyComplete
-                  ? "領取抽卡券"
+                  ? "領取 5 張抽卡券"
                   : "尚未完成"}
             </button>
           </div>
@@ -293,18 +311,14 @@ function TaskCard({
   status: TaskStatus;
   onClaim: () => void;
 }) {
-  const percent = Math.min(
-    100,
-    (task.progress / task.target) * 100,
-  );
+  const percent = Math.min(100, (task.progress / task.target) * 100);
 
   return (
     <div className="rounded-[24px] border border-[#dfece4] bg-white p-5">
       <div className="text-lg font-black">{task.title}</div>
 
       <div className="mt-4 text-sm font-bold text-[#557768]">
-        {Math.min(task.progress, task.target)} / {task.target}{" "}
-        {task.unit}
+        {Math.min(task.progress, task.target)} / {task.target} {task.unit}
       </div>
 
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7efe9]">
