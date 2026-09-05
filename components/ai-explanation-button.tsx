@@ -39,6 +39,12 @@ type GenerateResponse = {
   error?: string;
 };
 
+type QuickResponse = {
+  cached: boolean;
+  quick?: string;
+  error?: string;
+};
+
 type FeedbackValue = "helpful" | "not_helpful";
 
 export default function AIExplanationButton({
@@ -46,17 +52,83 @@ export default function AIExplanationButton({
 }: {
   payload: AIExplanationPayload;
 }) {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ExplanationResult | null>(null);
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [quickResult, setQuickResult] = useState<string | null>(null);
+  const [detailResult, setDetailResult] = useState<ExplanationResult | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedback, setFeedback] = useState<FeedbackValue | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
 
-  const requestExplanation = async () => {
-    if (loading) return;
+  const requestQuickExplanation = async () => {
+    if (quickLoading) return;
 
-    setLoading(true);
+    if (quickResult) {
+      setQuickOpen((current) => !current);
+      return;
+    }
+
+    setQuickLoading(true);
+    setErrorMessage("");
+
+    try {
+      const params = new URLSearchParams({
+        questionKey: payload.questionKey,
+        source: payload.source,
+      });
+
+      const previewResponse = await fetch(
+        `/api/ai-quick-explanation?${params.toString()}`,
+        { method: "GET", cache: "no-store" },
+      );
+
+      const preview = (await previewResponse.json()) as QuickResponse;
+
+      if (!previewResponse.ok) {
+        throw new Error(preview.error ?? "無法讀取 AI 解析。");
+      }
+
+      if (preview.cached && preview.quick) {
+        setQuickResult(preview.quick);
+        setQuickOpen(true);
+        return;
+      }
+
+      const response = await fetch("/api/ai-quick-explanation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await response.json()) as QuickResponse;
+
+      if (!response.ok || !data.quick) {
+        throw new Error(data.error ?? "AI 解析產生失敗，請稍後再試。");
+      }
+
+      setQuickResult(data.quick);
+      setQuickOpen(true);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "AI 解析發生未知錯誤。",
+      );
+    } finally {
+      setQuickLoading(false);
+    }
+  };
+
+  const requestDetailedExplanation = async () => {
+    if (detailLoading) return;
+
+    if (detailResult) {
+      setDetailOpen((current) => !current);
+      return;
+    }
+
+    setDetailLoading(true);
     setErrorMessage("");
 
     try {
@@ -67,50 +139,42 @@ export default function AIExplanationButton({
 
       const previewResponse = await fetch(
         `/api/ai-explanation?${params.toString()}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        },
+        { method: "GET", cache: "no-store" },
       );
 
       const preview = (await previewResponse.json()) as PreviewResponse;
 
       if (!previewResponse.ok) {
-        throw new Error(
-          preview.error ?? "無法讀取 AI 詳解。",
-        );
+        throw new Error(preview.error ?? "無法讀取 AI 詳解。");
       }
 
       if (preview.cached && preview.explanation) {
-        setResult(preview.explanation);
+        setDetailResult(preview.explanation);
+        setDetailOpen(true);
         return;
       }
 
       setShowConfirm(true);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "AI 詳解發生未知錯誤。",
+        error instanceof Error ? error.message : "AI 詳解發生未知錯誤。",
       );
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
-  const generateExplanation = async () => {
-    if (loading) return;
+  const generateDetailedExplanation = async () => {
+    if (detailLoading) return;
 
     setShowConfirm(false);
-    setLoading(true);
+    setDetailLoading(true);
     setErrorMessage("");
 
     try {
       const response = await fetch("/api/ai-explanation", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -122,15 +186,14 @@ export default function AIExplanationButton({
         );
       }
 
-      setResult(data.explanation);
+      setDetailResult(data.explanation);
+      setDetailOpen(true);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "AI 詳解發生未知錯誤。",
+        error instanceof Error ? error.message : "AI 詳解發生未知錯誤。",
       );
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
@@ -140,35 +203,26 @@ export default function AIExplanationButton({
     setFeedbackLoading(true);
 
     try {
-      const response = await fetch(
-        "/api/ai-explanation-feedback",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            questionKey: payload.questionKey,
-            source: payload.source,
-            sourceLabel: payload.sourceLabel,
-            feedback: value,
-          }),
-        },
-      );
+      const response = await fetch("/api/ai-explanation-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionKey: payload.questionKey,
+          source: payload.source,
+          sourceLabel: payload.sourceLabel,
+          feedback: value,
+        }),
+      });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(
-          data?.error ?? "回饋儲存失敗。",
-        );
+        throw new Error(data?.error ?? "回饋儲存失敗。");
       }
 
       setFeedback(value);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "回饋儲存失敗。",
+        error instanceof Error ? error.message : "回饋儲存失敗。",
       );
     } finally {
       setFeedbackLoading(false);
@@ -177,14 +231,33 @@ export default function AIExplanationButton({
 
   return (
     <div className="mt-4">
-      <button
-        type="button"
-        onClick={requestExplanation}
-        disabled={loading}
-        className="rounded-xl border border-[#cfe7d8] bg-white px-4 py-2 text-sm font-black text-[#237849] transition hover:bg-[#f3fbf6] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "AI 正在整理詳解..." : "✨ AI 詳解"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={requestQuickExplanation}
+          disabled={quickLoading}
+          className="rounded-xl border border-[#cfe7d8] bg-white px-4 py-2 text-sm font-black text-[#237849] transition hover:bg-[#f3fbf6] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {quickLoading
+            ? "AI 正在快速解析..."
+            : quickResult && quickOpen
+              ? "收起 AI 解析"
+              : "✨ AI 解析"}
+        </button>
+
+        <button
+          type="button"
+          onClick={requestDetailedExplanation}
+          disabled={detailLoading}
+          className="rounded-xl border border-[#cfd9e7] bg-white px-4 py-2 text-sm font-black text-[#3f607e] transition hover:bg-[#f5f8fb] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {detailLoading
+            ? "AI 正在整理詳解..."
+            : detailResult && detailOpen
+              ? "收起 AI 詳解"
+              : "📚 AI 詳解"}
+        </button>
+      </div>
 
       {errorMessage && (
         <div className="mt-3 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
@@ -192,22 +265,40 @@ export default function AIExplanationButton({
         </div>
       )}
 
-      {result && (
+      {quickResult && quickOpen && (
+        <div className="mt-4 rounded-[18px] border border-[#dcebe2] bg-[#f8fcf9] p-4 text-left">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-black text-[#2ba962]">一句話解析</div>
+            <button
+              type="button"
+              onClick={() => setQuickOpen(false)}
+              className="text-xs font-black text-[#789083] hover:text-[#315b45]"
+            >
+              收起
+            </button>
+          </div>
+          <div className="mt-2 text-sm font-bold leading-7 text-[#536f60]">
+            {quickResult}
+          </div>
+        </div>
+      )}
+
+      {detailResult && detailOpen && (
         <div className="mt-4 space-y-4 rounded-[20px] border border-[#dfece4] bg-[#f8fcf9] p-5 text-left">
-          <Section
-            title="這題在考什麼"
-            text={result.whatItTests}
-          />
+          <div className="flex items-center justify-between gap-3 border-b border-[#dfece4] pb-3">
+            <div className="text-sm font-black text-[#315b45]">AI 詳解</div>
+            <button
+              type="button"
+              onClick={() => setDetailOpen(false)}
+              className="text-xs font-black text-[#789083] hover:text-[#315b45]"
+            >
+              收起
+            </button>
+          </div>
 
-          <Section
-            title="正確答案"
-            text={result.correctAnswer}
-          />
-
-          <Section
-            title="為什麼"
-            text={result.whyCorrect}
-          />
+          <Section title="這題在考什麼" text={detailResult.whatItTests} />
+          <Section title="正確答案" text={detailResult.correctAnswer} />
+          <Section title="為什麼" text={detailResult.whyCorrect} />
 
           <div>
             <div className="text-sm font-black text-[#2ba962]">
@@ -215,14 +306,12 @@ export default function AIExplanationButton({
             </div>
 
             <div className="mt-2 space-y-2">
-              {result.optionAnalysis.map((item) => (
+              {detailResult.optionAnalysis.map((item) => (
                 <div
                   key={item.label}
                   className="rounded-xl border border-[#dfe8e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-[#60786c]"
                 >
-                  <span className="font-black text-[#315b45]">
-                    {item.label}
-                  </span>{" "}
+                  <span className="font-black text-[#315b45]">{item.label}</span>{" "}
                   {item.explanation}
                 </div>
               ))}
@@ -230,16 +319,10 @@ export default function AIExplanationButton({
           </div>
 
           <div>
-            <div className="text-sm font-black text-[#2ba962]">
-              快速整理
-            </div>
-
+            <div className="text-sm font-black text-[#2ba962]">快速整理</div>
             <ul className="mt-2 space-y-1.5 text-sm font-bold leading-6 text-[#60786c]">
-              {result.quickSummary.map((item, index) => (
-                <li
-                  key={`${item}-${index}`}
-                  className="flex gap-2"
-                >
+              {detailResult.quickSummary.map((item, index) => (
+                <li key={`${item}-${index}`} className="flex gap-2">
                   <span className="text-[#31c978]">•</span>
                   <span>{item}</span>
                 </li>
@@ -247,16 +330,10 @@ export default function AIExplanationButton({
             </ul>
           </div>
 
-          <Section
-            title="國考記憶點"
-            text={result.memoryPoint}
-          />
+          <Section title="國考記憶點" text={detailResult.memoryPoint} />
 
-          {result.commonTrap.trim() && (
-            <Section
-              title="常見陷阱"
-              text={result.commonTrap}
-            />
+          {detailResult.commonTrap.trim() && (
+            <Section title="常見陷阱" text={detailResult.commonTrap} />
           )}
 
           <div className="border-t border-[#dfece4] pt-4">
@@ -315,7 +392,7 @@ export default function AIExplanationButton({
             </div>
 
             <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-              MedSlime 會整理這題的考點、正解理由、其他選項與國考記憶點。
+              MedSlime 會深入整理這題的考點、正解理由、其他選項與國考記憶點。產生後會保存，同一題之後直接讀取，不會每次重新生成。
             </p>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
@@ -329,7 +406,7 @@ export default function AIExplanationButton({
 
               <button
                 type="button"
-                onClick={generateExplanation}
+                onClick={generateDetailedExplanation}
                 className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
                 產生詳解
@@ -342,21 +419,11 @@ export default function AIExplanationButton({
   );
 }
 
-function Section({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}) {
+function Section({ title, text }: { title: string; text: string }) {
   return (
     <div>
-      <div className="text-sm font-black text-[#2ba962]">
-        {title}
-      </div>
-      <div className="mt-1 text-sm font-bold leading-7 text-[#60786c]">
-        {text}
-      </div>
+      <div className="text-sm font-black text-[#2ba962]">{title}</div>
+      <div className="mt-1 text-sm font-bold leading-7 text-[#60786c]">{text}</div>
     </div>
   );
 }
