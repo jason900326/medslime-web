@@ -51,20 +51,10 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/auth") ||
     isPublicStudyRoute;
 
-  /*
-   * 個人帳號資料必須登入：
-   * - /slimes
-   * - /gacha
-   * - /achievements
-   * - /tasks
-   * - /study/focus
-   * - /study/mistakes
-   *
-   * 其他學習頁（教材、國考）仍可未登入使用。
-   */
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    url.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 
