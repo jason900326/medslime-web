@@ -18,6 +18,7 @@ function syncActiveUserId(userId: string | null) {
 export function useAuthUser() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function useAuthUser() {
 
       setUserId(nextUserId);
       setEmail(user?.email ?? null);
+      setCreatedAt(user?.created_at ?? null);
       syncActiveUserId(nextUserId);
       setLoading(false);
     };
@@ -45,6 +47,7 @@ export function useAuthUser() {
 
       setUserId(nextUserId);
       setEmail(session?.user?.email ?? null);
+      setCreatedAt(session?.user?.created_at ?? null);
       syncActiveUserId(nextUserId);
       setLoading(false);
     });
@@ -55,6 +58,7 @@ export function useAuthUser() {
   return {
     userId,
     email,
+    createdAt,
     loading,
     isLoggedIn: Boolean(userId),
   };
