@@ -15,15 +15,21 @@ function formatElapsed(totalSeconds: number) {
 }
 
 export default function ExamElapsedTimer() {
-  const startedAtRef = useRef(Date.now());
+  // Date.now() 不能在 Client Component render 階段執行，
+  // 否則 Next.js prerender 會把它視為 unstable value。
+  const startedAtRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
   const pausedAtRef = useRef<number | null>(null);
   const pausedTotalRef = useRef(0);
 
   useEffect(() => {
+    if (startedAtRef.current === null) {
+      startedAtRef.current = Date.now();
+    }
+
     const update = () => {
-      if (paused) return;
+      if (paused || startedAtRef.current === null) return;
 
       const seconds = Math.max(
         0,
