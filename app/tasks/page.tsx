@@ -36,7 +36,6 @@ function getMonday(date: Date) {
 
 function getWeekKeys(now: Date) {
   const monday = getMonday(now);
-
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(monday);
     date.setDate(monday.getDate() + index);
@@ -61,11 +60,7 @@ export default function TasksPage() {
         mistakesReviewed: 0,
         focusSeconds: 0,
       }
-    : {
-        questionsAnswered: 0,
-        mistakesReviewed: 0,
-        focusSeconds: 0,
-      };
+    : { questionsAnswered: 0, mistakesReviewed: 0, focusSeconds: 0 };
 
   const week = useMemo(() => {
     const activities = weekKeys.map(
@@ -100,16 +95,6 @@ export default function TasksPage() {
 
   const weekId = weekKeys[0] ?? "loading";
 
-  /*
-   * 經濟 v2：
-   * - 免費抽：1 抽 / 日
-   * - 三個每日任務：共 75 金幣（0.75 抽）
-   * - 每日全清：再送 1 張抽卡券
-   * - 每週全清：5 張抽卡券
-   *
-   * 完整活躍玩家在不含專注獎勵、成就的情況下，
-   * 平均每天約 3.46 抽；有讀書計時與成就時會再稍高一些。
-   */
   const dailyTasks: Task[] = [
     {
       id: "daily-questions",
@@ -205,7 +190,9 @@ export default function TasksPage() {
                   key={task.id}
                   task={task}
                   status={status}
-                  onClaim={() => game.claimTaskReward(task.claimId, task.reward)}
+                  onClaim={() =>
+                    game.claimTaskReward(task.claimId, task.reward)
+                  }
                 />
               );
             })}
@@ -214,10 +201,11 @@ export default function TasksPage() {
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
             <div className="text-lg font-black">每日全清獎勵：🎫 ×1</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-              三個每日任務都完成後再領 1 抽，讓每天的學習循環更有回饋感。
+              今天的基本份完成了，這張抽卡券可以帶走。
             </div>
 
             <button
+              type="button"
               disabled={!dailyComplete || dailyBonusClaimed}
               onClick={() =>
                 game.claimTaskReward(dailyBonusClaimId, {
@@ -251,11 +239,9 @@ export default function TasksPage() {
                 className="rounded-[24px] border border-[#dfece4] bg-white p-5"
               >
                 <div className="text-lg font-black">{title}</div>
-
                 <div className="mt-4 text-sm font-bold text-[#557768]">
                   {Math.min(progress, target)} / {target} {unit}
                 </div>
-
                 <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7efe9]">
                   <div
                     className="h-full rounded-full bg-[#55b97b]"
@@ -269,12 +255,13 @@ export default function TasksPage() {
           </div>
 
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
-            <div className="text-lg font-black">本週最終獎勵：🎫 ×5</div>
+            <div className="text-lg font-black">本週全清獎勵：🎫 ×5</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-              完整維持一週的學習節奏，可以一次拿到 5 抽。
+              這週有穩定回來學習，5 張抽卡券是你的。
             </div>
 
             <button
+              type="button"
               disabled={!weeklyComplete || weeklyClaimed}
               onClick={() =>
                 game.claimTaskReward(weeklyClaimId, {
@@ -316,26 +303,23 @@ function TaskCard({
   return (
     <div className="rounded-[24px] border border-[#dfece4] bg-white p-5">
       <div className="text-lg font-black">{task.title}</div>
-
       <div className="mt-4 text-sm font-bold text-[#557768]">
         {Math.min(task.progress, task.target)} / {task.target} {task.unit}
       </div>
-
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7efe9]">
         <div
           className="h-full rounded-full bg-[#55b97b]"
           style={{ width: `${percent}%` }}
         />
       </div>
-
       <div className="mt-5 flex items-center justify-between gap-3">
         <div className="font-black text-[#2a9d5e]">
           {task.reward.type === "coins"
             ? `🪙 ${task.reward.amount}`
             : `🎫 ${task.reward.amount}`}
         </div>
-
         <button
+          type="button"
           disabled={status !== "claimable"}
           onClick={onClaim}
           className={[

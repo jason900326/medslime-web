@@ -76,7 +76,6 @@ export default function GachaRevealOverlay({
 
   useEffect(() => {
     if (!open) return;
-
     setSingleRevealed(false);
     setCurrentIndex(0);
     setShowSummary(false);
@@ -86,10 +85,8 @@ export default function GachaRevealOverlay({
 
   useEffect(() => {
     if (!open) return;
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       document.body.style.overflow = previousOverflow;
     };
@@ -110,13 +107,11 @@ export default function GachaRevealOverlay({
 
   const revealNext = () => {
     if (!currentResult) return;
-
     if (currentIndex >= results.length - 1) {
       setShowSummary(true);
       setDragX(0);
       return;
     }
-
     setCurrentIndex((index) => index + 1);
     setDragX(0);
     setDragStartX(null);
@@ -127,23 +122,22 @@ export default function GachaRevealOverlay({
       revealNext();
       return;
     }
-
     setDragX(0);
     setDragStartX(null);
   };
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#102019]/80 px-4 py-5 backdrop-blur-md sm:px-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#102019]/80 px-3 py-3 backdrop-blur-md sm:px-6 sm:py-5"
       role="dialog"
       aria-modal="true"
       aria-label="抽卡結果"
     >
-      <div className="relative flex min-h-[calc(100dvh-2.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-white/20 bg-[radial-gradient(circle_at_top,#f4fff8_0%,#eef8f1_28%,#dceee3_100%)] shadow-2xl sm:min-h-0 sm:h-[min(820px,calc(100dvh-3rem))]">
+      <div className="relative flex h-[calc(100dvh-1.5rem)] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-white/20 bg-[radial-gradient(circle_at_top,#f4fff8_0%,#eef8f1_28%,#dceee3_100%)] shadow-2xl sm:h-[min(820px,calc(100dvh-3rem))]">
         <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-white/80 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[#89dfaf]/30 blur-3xl" />
 
-        <header className="relative z-20 flex items-center justify-between px-5 py-4 sm:px-7">
+        <header className="relative z-20 flex shrink-0 items-center justify-between px-5 py-3.5 sm:px-7 sm:py-4">
           <div>
             <div className="text-[11px] font-black tracking-[0.22em] text-[#55a777]">
               MEDSLIME GACHA
@@ -164,7 +158,14 @@ export default function GachaRevealOverlay({
           </button>
         </header>
 
-        <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-5 sm:px-8 sm:pb-8">
+        <div
+          className={[
+            "relative z-10 flex min-h-0 flex-1 justify-center px-4 pb-4 sm:px-8 sm:pb-8",
+            showSummary
+              ? "items-start overflow-y-auto overscroll-contain"
+              : "items-center overflow-hidden",
+          ].join(" ")}
+        >
           {loading || results.length === 0 ? (
             <LoadingStage />
           ) : pullCount === 1 ? (
@@ -198,7 +199,7 @@ export default function GachaRevealOverlay({
         </div>
 
         {!loading && pullCount === 1 && results.length > 0 && (
-          <footer className="relative z-20 flex justify-center px-5 pb-5 sm:pb-7">
+          <footer className="relative z-20 flex shrink-0 justify-center px-5 pb-5 sm:pb-7">
             <button
               type="button"
               onClick={close}
@@ -221,13 +222,25 @@ function LoadingStage() {
         <div className="absolute inset-6 animate-pulse rounded-full bg-[#a9e9c4]/45" />
         <Sparkles className="relative text-[#31c978]" size={40} strokeWidth={1.7} />
       </div>
-      <div className="mt-6 text-xl font-black text-[#17372a]">史萊姆生成中...</div>
-      <div className="mt-2 text-sm font-bold text-[#789083]">正在決定這次會遇見誰</div>
+      <div className="mt-6 text-xl font-black text-[#17372a]">
+        史萊姆生成中...
+      </div>
+      <div className="mt-2 text-sm font-bold text-[#789083]">
+        正在決定這次會遇見誰
+      </div>
     </div>
   );
 }
 
-function SingleReveal({ result, revealed, onReveal }: { result: GachaResult; revealed: boolean; onReveal: () => void }) {
+function SingleReveal({
+  result,
+  revealed,
+  onReveal,
+}: {
+  result: GachaResult;
+  revealed: boolean;
+  onReveal: () => void;
+}) {
   const slime = SLIME_BY_ID[result.slimeId];
   const theme = RARITY_THEME[slime.rarity];
 
@@ -238,27 +251,41 @@ function SingleReveal({ result, revealed, onReveal }: { result: GachaResult; rev
           <button
             type="button"
             onClick={() => !revealed && onReveal()}
-            aria-label={revealed ? `${slime.defaultName}，${slime.rarity}` : "翻開卡片"}
+            aria-label={
+              revealed ? `${slime.defaultName}，${slime.rarity}` : "翻開卡片"
+            }
             className={[
               "relative h-full w-full rounded-[30px] transition-transform duration-700 [transform-style:preserve-3d]",
               revealed ? "[transform:rotateY(180deg)]" : "hover:-translate-y-1",
             ].join(" ")}
           >
             <CardBack rarity={slime.rarity} />
-            <CardFront result={result} showReward className="[transform:rotateY(180deg)]" />
+            <CardFront
+              result={result}
+              showReward
+              className="[transform:rotateY(180deg)]"
+            />
           </button>
         </div>
       </div>
 
       <div className="mt-6 min-h-12">
         {revealed ? (
-          <div className="text-sm font-black text-[#4a6a59]">已加入這次抽卡結果</div>
+          <div className="text-sm font-black text-[#4a6a59]">
+            已加入這次抽卡結果
+          </div>
         ) : (
           <>
             <div className={`text-sm font-black ${theme.text}`}>
-              {slime.rarity === "SSR" ? "這張卡的氣息不太一樣..." : slime.rarity === "SR" ? "卡片周圍泛著強烈的光" : "點擊卡片翻開"}
+              {slime.rarity === "SSR"
+                ? "這張卡的氣息不太一樣..."
+                : slime.rarity === "SR"
+                  ? "卡片周圍泛著強烈的光"
+                  : "點擊卡片翻開"}
             </div>
-            <div className="mt-1 text-xs font-bold text-[#8aa095]">點一下看看是誰</div>
+            <div className="mt-1 text-xs font-bold text-[#8aa095]">
+              點一下看看是誰
+            </div>
           </>
         )}
       </div>
@@ -266,8 +293,28 @@ function SingleReveal({ result, revealed, onReveal }: { result: GachaResult; rev
   );
 }
 
-function TenPullStack({ results, currentIndex, dragX, dragStartX, remaining, onPointerDown, onPointerMove, onPointerUp, onNext, onShowAll }: {
-  results: GachaResult[]; currentIndex: number; dragX: number; dragStartX: number | null; remaining: number; onPointerDown: (x: number) => void; onPointerMove: (x: number) => void; onPointerUp: () => void; onNext: () => void; onShowAll: () => void;
+function TenPullStack({
+  results,
+  currentIndex,
+  dragX,
+  dragStartX,
+  remaining,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onNext,
+  onShowAll,
+}: {
+  results: GachaResult[];
+  currentIndex: number;
+  dragX: number;
+  dragStartX: number | null;
+  remaining: number;
+  onPointerDown: (x: number) => void;
+  onPointerMove: (x: number) => void;
+  onPointerUp: () => void;
+  onNext: () => void;
+  onShowAll: () => void;
 }) {
   const current = results[currentIndex];
   const slime = SLIME_BY_ID[current.slimeId];
@@ -276,11 +323,15 @@ function TenPullStack({ results, currentIndex, dragX, dragStartX, remaining, onP
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-4 flex w-full max-w-md items-center justify-between px-1 text-xs font-black text-[#668173] sm:text-sm">
-        <span>{currentIndex + 1} / {results.length}</span>
+        <span>
+          {currentIndex + 1} / {results.length}
+        </span>
         <span>剩下 {remaining} 張</span>
       </div>
 
-      <div className={`relative h-[430px] w-[278px] rounded-[32px] sm:h-[500px] sm:w-[322px] ${theme.glow}`}>
+      <div
+        className={`relative h-[430px] w-[278px] rounded-[32px] sm:h-[500px] sm:w-[322px] ${theme.glow}`}
+      >
         {results.slice(currentIndex).map((result, offset) => {
           const isTop = offset === 0;
           const visibleOffset = Math.min(offset, 5);
@@ -293,9 +344,15 @@ function TenPullStack({ results, currentIndex, dragX, dragStartX, remaining, onP
               className={[
                 "absolute inset-0 select-none rounded-[30px] transition-transform",
                 isTop && dragStartX !== null ? "duration-75" : "duration-300",
-                isTop ? "cursor-grab active:cursor-grabbing" : "pointer-events-none",
+                isTop
+                  ? "cursor-grab active:cursor-grabbing"
+                  : "pointer-events-none",
               ].join(" ")}
-              style={{ zIndex: results.length - offset, transform: isTop ? topTransform : stackTransform, transformOrigin: "center bottom" }}
+              style={{
+                zIndex: results.length - offset,
+                transform: isTop ? topTransform : stackTransform,
+                transformOrigin: "center bottom",
+              }}
               onPointerDown={(event) => {
                 if (!isTop) return;
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -316,14 +373,28 @@ function TenPullStack({ results, currentIndex, dragX, dragStartX, remaining, onP
 
       <div className="mt-7 text-center">
         <div className={`text-sm font-black ${theme.text}`}>
-          {slime.rarity === "SSR" ? "SSR · 這張值得停一下" : `${slime.rarity} · ${slime.defaultName}`}
+          {slime.rarity === "SSR"
+            ? "SSR · 這張值得停一下"
+            : `${slime.rarity} · ${slime.defaultName}`}
         </div>
-        <div className="mt-1 text-xs font-bold text-[#84988d]">左右滑開卡片，看看下一張</div>
+        <div className="mt-1 text-xs font-bold text-[#84988d]">
+          左右滑開卡片，看看下一張
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        <button type="button" onClick={onShowAll} className="rounded-xl border border-[#cfe1d6] bg-white/80 px-4 py-2.5 text-xs font-black text-[#4b6859] transition hover:bg-white">全部揭曉</button>
-        <button type="button" onClick={onNext} className="flex items-center gap-1 rounded-xl bg-[#17372a] px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5">
+        <button
+          type="button"
+          onClick={onShowAll}
+          className="rounded-xl border border-[#cfe1d6] bg-white/80 px-4 py-2.5 text-xs font-black text-[#4b6859] transition hover:bg-white"
+        >
+          全部揭曉
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          className="flex items-center gap-1 rounded-xl bg-[#17372a] px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5"
+        >
           {currentIndex === results.length - 1 ? "查看總覽" : "下一張"}
           <ChevronRight size={15} strokeWidth={3} />
         </button>
@@ -332,34 +403,61 @@ function TenPullStack({ results, currentIndex, dragX, dragStartX, remaining, onP
   );
 }
 
-function TenPullSummary({ results, onClose }: { results: GachaResult[]; onClose: () => void }) {
+function TenPullSummary({
+  results,
+  onClose,
+}: {
+  results: GachaResult[];
+  onClose: () => void;
+}) {
   const highRarity = results.filter((result) => {
     const rarity = SLIME_BY_ID[result.slimeId].rarity;
     return rarity === "SR" || rarity === "SSR";
   }).length;
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="w-full max-w-4xl pb-4 pt-1">
       <div className="text-center">
-        <div className="text-2xl font-black text-[#17372a] sm:text-3xl">十連結果</div>
-        <div className="mt-2 text-sm font-bold text-[#789083]">
-          {highRarity > 0 ? `這次有 ${highRarity} 張 SR 以上` : "這次的史萊姆都收進圖鑑紀錄了"}
+        <div className="text-xl font-black text-[#17372a] sm:text-3xl">
+          十連結果
+        </div>
+        <div className="mt-1 text-xs font-bold text-[#789083] sm:mt-2 sm:text-sm">
+          {highRarity > 0
+            ? `這次有 ${highRarity} 張 SR 以上`
+            : "這次的史萊姆都收進圖鑑紀錄了"}
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-5 sm:gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-5 sm:gap-3">
         {results.map((result, index) => {
           const slime = SLIME_BY_ID[result.slimeId];
           const theme = RARITY_THEME[slime.rarity];
           return (
-            <article key={`${result.slimeId}-${index}`} className={`relative overflow-hidden rounded-[20px] border-2 bg-gradient-to-br p-2.5 shadow-sm ${theme.border} ${theme.soft}`}>
-              {result.isNew && <div className="absolute left-2 top-2 z-10 rounded-full bg-[#17372a] px-2 py-1 text-[9px] font-black tracking-wide text-white">NEW</div>}
-              <div className="flex min-h-[106px] items-center justify-center sm:min-h-[120px]">
-                <img src={slime.image} alt={slime.defaultName} className="h-auto max-h-[112px] w-full object-contain sm:max-h-[130px]" />
+            <article
+              key={`${result.slimeId}-${index}`}
+              className={`relative overflow-hidden rounded-[18px] border-2 bg-gradient-to-br p-2 shadow-sm sm:rounded-[20px] sm:p-2.5 ${theme.border} ${theme.soft}`}
+            >
+              {result.isNew && (
+                <div className="absolute left-2 top-2 z-10 rounded-full bg-[#17372a] px-2 py-1 text-[9px] font-black tracking-wide text-white">
+                  NEW
+                </div>
+              )}
+              <div className="flex min-h-[82px] items-center justify-center sm:min-h-[120px]">
+                <img
+                  src={slime.image}
+                  alt={slime.defaultName}
+                  className="h-auto max-h-[88px] w-full object-contain sm:max-h-[130px]"
+                />
               </div>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <div className="min-w-0 truncate text-[11px] font-black text-[#294b39] sm:text-xs">{slime.defaultName}</div>
-                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black ${theme.badge}`}>{slime.rarity}</span>
+                <div className="min-w-0 truncate text-[10px] font-black text-[#294b39] sm:text-xs">
+                  {slime.defaultName}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black ${theme.badge}`}
+                >
+                  {slime.rarity}
+                </span>
               </div>
               <RewardBadge result={result} compact />
             </article>
@@ -367,8 +465,14 @@ function TenPullSummary({ results, onClose }: { results: GachaResult[]; onClose:
         })}
       </div>
 
-      <div className="mt-6 flex justify-center">
-        <button type="button" onClick={onClose} className="rounded-2xl bg-[#17372a] px-7 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5">收下全部史萊姆</button>
+      <div className="mt-4 flex justify-center sm:mt-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-2xl bg-[#17372a] px-7 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5"
+        >
+          收下全部史萊姆
+        </button>
       </div>
     </div>
   );
@@ -376,33 +480,76 @@ function TenPullSummary({ results, onClose }: { results: GachaResult[]; onClose:
 
 function CardBack({ rarity }: { rarity: SlimeRarity }) {
   const theme = RARITY_THEME[rarity];
-
   return (
-    <div className={["absolute inset-0 overflow-hidden rounded-[30px] border-2 bg-[#17372a] [backface-visibility:hidden]", theme.border].join(" ")}>
-      <img src="/gacha/card-back.png" alt="MedSlime 卡背" draggable={false} className="h-full w-full object-cover" />
+    <div
+      className={[
+        "absolute inset-0 overflow-hidden rounded-[30px] border-2 bg-[#17372a] [backface-visibility:hidden]",
+        theme.border,
+      ].join(" ")}
+    >
+      <img
+        src="/gacha/card-back.png"
+        alt="MedSlime 卡背"
+        draggable={false}
+        className="h-full w-full object-cover"
+      />
       <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-inset ring-white/20" />
     </div>
   );
 }
 
-function CardFront({ result, showReward = false, className = "" }: { result: GachaResult; showReward?: boolean; className?: string }) {
+function CardFront({
+  result,
+  showReward = false,
+  className = "",
+}: {
+  result: GachaResult;
+  showReward?: boolean;
+  className?: string;
+}) {
   const slime = SLIME_BY_ID[result.slimeId];
   const theme = RARITY_THEME[slime.rarity];
 
   return (
-    <div className={["absolute inset-0 overflow-hidden rounded-[30px] border-2 bg-gradient-to-br p-3 shadow-xl [backface-visibility:hidden]", theme.border, theme.soft, className].join(" ")}>
+    <div
+      className={[
+        "absolute inset-0 overflow-hidden rounded-[30px] border-2 bg-gradient-to-br p-3 shadow-xl [backface-visibility:hidden]",
+        theme.border,
+        theme.soft,
+        className,
+      ].join(" ")}
+    >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[24px] border border-white/80 bg-white/65 p-4">
         <div className="absolute inset-x-8 top-12 h-32 rounded-full bg-white/80 blur-2xl" />
         <div className="relative z-10 flex items-center justify-between">
-          <span className={`rounded-full px-3 py-1 text-[11px] font-black ${theme.badge}`}>{slime.rarity}</span>
-          {result.isNew && <span className="rounded-full bg-[#17372a] px-3 py-1 text-[10px] font-black tracking-wide text-white">NEW</span>}
+          <span
+            className={`rounded-full px-3 py-1 text-[11px] font-black ${theme.badge}`}
+          >
+            {slime.rarity}
+          </span>
+          {result.isNew && (
+            <span className="rounded-full bg-[#17372a] px-3 py-1 text-[10px] font-black tracking-wide text-white">
+              NEW
+            </span>
+          )}
         </div>
         <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center py-3">
-          <img src={slime.image} alt={slime.defaultName} draggable={false} className="h-auto max-h-[280px] w-full object-contain sm:max-h-[325px]" />
+          <img
+            src={slime.image}
+            alt={slime.defaultName}
+            draggable={false}
+            className="h-auto max-h-[280px] w-full object-contain sm:max-h-[325px]"
+          />
         </div>
         <div className="relative z-10 text-center">
-          <div className={`text-[11px] font-black tracking-[0.16em] ${theme.text}`}>{slime.rarity} SLIME</div>
-          <div className="mt-1 text-xl font-black text-[#17372a] sm:text-2xl">{slime.defaultName}</div>
+          <div
+            className={`text-[11px] font-black tracking-[0.16em] ${theme.text}`}
+          >
+            {slime.rarity} SLIME
+          </div>
+          <div className="mt-1 text-xl font-black text-[#17372a] sm:text-2xl">
+            {slime.defaultName}
+          </div>
           {showReward && <RewardBadge result={result} />}
         </div>
       </div>
@@ -410,11 +557,46 @@ function CardFront({ result, showReward = false, className = "" }: { result: Gac
   );
 }
 
-function RewardBadge({ result, compact = false }: { result: GachaResult; compact?: boolean }) {
-  const base = compact ? "mt-1.5 truncate rounded-lg px-2 py-1 text-[9px] font-black" : "mx-auto mt-3 max-w-[220px] rounded-xl px-3 py-2 text-xs font-black";
-  if (result.isNew) return <div className={`${base} bg-[#eaf9f0] text-[#28754b]`}>NEW · 已加入圖鑑</div>;
+function RewardBadge({
+  result,
+  compact = false,
+}: {
+  result: GachaResult;
+  compact?: boolean;
+}) {
+  const base = compact
+    ? "mt-1.5 truncate rounded-lg px-2 py-1 text-[9px] font-black"
+    : "mx-auto mt-3 max-w-[220px] rounded-xl px-3 py-2 text-xs font-black";
+
+  if (result.isNew) {
+    return (
+      <div className={`${base} bg-[#eaf9f0] text-[#28754b]`}>
+        NEW · 已加入圖鑑
+      </div>
+    );
+  }
+
   if (!result.duplicateReward) return null;
-  if (result.duplicateReward.type === "coins") return <div className={`${base} bg-[#fff4d8] text-[#996719]`}>重複 · +{result.duplicateReward.amount} 金幣</div>;
-  if (result.duplicateReward.type === "fragments_full") return <div className={`${base} bg-[#eef3f0] text-[#557768]`}>碎片已滿 · 可解鎖飾品</div>;
-  return <div className={`${base} bg-[#eef3f0] text-[#557768]`}>重複 · +{result.duplicateReward.amount} 碎片</div>;
+
+  if (result.duplicateReward.type === "coins") {
+    return (
+      <div className={`${base} bg-[#fff4d8] text-[#996719]`}>
+        重複 · +{result.duplicateReward.amount} 金幣
+      </div>
+    );
+  }
+
+  if (result.duplicateReward.type === "fragments_full") {
+    return (
+      <div className={`${base} bg-[#eef3f0] text-[#557768]`}>
+        碎片已滿 · 可解鎖飾品
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${base} bg-[#eef3f0] text-[#557768]`}>
+      重複 · +{result.duplicateReward.amount} 碎片
+    </div>
+  );
 }
