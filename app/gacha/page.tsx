@@ -6,7 +6,7 @@ import TopBar from "@/components/top-bar";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { useGameState } from "@/components/game-state-provider";
-import { SLIME_BY_ID } from "@/lib/slime-data";
+import GachaRevealOverlay from "./gacha-reveal-overlay";
 
 type Result = ReturnType<typeof useGameState>["pullOne"] extends () => infer R
   ? R
@@ -17,6 +17,8 @@ export default function GachaPage() {
   const game = useGameState();
   const [results, setResults] = useState<Result[]>([]);
   const [pulling, setPulling] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const [pullCount, setPullCount] = useState<1 | 10>(1);
 
   if (auth.loading) {
     return <main className="min-h-screen bg-[#f8fcf9]" />;
@@ -48,18 +50,29 @@ export default function GachaPage() {
 
     if (payment === "tickets" && !game.spendTickets(count)) return;
 
-    setPulling(true);
+    setPullCount(count);
     setResults([]);
+    setPulling(true);
+    setOverlayOpen(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 350));
 
-    const pulled: Result[] = [];
-    for (let i = 0; i < count; i += 1) {
-      pulled.push(game.pullOne());
+      const pulled: Result[] = [];
+      for (let i = 0; i < count; i += 1) {
+        pulled.push(game.pullOne());
+      }
+
+      setResults(pulled);
+    } finally {
+      setPulling(false);
     }
+  };
 
-    setResults(pulled);
-    setPulling(false);
+  const closeOverlay = () => {
+    if (pulling) return;
+    setOverlayOpen(false);
+    setResults([]);
   };
 
   return (
@@ -130,103 +143,19 @@ export default function GachaPage() {
           </div>
         </section>
 
-        <section className="mt-6 pb-8">
-          <div className="text-xl font-black">抽卡結果</div>
-
-          <div className="mt-4">
-            {pulling ? (
-              <div className="rounded-[24px] border border-[#dceae2] bg-white p-8 text-center">
-                <div className="text-4xl">🫧</div>
-                <div className="mt-3 font-black">史萊姆生成中...</div>
-              </div>
-            ) : results.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-[#cfded5] bg-white/70 p-7 text-center text-sm font-bold text-[#789083]">
-                抽完之後，結果會出現在這裡。
-              </div>
-            ) : (
-              <>
-                <div
-                  className={
-                    results.length === 1
-                      ? "mx-auto grid max-w-sm grid-cols-1 gap-4"
-                      : "grid grid-cols-2 gap-3 md:grid-cols-5"
-                  }
-                >
-                  {results.map((result, index) => {
-                    const slime = SLIME_BY_ID[result.slimeId];
-
-                    return (
-                      <article
-                        key={`${result.slimeId}-${index}`}
-                        className="rounded-[22px] border border-[#dfe9e3] bg-white p-4 text-center shadow-[0_8px_20px_rgba(31,83,53,0.04)]"
-                      >
-                        <div className="flex min-h-[130px] items-center justify-center">
-                          <img
-                            src={slime.image}
-                            alt={slime.defaultName}
-                            className="h-auto w-full max-w-[135px] object-contain"
-                          />
-                        </div>
-
-                        <div className="mt-2 text-xs font-black text-[#789083]">
-                          {slime.rarity}
-                        </div>
-                        <div className="mt-1 text-sm font-black">
-                          {slime.defaultName}
-                        </div>
-
-                        <ResultReward result={result} />
-                      </article>
-                    );
-                  })}
-                </div>
-
-                <Link
-                  href="/slimes"
-                  className="mx-auto mt-4 block max-w-sm rounded-2xl border border-[#d7e7de] bg-white px-5 py-3 text-center text-sm font-black text-[#315b45]"
-                >
-                  🐾 回圖鑑看看
-                </Link>
-              </>
-            )}
-          </div>
+        <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/75 px-5 py-4 text-sm font-bold text-[#70877b]">
+          抽卡後會直接進入揭曉畫面。單抽可以翻牌；十連抽可以把卡片一張一張滑開，也可以直接全部揭曉。
         </section>
       </div>
+
+      <GachaRevealOverlay
+        open={overlayOpen}
+        loading={pulling}
+        results={results}
+        pullCount={pullCount}
+        onClose={closeOverlay}
+      />
     </main>
-  );
-}
-
-function ResultReward({ result }: { result: Result }) {
-  if (result.isNew) {
-    return (
-      <div className="mt-3 rounded-xl bg-[#eaf9f0] px-3 py-2 text-xs font-black text-[#28754b]">
-        NEW! · 已加入圖鑑
-      </div>
-    );
-  }
-
-  if (!result.duplicateReward) return null;
-
-  if (result.duplicateReward.type === "coins") {
-    return (
-      <div className="mt-3 rounded-xl bg-[#fff7e8] px-3 py-2 text-xs font-black text-[#9b6a20]">
-        重複角色 · +{result.duplicateReward.amount} 金幣
-      </div>
-    );
-  }
-
-  if (result.duplicateReward.type === "fragments_full") {
-    return (
-      <div className="mt-3 rounded-xl bg-[#f4f8f5] px-3 py-2 text-xs font-black text-[#557768]">
-        碎片已滿 · 可解鎖飾品
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 rounded-xl bg-[#f4f8f5] px-3 py-2 text-xs font-black text-[#557768]">
-      重複角色 · +{result.duplicateReward.amount} 碎片
-    </div>
   );
 }
 
@@ -275,7 +204,7 @@ function PullOption({
             "mt-2 w-full rounded-xl border px-4 py-3 text-sm font-black transition",
             secondaryDisabled
               ? "cursor-not-allowed border-[#e3e9e5] bg-[#f7faf8] text-[#a8b7ad]"
-              : "border-[#d7e7de] bg-white text-[#315b45]",
+              : "border-[#d7e7de] bg-white text-[#315b45] hover:bg-[#f7fbf8]",
           ].join(" ")}
         >
           {secondaryLabel}
