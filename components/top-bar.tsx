@@ -55,8 +55,8 @@ export default function TopBar({
         {!auth.loading && auth.isLoggedIn && (
           <>
             <ResourcePill label={`🔥 ${game.streak} 天`} />
-            <ResourcePill label={`🪙 ${game.coins}`} />
-            <ResourcePill label={`🎫 ${game.tickets}`} />
+            <ResourcePill label={`🪙 ${game.coins}`} href="/shop" ariaLabel="前往資源頁" />
+            <ResourcePill label={`🎫 ${game.tickets}`} href="/shop" ariaLabel="前往資源頁" />
 
             <button
               type="button"
@@ -81,10 +81,30 @@ export default function TopBar({
   );
 }
 
-function ResourcePill({ label }: { label: string }) {
-  return (
-    <div className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-3 py-2 text-xs font-black text-[var(--brand-text)] shadow-sm md:px-4 md:text-sm">
-      {label}
-    </div>
-  );
+function ResourcePill({
+  label,
+  href,
+  ariaLabel,
+}: {
+  label: string;
+  href?: string;
+  ariaLabel?: string;
+}) {
+  const className =
+    "rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-3 py-2 text-xs font-black text-[var(--brand-text)] shadow-sm transition md:px-4 md:text-sm";
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        aria-label={ariaLabel}
+        title="查看可購買資源"
+        className={`${className} hover:-translate-y-0.5 hover:bg-[#f5faf7]`}
+      >
+        {label}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{label}</div>;
 }
