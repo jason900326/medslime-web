@@ -103,10 +103,10 @@ export default function GachaPage() {
           </div>
 
           <div className="mt-3 text-xs font-bold text-[#8a9c92] sm:text-sm">
-            抽卡機率：N 44% · R 38% · SR 17.5% · SSR 0.5%
+            抽卡機率：N 44% · R 37.5% · SR 18% · SSR 0.5%
           </div>
           <div className="mt-1 text-xs font-bold text-[#9aa99f]">
-            SSR 最晚第 200 抽保底。
+            SSR 最晚第 50 抽保底；收集進度會優先補齊尚未取得或尚未解鎖飾品的史萊姆。
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
