@@ -29,7 +29,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積專注 1 小時",
     target: 60,
     unit: "分鐘",
-    reward: { type: "coins", amount: 50 },
+    reward: { type: "coins", amount: 100 },
     getProgress: (game) =>
       Math.floor(
         game.focusHistory.reduce(
@@ -45,7 +45,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積專注 10 小時",
     target: 600,
     unit: "分鐘",
-    reward: { type: "coins", amount: 100 },
+    reward: { type: "coins", amount: 300 },
     getProgress: (game) =>
       Math.floor(
         game.focusHistory.reduce(
@@ -61,7 +61,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積專注 30 小時",
     target: 1800,
     unit: "分鐘",
-    reward: { type: "tickets", amount: 1 },
+    reward: { type: "tickets", amount: 3 },
     getProgress: (game) =>
       Math.floor(
         game.focusHistory.reduce(
@@ -77,7 +77,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積作答 1,000 題",
     target: 1000,
     unit: "題",
-    reward: { type: "coins", amount: 100 },
+    reward: { type: "coins", amount: 500 },
     getProgress: (game) => game.totalQuestionsAnswered,
   },
   {
@@ -87,7 +87,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "收集 5 隻不同史萊姆",
     target: 5,
     unit: "隻",
-    reward: { type: "coins", amount: 50 },
+    reward: { type: "coins", amount: 150 },
     getProgress: (game) =>
       Object.values(game.slimes).filter((slime) => slime.owned).length,
   },
@@ -98,7 +98,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "收集全部 N 稀有度史萊姆",
     target: SLIMES.filter((slime) => slime.rarity === "N").length,
     unit: "隻",
-    reward: { type: "coins", amount: 100 },
+    reward: { type: "tickets", amount: 2 },
     getProgress: (game) =>
       SLIMES.filter(
         (slime) =>
@@ -113,7 +113,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積抽卡 10 次",
     target: 10,
     unit: "抽",
-    reward: { type: "coins", amount: 50 },
+    reward: { type: "coins", amount: 100 },
     getProgress: (game) => game.totalPulls,
   },
   {
@@ -123,7 +123,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "累積抽卡 100 次",
     target: 100,
     unit: "抽",
-    reward: { type: "tickets", amount: 1 },
+    reward: { type: "tickets", amount: 5 },
     getProgress: (game) => game.totalPulls,
   },
   {
@@ -133,7 +133,7 @@ const achievementDefinitions: AchievementDefinition[] = [
     description: "第一次抽到 SSR 史萊姆",
     target: 1,
     unit: "次",
-    reward: { type: "tickets", amount: 1 },
+    reward: { type: "tickets", amount: 3 },
     getProgress: (game) =>
       SLIMES.some(
         (slime) =>
