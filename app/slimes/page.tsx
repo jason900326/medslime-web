@@ -182,23 +182,33 @@ function SlimeCard({
   const canUnlockAccessory =
     owned && !accessoryUnlocked && fragments >= ACCESSORY_COST;
   const hiddenSSR = slime.rarity === "SSR" && !owned;
+  const currentName = player?.nickname?.trim() || slime.defaultName;
   const cardImage = hiddenSSR
     ? LOCKED_SSR_PLACEHOLDER
     : owned && accessoryUnlocked && accessoryEquipped
       ? slime.accessoryImage
       : slime.image;
 
-  // 飾品圖片通常因為帽子／配件佔用更多透明畫布。
-  // 將未穿戴版本略微放大，讓兩種狀態的史萊姆本體視覺尺寸接近。
-  const visualScale = accessoryEquipped ? 1.02 : 1.13;
+  // 以兩種圖片中視覺較小的未穿戴版本為基準，
+  // 不再把小圖放大；穿戴版則縮小到接近同一個本體尺寸。
+  const visualScale = accessoryEquipped ? 0.9 : 1;
 
   const beginNicknameEdit = () => {
-    setNicknameDraft(player?.nickname ?? "");
+    setNicknameDraft("");
     setEditingNickname(true);
   };
 
+  const cancelNicknameEdit = () => {
+    setNicknameDraft("");
+    setEditingNickname(false);
+  };
+
   const saveNickname = () => {
-    game.setNickname(slime.id, nicknameDraft.trim());
+    const next = nicknameDraft.trim();
+    if (next) {
+      game.setNickname(slime.id, next);
+    }
+    setNicknameDraft("");
     setEditingNickname(false);
   };
 
@@ -233,10 +243,10 @@ function SlimeCard({
         <div className="relative flex h-[148px] w-[148px] shrink-0 items-center justify-center overflow-visible sm:h-[164px] sm:w-[164px]">
           <img
             src={cardImage}
-            alt={hiddenSSR ? "???" : slime.defaultName}
+            alt={hiddenSSR ? "???" : currentName}
             draggable={false}
             className={[
-              "block h-full w-full max-w-none object-contain transition-[filter,opacity] duration-300",
+              "block h-full w-full max-w-none object-contain transition-[filter,opacity,transform] duration-300",
               hiddenSSR
                 ? "brightness-0 opacity-70"
                 : owned
@@ -261,56 +271,58 @@ function SlimeCard({
         <div className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <div className="truncate text-xl font-black">
-                  {hiddenSSR ? "???" : slime.defaultName}
-                </div>
-                {owned && !hiddenSSR && !editingNickname && (
-                  <button
-                    type="button"
-                    onClick={beginNicknameEdit}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-base text-[#668276] transition hover:bg-[#eef7f1]"
-                    aria-label={`修改${slime.defaultName}的名字`}
-                    title="修改名字"
-                  >
-                    ✏️
-                  </button>
-                )}
-              </div>
-
-              {editingNickname && owned ? (
-                <div className="mt-2 flex max-w-sm gap-2">
+              {editingNickname && owned && !hiddenSSR ? (
+                <div className="flex max-w-sm items-center gap-2">
                   <input
                     autoFocus
                     value={nicknameDraft}
                     onChange={(event) => setNicknameDraft(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") saveNickname();
-                      if (event.key === "Escape") setEditingNickname(false);
+                      if (event.key === "Escape") cancelNicknameEdit();
                     }}
-                    placeholder="輸入暱稱"
-                    className="min-w-0 flex-1 rounded-xl border border-[#bcdcca] bg-white px-3 py-2 text-sm font-black text-[#17372a] outline-none focus:border-[#65d795]"
+                    placeholder={currentName}
+                    aria-label={`修改${currentName}的名字`}
+                    className="min-w-0 flex-1 border-0 border-b-2 border-[#bcdcca] bg-transparent px-0 py-1 text-xl font-black text-[#17372a] outline-none placeholder:text-[#9eafa6] placeholder:opacity-55 focus:border-[#65d795]"
                   />
                   <button
                     type="button"
                     onClick={saveNickname}
-                    className="rounded-xl bg-[#31c978] px-3 py-2 text-sm font-black text-white"
+                    disabled={!nicknameDraft.trim()}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#31c978] text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#dce9e1] disabled:text-[#8da096]"
+                    aria-label="儲存名稱"
+                    title="儲存"
                   >
                     ✓
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingNickname(false)}
-                    className="rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-black text-[#60786c]"
+                    onClick={cancelNicknameEdit}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#d7e7de] bg-white text-sm font-black text-[#60786c]"
+                    aria-label="取消修改名稱"
+                    title="取消"
                   >
                     ×
                   </button>
                 </div>
-              ) : player?.nickname?.trim() ? (
-                <div className="mt-1 truncate text-sm font-black text-[#315b45]">
-                  暱稱：{player.nickname}
+              ) : (
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-xl font-black">
+                    {hiddenSSR ? "???" : currentName}
+                  </div>
+                  {owned && !hiddenSSR && (
+                    <button
+                      type="button"
+                      onClick={beginNicknameEdit}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-base text-[#668276] transition hover:bg-[#eef7f1]"
+                      aria-label={`修改${currentName}的名字`}
+                      title="修改名字"
+                    >
+                      ✏️
+                    </button>
+                  )}
                 </div>
-              ) : null}
+              )}
 
               <div className="mt-1 text-sm font-bold text-[#789083]">
                 {slime.rarity} · {owned ? "已擁有" : "尚未取得"}
