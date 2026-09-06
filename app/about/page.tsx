@@ -47,13 +47,16 @@ export default function AboutPage() {
         </InfoSection>
 
         <InfoSection title="發現題目或解析有問題？">
-          <p>如果你發現答案、題目文字、AI 解析或網站功能有問題，歡迎直接回報。</p>
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("MedSlime 問題回報")}`}
+          <p>如果你發現答案、題目文字、AI 解析或網站功能有問題，可以直接填寫站內回報表單。</p>
+          <Link
+            href="/feedback"
             className="mt-3 inline-flex rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white"
           >
-            寄信給我 · {CONTACT_EMAIL}
-          </a>
+            前往回報問題
+          </Link>
+          <div className="mt-3 text-xs font-bold text-[#8a9c92]">
+            聯絡信箱：{CONTACT_EMAIL}
+          </div>
         </InfoSection>
 
         <div className="mt-6 flex flex-wrap gap-3 text-sm font-black">
