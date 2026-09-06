@@ -116,3 +116,20 @@ button {
   background: rgba(49, 201, 120, 0.18);
   color: var(--brand-text);
 }
+
+/*
+ * Slime source PNGs were exported with different transparent margins.
+ * Base images therefore looked much larger than their accessory variants even
+ * inside the same image box. Use the visually smaller accessory render as the
+ * baseline so toggling an accessory does not make the character jump in size.
+ * Scope this to the collection cards and the home companion only.
+ */
+[id^="slime-card-"] img[src^="/slimes/"]:not([src*="-accessory"]),
+button[aria-label^="戳一下"] img[src^="/slimes/"]:not([src*="-accessory"]) {
+  transform: scale(0.76) !important;
+}
+
+[id^="slime-card-"] img[src*="-accessory"],
+button[aria-label^="戳一下"] img[src*="-accessory"] {
+  transform: scale(1) !important;
+}
