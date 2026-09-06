@@ -5,13 +5,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const MONTHLY_FREE_AI_DETAILS = 10;
 
 function currentTaipeiPeriod() {
-  return new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Taipei",
     year: "numeric",
     month: "2-digit",
-  })
-    .format(new Date())
-    .replace("-", "-");
+  }).formatToParts(new Date());
+
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}`;
 }
 
 export async function GET() {
