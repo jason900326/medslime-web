@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCheckMacValue } from "@/lib/ecpay";
 
-export const runtime = "nodejs";
-
 export async function POST(request: NextRequest) {
   const hashKey = process.env.ECPAY_HASH_KEY;
   const hashIv = process.env.ECPAY_HASH_IV;
