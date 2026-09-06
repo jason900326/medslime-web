@@ -36,6 +36,16 @@ export default function FocusPage() {
 
   const totalSeconds = plannedMinutes * 60;
   const elapsedSeconds = Math.max(0, totalSeconds - secondsLeft);
+  const plannedReward =
+    plannedMinutes >= 10
+      ? Math.max(
+          0,
+          Math.min(
+            Math.floor(plannedMinutes / 5) * 5,
+            game.focusCoinCap - game.todayFocusCoins,
+          ),
+        )
+      : 0;
 
   const displayTime = useMemo(() => {
     const minutes = Math.floor(secondsLeft / 60);
@@ -166,6 +176,10 @@ export default function FocusPage() {
           <SummaryCard label="最近紀錄" value={`${game.focusHistory.length}`} suffix="次" />
         </section>
 
+        <div className="mt-3 rounded-2xl border border-[#dfece4] bg-[#f3fbf6] px-4 py-3 text-sm font-bold leading-6 text-[#557768]">
+          完成至少 10 分鐘即可獲得獎勵；每完整 5 分鐘 +🪙5，每日最多 🪙{game.focusCoinCap}。
+        </div>
+
         <section className="mt-5 rounded-[26px] border border-[#d8e9df] bg-white p-5 shadow-[0_12px_30px_rgba(40,106,69,0.05)] md:p-7">
           <div className="flex flex-wrap gap-2">
             {presets.map((minutes) => (
@@ -251,6 +265,13 @@ export default function FocusPage() {
               <div className="mt-3 text-sm font-bold text-[#789083]">
                 本輪設定：{plannedMinutes} 分鐘
               </div>
+              <div className="mt-1 text-sm font-black text-[#2a9d5e]">
+                {game.todayFocusCoins >= game.focusCoinCap
+                  ? "今日計時金幣已達上限"
+                  : plannedMinutes < 10
+                    ? "至少設定 10 分鐘才有金幣獎勵"
+                    : `完成本輪預計 +🪙 ${plannedReward}`}
+              </div>
             </div>
           </div>
 
@@ -316,7 +337,7 @@ export default function FocusPage() {
                   ? `獲得 🪙 ${earnedCoins}`
                   : game.todayFocusCoins >= game.focusCoinCap
                     ? "今天的計時金幣已經領滿了。"
-                    : "本輪未達 10 分鐘，因此沒有金幣獎勵。"}
+                    : "完成至少 10 分鐘才會獲得金幣獎勵。"}
               </div>
             </div>
           )}

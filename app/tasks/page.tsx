@@ -102,7 +102,7 @@ export default function TasksPage() {
       progress: today.questionsAnswered,
       target: 5,
       unit: "題",
-      reward: { type: "coins", amount: 25 },
+      reward: { type: "coins", amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
@@ -111,7 +111,7 @@ export default function TasksPage() {
       progress: today.mistakesReviewed,
       target: 1,
       unit: "題",
-      reward: { type: "coins", amount: 25 },
+      reward: { type: "coins", amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:review`,
     },
     {
@@ -120,7 +120,7 @@ export default function TasksPage() {
       progress: Math.floor(today.focusSeconds / 60),
       target: 20,
       unit: "分鐘",
-      reward: { type: "coins", amount: 25 },
+      reward: { type: "coins", amount: 40 },
       claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
@@ -201,7 +201,7 @@ export default function TasksPage() {
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
             <div className="text-lg font-black">每日全清獎勵：🎫 ×1</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-              今天的基本份完成了，這張抽卡券可以帶走。
+              三項每日任務合計可拿 100 金幣，再完成全清就多帶走 1 張抽卡券。
             </div>
 
             <button

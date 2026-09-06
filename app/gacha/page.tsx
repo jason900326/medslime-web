@@ -6,11 +6,10 @@ import TopBar from "@/components/top-bar";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { useGameState } from "@/components/game-state-provider";
+import { SLIME_BY_ID } from "@/lib/slime-data";
 import GachaRevealOverlay from "./gacha-reveal-overlay";
 
-type Result = ReturnType<typeof useGameState>["pullOne"] extends () => infer R
-  ? R
-  : never;
+type Result = ReturnType<ReturnType<typeof useGameState>["pullOne"]>;
 
 const OWNER_EMAIL = "s0916540326@gmail.com";
 
@@ -112,8 +111,17 @@ export default function GachaPage() {
       await new Promise((resolve) => setTimeout(resolve, 350));
 
       const pulled: Result[] = [];
+      let hasSRPlus = false;
+
       for (let i = 0; i < count; i += 1) {
-        pulled.push(game.pullOne());
+        const guaranteeSR = count === 10 && i === count - 1 && !hasSRPlus;
+        const result = game.pullOne(guaranteeSR ? { forceSR: true } : undefined);
+        pulled.push(result);
+
+        const rarity = SLIME_BY_ID[result.slimeId]?.rarity;
+        if (rarity === "SR" || rarity === "SSR") {
+          hasSRPlus = true;
+        }
       }
 
       setResults(pulled);
@@ -162,10 +170,44 @@ export default function GachaPage() {
           </div>
 
           <div className="mt-3 text-xs font-bold text-[#8a9c92] sm:text-sm">
-            抽卡機率：N 44% · R 37.5% · SR 18% · SSR 0.5%
+            抽卡機率：N 45% · R 37% · SR 17.7% · SSR 0.3%
           </div>
           <div className="mt-1 text-xs font-bold text-[#9aa99f]">
-            SSR 最晚第 50 抽保底；收集進度會優先補齊尚未取得或尚未解鎖飾品的史萊姆。
+            SSR 最晚第 80 抽保底；十連抽保證至少 1 隻 SR 以上。
+          </div>
+          <div className="mt-1 text-xs font-bold text-[#9aa99f]">
+            收集進度會優先補齊尚未取得或尚未解鎖飾品的史萊姆。
+          </div>
+
+          <div className="mt-5 rounded-[22px] border border-[#eadfca] bg-white/85 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-black text-[#6c542b]">十連目標</div>
+                <div className="mt-0.5 text-xs font-bold text-[#9a8662]">
+                  存到十抽再開，至少會看到 1 隻 SR 以上。
+                </div>
+              </div>
+              <div className="shrink-0 rounded-full bg-[#fff4dc] px-3 py-1.5 text-xs font-black text-[#b77a20]">
+                SR+ 保證
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <TenPullProgress
+                icon="🪙"
+                label="金幣十連"
+                current={game.coins}
+                target={1000}
+                neededUnit="金幣"
+              />
+              <TenPullProgress
+                icon="🎫"
+                label="抽卡券十連"
+                current={game.tickets}
+                target={10}
+                neededUnit="張"
+              />
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -187,7 +229,7 @@ export default function GachaPage() {
               buttonLabel="🪙 100 抽 1 次"
               disabled={game.coins < 100 || pulling}
               onClick={() => performPull(1, "coins")}
-              secondaryLabel="🪙 1,000 抽 10 次"
+              secondaryLabel="🪙 1,000 抽 10 次 · SR+ 保證"
               secondaryDisabled={game.coins < 1000 || pulling}
               onSecondary={() => performPull(10, "coins")}
             />
@@ -198,7 +240,7 @@ export default function GachaPage() {
               buttonLabel="🎫 1 張抽 1 次"
               disabled={game.tickets < 1 || pulling}
               onClick={() => performPull(1, "tickets")}
-              secondaryLabel="🎫 10 張抽 10 次"
+              secondaryLabel="🎫 10 張抽 10 次 · SR+ 保證"
               secondaryDisabled={game.tickets < 10 || pulling}
               onSecondary={() => performPull(10, "tickets")}
             />
@@ -214,6 +256,47 @@ export default function GachaPage() {
         onClose={closeOverlay}
       />
     </main>
+  );
+}
+
+function TenPullProgress({
+  icon,
+  label,
+  current,
+  target,
+  neededUnit,
+}: {
+  icon: string;
+  label: string;
+  current: number;
+  target: number;
+  neededUnit: string;
+}) {
+  const progress = Math.min(100, (current / target) * 100);
+  const remaining = Math.max(0, target - current);
+
+  return (
+    <div className="rounded-2xl border border-[#eee5d4] bg-[#fffdf8] p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-black text-[#315b45]">
+          {icon} {label}
+        </div>
+        <div className="text-xs font-black text-[#8c7b5e]">
+          {Math.min(current, target)} / {target}
+        </div>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#f0eadf]">
+        <div
+          className="h-full rounded-full bg-[#e6b653] transition-[width]"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="mt-2 text-xs font-bold text-[#8f8068]">
+        {remaining === 0
+          ? "可以十連了！"
+          : `再 ${remaining} ${neededUnit}即可十連`}
+      </div>
+    </div>
   );
 }
 
