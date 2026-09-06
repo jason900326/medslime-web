@@ -289,14 +289,12 @@ function ExamQuizContent() {
               RESULT
             </div>
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
-            <div className="mt-2 text-sm font-bold text-[#789083]">
-              作答時間 <span className="font-mono font-black text-[#315b45]">{formatElapsed(elapsedAtFinish)}</span>
-            </div>
 
-            <div className="mx-auto mt-6 grid max-w-3xl grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
+            <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3 sm:mt-8 sm:gap-4">
               <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
               <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
               <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
+              <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
             </div>
 
             {gradableCount < questions.length && (
@@ -956,11 +954,11 @@ function TutorialItem({
 
 function ResultCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-[16px] border border-[#dfece4] bg-[#f8fcf9] px-2 py-3 sm:rounded-[20px] sm:p-5">
-      <div className="text-[10px] font-bold leading-4 text-[#789083] sm:text-sm">
+    <div className="min-w-0 rounded-[18px] border border-[#dfece4] bg-[#f8fcf9] px-3 py-4 sm:rounded-[20px] sm:p-5">
+      <div className="text-xs font-bold leading-4 text-[#789083] sm:text-sm">
         {label}
       </div>
-      <div className="mt-1 break-keep text-base font-black leading-tight sm:text-2xl">
+      <div className="mt-1 break-keep text-lg font-black leading-tight sm:text-2xl">
         {value}
       </div>
     </div>
