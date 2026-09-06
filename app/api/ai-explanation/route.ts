@@ -18,10 +18,7 @@ type ExplanationResult = {
   whatItTests: string;
   correctAnswer: string;
   whyCorrect: string;
-  optionAnalysis: Array<{
-    label: string;
-    explanation: string;
-  }>;
+  optionAnalysis: Array<{ label: string; explanation: string }>;
   quickSummary: string[];
   memoryPoint: string;
   commonTrap: string;
@@ -29,16 +26,15 @@ type ExplanationResult = {
 
 type OpenAIResponse = {
   output_text?: string;
-  output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
-  }>;
-  error?: {
-    message?: string;
-  };
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  error?: { message?: string };
 };
+
+type CreditSource = "free" | "paid";
+
+type CreditConsumeResult =
+  | { ok: false; remaining: 0 }
+  | { ok: true; remaining: number; source: CreditSource };
 
 const explanationSchema = {
   type: "object",
@@ -120,10 +116,7 @@ async function readCachedExplanation(input: {
       .eq("question_key", questionKey)
       .maybeSingle();
 
-    if (error) {
-      throw new Error(`共用 AI 解析讀取失敗：${error.message}`);
-    }
-
+    if (error) throw new Error(`共用 AI 解析讀取失敗：${error.message}`);
     return (data?.explanation as ExplanationResult | null) ?? null;
   }
 
@@ -134,10 +127,7 @@ async function readCachedExplanation(input: {
     .eq("question_key", questionKey)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`教材 AI 解析讀取失敗：${error.message}`);
-  }
-
+  if (error) throw new Error(`教材 AI 解析讀取失敗：${error.message}`);
   return (data?.explanation as ExplanationResult | null) ?? null;
 }
 
@@ -166,9 +156,7 @@ async function saveExplanation(input: {
         { onConflict: "question_key" },
       );
 
-    if (error) {
-      throw new Error(`共用 AI 解析儲存失敗：${error.message}`);
-    }
+    if (error) throw new Error(`共用 AI 解析儲存失敗：${error.message}`);
     return;
   }
 
@@ -186,9 +174,7 @@ async function saveExplanation(input: {
       { onConflict: "user_id,question_key" },
     );
 
-  if (error) {
-    throw new Error(`教材 AI 解析儲存失敗：${error.message}`);
-  }
+  if (error) throw new Error(`教材 AI 解析儲存失敗：${error.message}`);
 }
 
 async function recordExplanationEvent(input: {
@@ -206,12 +192,25 @@ async function recordExplanationEvent(input: {
     event_type: eventType,
   });
 
-  if (error) {
-    console.error("AI 解析事件統計寫入失敗：", error);
-  }
+  if (error) console.error("AI 解析事件統計寫入失敗：", error);
 }
 
-async function consumeDetailCredit(userId: string) {
+function normalizeRpcPayload(data: unknown): Record<string, unknown> {
+  if (data && typeof data === "object") return data as Record<string, unknown>;
+  if (typeof data === "string") {
+    try {
+      const parsed = JSON.parse(data);
+      return parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+async function consumeDetailCredit(userId: string): Promise<CreditConsumeResult> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("consume_ai_detail_credit", {
     p_user_id: userId,
@@ -219,23 +218,25 @@ async function consumeDetailCredit(userId: string) {
 
   if (error) {
     if (error.message.includes("AI_DETAIL_CREDIT_REQUIRED")) {
-      return { ok: false as const, remaining: 0 };
+      return { ok: false, remaining: 0 };
     }
     throw new Error(`AI 詳解額度扣除失敗：${error.message}`);
   }
 
-  return { ok: true as const, remaining: Number(data ?? 0) };
+  const payload = normalizeRpcPayload(data);
+  const source: CreditSource = payload.source === "paid" ? "paid" : "free";
+  const remaining = Math.max(0, Number(payload.remaining ?? 0));
+  return { ok: true, remaining, source };
 }
 
-async function refundDetailCredit(userId: string) {
+async function refundDetailCredit(userId: string, source: CreditSource) {
   try {
     const admin = createAdminClient();
     const { error } = await admin.rpc("refund_ai_detail_credit", {
       p_user_id: userId,
+      p_source: source,
     });
-    if (error) {
-      console.error("AI 詳解額度退回失敗：", error);
-    }
+    if (error) console.error("AI 詳解額度退回失敗：", error);
   } catch (error) {
     console.error("AI 詳解額度退回失敗：", error);
   }
@@ -284,16 +285,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "AI 詳解讀取失敗。",
-      },
+      { error: error instanceof Error ? error.message : "AI 詳解讀取失敗。" },
       { status: 500 },
     );
   }
 }
 
 export async function POST(request: Request) {
-  let reservedCreditUserId: string | null = null;
+  let reservedCredit: { userId: string; source: CreditSource } | null = null;
 
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -358,7 +357,6 @@ export async function POST(request: Request) {
         source,
         eventType: "cache_view",
       });
-
       return NextResponse.json({ cached: true, explanation: cached });
     }
 
@@ -366,14 +364,14 @@ export async function POST(request: Request) {
     if (!credit.ok) {
       return NextResponse.json(
         {
-          error: "AI 詳解額度已用完，請先前往商城補充額度。",
+          error: "本月免費 AI 詳解與購買額度都已用完，請先前往商城補充額度。",
           code: "AI_DETAIL_CREDIT_REQUIRED",
           aiDetailCredits: 0,
         },
         { status: 402 },
       );
     }
-    reservedCreditUserId = user.id;
+    reservedCredit = { userId: user.id, source: credit.source };
 
     const userAnswer = typeof body.userAnswer === "number" ? body.userAnswer : null;
     const correctLabel = `${String.fromCharCode(65 + correctIndex)}. ${options[correctIndex]}`;
@@ -478,8 +476,8 @@ export async function POST(request: Request) {
 
     if (!openAIResponse.ok) {
       console.error("OpenAI explanation failed:", openAIPayload);
-      await refundDetailCredit(user.id);
-      reservedCreditUserId = null;
+      await refundDetailCredit(user.id, credit.source);
+      reservedCredit = null;
       return NextResponse.json(
         {
           error:
@@ -492,8 +490,8 @@ export async function POST(request: Request) {
 
     const outputText = getOutputText(openAIPayload);
     if (!outputText) {
-      await refundDetailCredit(user.id);
-      reservedCreditUserId = null;
+      await refundDetailCredit(user.id, credit.source);
+      reservedCredit = null;
       return NextResponse.json(
         { error: "OpenAI 已回應，但沒有取得可解析的詳解。" },
         { status: 502 },
@@ -504,8 +502,8 @@ export async function POST(request: Request) {
     try {
       explanation = JSON.parse(outputText) as ExplanationResult;
     } catch {
-      await refundDetailCredit(user.id);
-      reservedCreditUserId = null;
+      await refundDetailCredit(user.id, credit.source);
+      reservedCredit = null;
       return NextResponse.json(
         { error: "AI 詳解格式異常，請再試一次。" },
         { status: 502 },
@@ -529,15 +527,16 @@ export async function POST(request: Request) {
       eventType: "generated",
     });
 
-    reservedCreditUserId = null;
+    reservedCredit = null;
     return NextResponse.json({
       cached: false,
       explanation,
       aiDetailCredits: credit.remaining,
+      aiDetailCreditSource: credit.source,
     });
   } catch (error) {
-    if (reservedCreditUserId) {
-      await refundDetailCredit(reservedCreditUserId);
+    if (reservedCredit) {
+      await refundDetailCredit(reservedCredit.userId, reservedCredit.source);
     }
 
     console.error("AI explanation route failed:", error);
