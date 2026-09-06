@@ -9,11 +9,7 @@ import { useGameState } from "@/components/game-state-provider";
 import { SLIME_BY_ID } from "@/lib/slime-data";
 import GachaRevealOverlay from "./gacha-reveal-overlay";
 
-type Result = ReturnType<typeof useGameState>["pullOne"] extends (
-  ...args: never[]
-) => infer R
-  ? R
-  : never;
+type Result = ReturnType<ReturnType<typeof useGameState>["pullOne"]>;
 
 const OWNER_EMAIL = "s0916540326@gmail.com";
 
