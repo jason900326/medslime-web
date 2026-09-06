@@ -310,7 +310,7 @@ function MistakeCard({
         </div>
       </div>
 
-      <div className="mt-5 text-lg font-black leading-8">
+      <div className="mt-5 text-base font-black leading-7 sm:text-lg sm:leading-8">
         {item.questionNumber ? `${item.questionNumber}. ` : ""}
         {item.stem}
       </div>
