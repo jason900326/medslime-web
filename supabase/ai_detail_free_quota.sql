@@ -1,6 +1,6 @@
--- Add monthly free AI-detail allowance on top of purchased credits.
--- Run once in Supabase SQL Editor before merging this branch.
--- Policy: 10 free NEW AI-detail generations per account per calendar month (Taiwan time).
+-- Add daily free AI-detail allowance on top of purchased credits.
+-- Run once in Supabase SQL Editor after this change is deployed.
+-- Policy: 10 free NEW AI-detail generations per account per calendar day (Taiwan time).
 -- Cached detailed explanations remain free and consume nothing.
 
 alter table public.player_entitlements
@@ -19,7 +19,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_period text := to_char(timezone('Asia/Taipei', now()), 'YYYY-MM');
+  v_period text := to_char(timezone('Asia/Taipei', now()), 'YYYY-MM-DD');
   v_paid integer := 0;
   v_free_used integer := 0;
   v_source text;
@@ -95,7 +95,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_period text := to_char(timezone('Asia/Taipei', now()), 'YYYY-MM');
+  v_period text := to_char(timezone('Asia/Taipei', now()), 'YYYY-MM-DD');
   v_paid integer := 0;
   v_free_used integer := 0;
 begin

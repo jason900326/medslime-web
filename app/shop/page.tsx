@@ -35,7 +35,7 @@ export default function ShopPage() {
             total: Math.max(0, Number(payload.aiDetailCredits ?? 0)),
             free: Math.max(0, Number(payload.aiDetailFreeRemaining ?? 0)),
             paid: Math.max(0, Number(payload.aiDetailPaidCredits ?? 0)),
-            freeLimit: Math.max(0, Number(payload.aiDetailFreeMonthlyLimit ?? 10)),
+            freeLimit: Math.max(0, Number(payload.aiDetailFreeDailyLimit ?? 10)),
           });
         }
       } catch {
@@ -85,7 +85,7 @@ export default function ShopPage() {
         <ShopSection
           eyebrow="AI DETAIL"
           title="AI 詳解額度"
-          description="每個帳號每月有 10 次免費的新詳解；免費次數用完後才會使用購買額度。已存在的詳解快取不會扣任何次數。"
+          description="每個帳號每天有 10 次免費的新詳解；免費次數用完後才會使用購買額度。已存在的詳解快取不會扣任何次數。"
         >
           <div className="mb-5 rounded-2xl border border-[#dfece4] bg-[#f7fcf9] px-4 py-4">
             <div className="flex items-center justify-between gap-4">
@@ -101,7 +101,7 @@ export default function ShopPage() {
             {aiBalance && (
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black">
                 <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
-                  本月免費 <span className="text-[#237849]">{aiBalance.free} / {aiBalance.freeLimit}</span>
+                  今日免費 <span className="text-[#237849]">{aiBalance.free} / {aiBalance.freeLimit}</span>
                 </div>
                 <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
                   購買額度 <span className="text-[#237849]">{aiBalance.paid}</span>
@@ -118,11 +118,11 @@ export default function ShopPage() {
           <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
             點選方案價格後會前往綠界科技付款頁；付款完成後由 MedSlime 伺服器驗證並自動入帳。
           </p>
-          <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-bold leading-6 text-[#80651e]">
-            {ecpayEnabled
-              ? "目前為綠界 Stage 測試串接，請只使用測試交易。"
-              : "付款功能目前暫時無法使用。"}
-          </div>
+          {!ecpayEnabled && (
+            <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-bold leading-6 text-[#80651e]">
+              付款功能目前暫時無法使用。
+            </div>
+          )}
         </section>
       </div>
     </main>

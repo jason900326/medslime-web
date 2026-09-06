@@ -2,17 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const MONTHLY_FREE_AI_DETAILS = 10;
+const DAILY_FREE_AI_DETAILS = 10;
 
 function currentTaipeiPeriod() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Taipei",
     year: "numeric",
     month: "2-digit",
+    day: "2-digit",
   }).formatToParts(new Date());
 
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${map.year}-${map.month}`;
+  return `${map.year}-${map.month}-${map.day}`;
 }
 
 export async function GET() {
@@ -40,13 +41,13 @@ export async function GET() {
     const freeUsed = data?.ai_detail_free_period === period
       ? Math.max(0, Number(data?.ai_detail_free_used ?? 0))
       : 0;
-    const freeRemaining = Math.max(0, MONTHLY_FREE_AI_DETAILS - freeUsed);
+    const freeRemaining = Math.max(0, DAILY_FREE_AI_DETAILS - freeUsed);
 
     return NextResponse.json({
       aiDetailCredits: paidCredits + freeRemaining,
       aiDetailPaidCredits: paidCredits,
       aiDetailFreeRemaining: freeRemaining,
-      aiDetailFreeMonthlyLimit: MONTHLY_FREE_AI_DETAILS,
+      aiDetailFreeDailyLimit: DAILY_FREE_AI_DETAILS,
       updatedAt: data?.updated_at ?? null,
     });
   } catch (error) {
