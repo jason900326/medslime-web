@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import TopBar from "@/components/top-bar";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
@@ -12,8 +12,6 @@ type Result = ReturnType<typeof useGameState>["pullOne"] extends () => infer R
   ? R
   : never;
 
-const OWNER_EMAIL = "s0916540326@gmail.com";
-
 export default function GachaPage() {
   const auth = useAuthUser();
   const game = useGameState();
@@ -21,59 +19,8 @@ export default function GachaPage() {
   const [pulling, setPulling] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [pullCount, setPullCount] = useState<1 | 10>(1);
-  const [ownerResetChecking, setOwnerResetChecking] = useState(false);
-  const [ownerResetError, setOwnerResetError] = useState("");
 
-  useEffect(() => {
-    if (auth.loading || !auth.isLoggedIn) return;
-    if (auth.email?.toLowerCase() !== OWNER_EMAIL) return;
-
-    let cancelled = false;
-    setOwnerResetChecking(true);
-    setOwnerResetError("");
-
-    const resetOwnerAccount = async () => {
-      try {
-        const response = await fetch("/api/owner-test-reset", {
-          method: "POST",
-          cache: "no-store",
-        });
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload?.error || "測試帳號重置失敗。");
-        }
-
-        if (cancelled) return;
-
-        if (payload?.applied) {
-          if (auth.userId) {
-            window.localStorage.removeItem(
-              `medslime_mistakes_v1:${auth.userId}`,
-            );
-          }
-          window.location.reload();
-          return;
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setOwnerResetError(
-            error instanceof Error ? error.message : "測試帳號重置失敗。",
-          );
-        }
-      } finally {
-        if (!cancelled) setOwnerResetChecking(false);
-      }
-    };
-
-    void resetOwnerAccount();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [auth.loading, auth.isLoggedIn, auth.email, auth.userId]);
-
-  if (auth.loading || ownerResetChecking) {
+  if (auth.loading) {
     return <main className="min-h-screen bg-[#f8fcf9]" />;
   }
 
@@ -137,12 +84,6 @@ export default function GachaPage() {
           backLabel="返回史萊姆圖鑑"
         />
 
-        {ownerResetError && (
-          <div className="mt-5 rounded-2xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
-            測試帳號重置沒有完成：{ownerResetError}
-          </div>
-        )}
-
         <section className="mt-6 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.06)] md:p-7">
           <div className="text-xs font-black tracking-[0.1em] text-[#c58a2d]">
             GACHA
@@ -162,10 +103,10 @@ export default function GachaPage() {
           </div>
 
           <div className="mt-3 text-xs font-bold text-[#8a9c92] sm:text-sm">
-            抽卡機率：N 44% · R 37.5% · SR 18% · SSR 0.5%
+            抽卡機率：N 45% · R 37% · SR 17.8% · SSR 0.2%
           </div>
           <div className="mt-1 text-xs font-bold text-[#9aa99f]">
-            SSR 最晚第 50 抽保底；收集進度會優先補齊尚未取得或尚未解鎖飾品的史萊姆。
+            SSR 最晚第 150 抽保底；收集保護仍會優先補齊尚未取得或尚未解鎖飾品的史萊姆。
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
