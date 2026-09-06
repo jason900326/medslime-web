@@ -48,7 +48,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicInfoRoute =
     pathname === "/about" ||
     pathname === "/privacy" ||
-    pathname === "/terms";
+    pathname === "/terms" ||
+    pathname === "/feedback";
 
   const isPublicRoute =
     pathname === "/" ||
