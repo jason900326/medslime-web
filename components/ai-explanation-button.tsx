@@ -38,6 +38,7 @@ type GenerateResponse = {
   cached: boolean;
   explanation?: ExplanationResult;
   aiDetailCredits?: number;
+  aiDetailCreditSource?: "free" | "paid";
   code?: string;
   error?: string;
 };
@@ -50,10 +51,20 @@ type QuickResponse = {
 
 type EntitlementResponse = {
   aiDetailCredits?: number;
+  aiDetailPaidCredits?: number;
+  aiDetailFreeRemaining?: number;
+  aiDetailFreeDailyLimit?: number;
   error?: string;
 };
 
 type FeedbackValue = "helpful" | "not_helpful";
+
+type Balance = {
+  total: number;
+  free: number;
+  paid: number;
+  freeLimit: number;
+};
 
 export default function AIExplanationButton({
   payload,
@@ -67,11 +78,29 @@ export default function AIExplanationButton({
   const [quickOpen, setQuickOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [detailCredits, setDetailCredits] = useState<number | null>(null);
-  const [needsCredits, setNeedsCredits] = useState(false);
+  const [showOutOfCredits, setShowOutOfCredits] = useState(false);
+  const [balance, setBalance] = useState<Balance | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [feedback, setFeedback] = useState<FeedbackValue | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const loadBalance = async () => {
+    const response = await fetch("/api/entitlements", { cache: "no-store" });
+    const data = (await response.json()) as EntitlementResponse;
+    if (!response.ok) {
+      throw new Error(data.error ?? "無法讀取 AI 詳解額度。");
+    }
+
+    const nextBalance = {
+      total: Math.max(0, Number(data.aiDetailCredits ?? 0)),
+      free: Math.max(0, Number(data.aiDetailFreeRemaining ?? 0)),
+      paid: Math.max(0, Number(data.aiDetailPaidCredits ?? 0)),
+      freeLimit: Math.max(0, Number(data.aiDetailFreeDailyLimit ?? 10)),
+    };
+    setBalance(nextBalance);
+    return nextBalance;
+  };
 
   const requestQuickExplanation = async () => {
     if (quickLoading) return;
@@ -138,7 +167,8 @@ export default function AIExplanationButton({
 
     setDetailLoading(true);
     setErrorMessage("");
-    setNeedsCredits(false);
+    setNoticeMessage("");
+    setShowOutOfCredits(false);
 
     try {
       const params = new URLSearchParams({
@@ -157,25 +187,18 @@ export default function AIExplanationButton({
       }
 
       if (preview.cached && preview.explanation) {
+        const current = await loadBalance();
         setDetailResult(preview.explanation);
         setDetailOpen(true);
+        setNoticeMessage(
+          `這題已有 AI 詳解快取，本次不扣額度。今日免費還有 ${current.free} / ${current.freeLimit} 次。`,
+        );
         return;
       }
 
-      const creditResponse = await fetch("/api/entitlements", {
-        cache: "no-store",
-      });
-      const creditData = (await creditResponse.json()) as EntitlementResponse;
-      if (!creditResponse.ok) {
-        throw new Error(creditData.error ?? "無法讀取 AI 詳解額度。");
-      }
-
-      const credits = Math.max(0, Number(creditData.aiDetailCredits ?? 0));
-      setDetailCredits(credits);
-
-      if (credits <= 0) {
-        setNeedsCredits(true);
-        setErrorMessage("AI 詳解額度已用完。已有快取的詳解仍可免費查看。 ");
+      const current = await loadBalance();
+      if (current.total <= 0) {
+        setShowOutOfCredits(true);
         return;
       }
 
@@ -195,7 +218,8 @@ export default function AIExplanationButton({
     setShowConfirm(false);
     setDetailLoading(true);
     setErrorMessage("");
-    setNeedsCredits(false);
+    setNoticeMessage("");
+    setShowOutOfCredits(false);
 
     try {
       const response = await fetch("/api/ai-explanation", {
@@ -207,17 +231,29 @@ export default function AIExplanationButton({
 
       if (!response.ok || !data.explanation) {
         if (response.status === 402 || data.code === "AI_DETAIL_CREDIT_REQUIRED") {
-          setDetailCredits(0);
-          setNeedsCredits(true);
+          setShowOutOfCredits(true);
+          return;
         }
         throw new Error(data.error ?? "AI 詳解產生失敗，請稍後再試。");
       }
 
-      if (typeof data.aiDetailCredits === "number") {
-        setDetailCredits(data.aiDetailCredits);
-      }
+      const current = await loadBalance();
       setDetailResult(data.explanation);
       setDetailOpen(true);
+
+      if (data.cached) {
+        setNoticeMessage(
+          `這題已有 AI 詳解快取，本次不扣額度。今日免費還有 ${current.free} / ${current.freeLimit} 次。`,
+        );
+      } else if (data.aiDetailCreditSource === "paid") {
+        setNoticeMessage(
+          `已使用 1 次購買額度。購買額度還剩 ${current.paid} 次。`,
+        );
+      } else {
+        setNoticeMessage(
+          `已使用 1 次今日免費 AI 詳解。今日免費還剩 ${current.free} / ${current.freeLimit} 次。`,
+        );
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "AI 詳解發生未知錯誤。",
@@ -287,17 +323,15 @@ export default function AIExplanationButton({
         </button>
       </div>
 
+      {noticeMessage && (
+        <div className="mt-3 rounded-xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-bold leading-6 text-[#315b45]">
+          {noticeMessage}
+        </div>
+      )}
+
       {errorMessage && (
         <div className="mt-3 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
           {errorMessage}
-          {needsCredits && (
-            <Link
-              href="/shop"
-              className="ml-2 inline-block font-black text-[#237849] underline underline-offset-2"
-            >
-              前往儲值
-            </Link>
-          )}
         </div>
       )}
 
@@ -409,7 +443,7 @@ export default function AIExplanationButton({
         </div>
       )}
 
-      {showConfirm && (
+      {showConfirm && balance && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 px-5">
           <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
             <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
@@ -419,10 +453,20 @@ export default function AIExplanationButton({
               使用 1 次 AI 詳解？
             </div>
             <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-              這題目前沒有快取，產生新詳解會使用 1 次額度。產生成功後會保存，同一題之後再查看不會重複扣除。
+              這題目前沒有快取，產生成功後會保存，同一題之後再查看不會重複扣除。
             </p>
-            <div className="mt-4 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#315b45]">
-              目前剩餘 {detailCredits ?? "—"} 次
+            <div className="mt-4 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black leading-6 text-[#315b45]">
+              {balance.free > 0 ? (
+                <>
+                  本次將使用今日免費額度。<br />
+                  今日免費剩餘 {balance.free} / {balance.freeLimit} 次
+                </>
+              ) : (
+                <>
+                  今日免費額度已用完，本次將使用購買額度。<br />
+                  購買額度剩餘 {balance.paid} 次
+                </>
+              )}
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
@@ -439,6 +483,37 @@ export default function AIExplanationButton({
               >
                 使用 1 次並產生
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOutOfCredits && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/35 px-5">
+          <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+              MEDSLIME AI
+            </div>
+            <div className="mt-2 text-2xl font-black text-[#17372a]">
+              今日免費 AI 詳解已用完
+            </div>
+            <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
+              你今天的 10 次免費新詳解已使用完畢，目前也沒有可用的購買額度。已經產生過的快取詳解仍然可以免費查看。
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowOutOfCredits(false)}
+                className="rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-black text-[#315b45]"
+              >
+                先不要
+              </button>
+              <Link
+                href="/shop"
+                className="flex items-center justify-center rounded-xl bg-[#31c978] px-4 py-3 text-center font-black text-white transition hover:bg-[#2dbc70]"
+              >
+                前往商城購買
+              </Link>
             </div>
           </div>
         </div>
