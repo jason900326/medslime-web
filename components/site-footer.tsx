@@ -16,20 +16,20 @@ export default function SiteFooter() {
           <div>
             <div className="text-sm font-black text-[#17372a]">有問題、發現錯題或想聯絡我？</div>
             <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">
-              回報時如果能附上頁面、操作步驟與截圖，我會更容易找到問題。
+              直接填寫回報表單；留下 Email 後，如果需要確認細節，我會再聯絡你。
             </div>
           </div>
 
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("MedSlime 問題回報")}`}
+          <Link
+            href="/feedback"
             className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#eefaf2] px-4 py-3 text-sm font-black text-[#237849] transition hover:bg-[#e3f7eb]"
           >
-            ✉️ 回報問題
-          </a>
+            💬 回報問題
+          </Link>
         </div>
 
         <div className="mt-4 border-t border-[#edf2ef] pt-4">
-          <div className="text-xs font-bold text-[#789083]">{CONTACT_EMAIL}</div>
+          <div className="text-xs font-bold text-[#789083]">聯絡信箱：{CONTACT_EMAIL}</div>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-black text-[#557768]">
             <Link href="/about" className="hover:text-[#2a9d5e]">資料來源與 AI 說明</Link>
             <Link href="/privacy" className="hover:text-[#2a9d5e]">隱私權政策</Link>
