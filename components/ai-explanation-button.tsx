@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type AIExplanationPayload = {
   questionKey: string;
@@ -84,6 +84,16 @@ export default function AIExplanationButton({
   const [errorMessage, setErrorMessage] = useState("");
   const [feedback, setFeedback] = useState<FeedbackValue | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  useEffect(() => {
+    if (!noticeMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setNoticeMessage("");
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [noticeMessage]);
 
   const loadBalance = async () => {
     const response = await fetch("/api/entitlements", { cache: "no-store" });
@@ -479,7 +489,7 @@ export default function AIExplanationButton({
               <button
                 type="button"
                 onClick={generateDetailedExplanation}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="whitespace-nowrap rounded-xl bg-[#31c978] px-3 py-3 text-sm font-black text-white transition hover:bg-[#2dbc70] sm:px-4 sm:text-base"
               >
                 使用 1 次並產生
               </button>
