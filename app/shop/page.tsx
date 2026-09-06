@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
-import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { SHOP_PRODUCTS, type ShopProduct } from "@/lib/shop-products";
 
 const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
+const checkoutEnabled =
+  ecpayEnabled && process.env.NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED === "true";
 const coinPackages = SHOP_PRODUCTS.filter((item) => item.kind === "coins");
 const aiPackages = SHOP_PRODUCTS.filter((item) => item.kind === "ai_detail");
 
@@ -50,16 +52,6 @@ export default function ShopPage() {
   }, [auth.isLoggedIn]);
 
   if (auth.loading) return <main className="min-h-screen bg-[#f8fcf9]" />;
-  if (!auth.isLoggedIn) {
-    return (
-      <LoginRequired
-        title="登入後才能儲值"
-        description="金幣與 AI 詳解額度會綁定你的 MedSlime 帳號。"
-        backHref="/"
-        backLabel="返回首頁"
-      />
-    );
-  }
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -67,19 +59,29 @@ export default function ShopPage() {
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
         <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-6 shadow-[0_16px_42px_rgba(30,78,50,0.06)] sm:p-8">
-          <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">RECHARGE</div>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">額度儲值</h1>
+          <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">SHOP</div>
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">MedSlime 商城</h1>
           <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#70877a] sm:text-base">
-            選擇需要的金幣或 AI 詳解額度。方案越大，每 1 元能取得的資源越多。
+            商城販售虛擬金幣與 AI 詳解使用額度。商品內容與價格公開展示，付款功能會在金流審核完成後開放。
           </p>
         </section>
+
+        {!checkoutEnabled && (
+          <section className="mt-5 rounded-[22px] border border-[#f0dfaa] bg-[#fff9e8] px-5 py-4 text-sm font-black leading-6 text-[#80651e]">
+            🕒 目前金流審核中：可以查看所有商品與價格，但暫時無法付款。
+          </section>
+        )}
 
         <ShopSection
           eyebrow="COINS"
           title="金幣"
           description="100 金幣可抽 1 次。金幣也能透過每日任務、專注學習與成就免費取得。"
         >
-          <PackageGrid products={coinPackages} icon="🪙" />
+          <PackageGrid
+            products={coinPackages}
+            icon="🪙"
+            isLoggedIn={auth.isLoggedIn}
+          />
         </ShopSection>
 
         <ShopSection
@@ -87,42 +89,47 @@ export default function ShopPage() {
           title="AI 詳解額度"
           description="每個帳號每天有 10 次免費的新詳解；免費次數用完後才會使用購買額度。已存在的詳解快取不會扣任何次數。"
         >
-          <div className="mb-5 rounded-2xl border border-[#dfece4] bg-[#f7fcf9] px-4 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-xs font-black text-[#789083]">目前可用</div>
-                <div className="mt-0.5 text-2xl font-black text-[#237849]">
-                  {aiBalance === null ? "讀取中…" : `${aiBalance.total} 次`}
+          {auth.isLoggedIn ? (
+            <div className="mb-5 rounded-2xl border border-[#dfece4] bg-[#f7fcf9] px-4 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-black text-[#789083]">目前可用</div>
+                  <div className="mt-0.5 text-2xl font-black text-[#237849]">
+                    {aiBalance === null ? "讀取中…" : `${aiBalance.total} 次`}
+                  </div>
                 </div>
+                <div className="text-3xl">🤖</div>
               </div>
-              <div className="text-3xl">🤖</div>
+
+              {aiBalance && (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black">
+                  <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
+                    今日免費 <span className="text-[#237849]">{aiBalance.free} / {aiBalance.freeLimit}</span>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
+                    購買額度 <span className="text-[#237849]">{aiBalance.paid}</span>
+                  </div>
+                </div>
+              )}
             </div>
+          ) : (
+            <div className="mb-5 rounded-2xl border border-[#dfece4] bg-[#f7fcf9] px-4 py-4 text-sm font-bold leading-6 text-[#668276]">
+              登入後可查看你的每日免費次數與已購買 AI 詳解額度。
+            </div>
+          )}
 
-            {aiBalance && (
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black">
-                <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
-                  今日免費 <span className="text-[#237849]">{aiBalance.free} / {aiBalance.freeLimit}</span>
-                </div>
-                <div className="rounded-xl bg-white px-3 py-2.5 text-[#557768]">
-                  購買額度 <span className="text-[#237849]">{aiBalance.paid}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <PackageGrid products={aiPackages} icon="🤖" />
+          <PackageGrid
+            products={aiPackages}
+            icon="🤖"
+            isLoggedIn={auth.isLoggedIn}
+          />
         </ShopSection>
 
         <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
-          <div className="font-black">付款方式</div>
+          <div className="font-black">付款與入帳</div>
           <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-            點選方案價格後會前往綠界科技付款頁；付款完成後由 MedSlime 伺服器驗證並自動入帳。
+            金流開放後，點選商品價格會前往綠界科技付款頁；付款完成後由 MedSlime 伺服器驗證交易並自動將商品入帳至登入帳號。
           </p>
-          {!ecpayEnabled && (
-            <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-bold leading-6 text-[#80651e]">
-              付款功能目前暫時無法使用。
-            </div>
-          )}
         </section>
       </div>
     </main>
@@ -153,9 +160,11 @@ function ShopSection({
 function PackageGrid({
   products,
   icon,
+  isLoggedIn,
 }: {
   products: ShopProduct[];
   icon: string;
+  isLoggedIn: boolean;
 }) {
   const baseline = useMemo(() => {
     if (products.length === 0) return 0;
@@ -176,6 +185,7 @@ function PackageGrid({
             {...item}
             icon={icon}
             bonusPercent={bonusPercent}
+            isLoggedIn={isLoggedIn}
           />
         );
       })}
@@ -190,15 +200,17 @@ function PackageCard({
   price,
   note,
   bonusPercent,
+  isLoggedIn,
 }: ShopProduct & {
   icon: string;
   bonusPercent: number;
+  isLoggedIn: boolean;
 }) {
   const isAi = id.startsWith("ai-");
   const isBestValue = bonusPercent >= 50 || id === "coins-3300";
 
   return (
-    <article className="relative flex min-h-[210px] flex-col rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] px-4 pb-4 pt-5 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
+    <article className="relative flex min-h-[220px] flex-col rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] px-4 pb-4 pt-5 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
       <div className="absolute right-3 top-3">
         <span
           className={[
@@ -228,20 +240,37 @@ function PackageCard({
           </div>
         )}
 
-        <form action="/api/payments/ecpay/checkout" method="post">
-          <input type="hidden" name="productId" value={id} />
-          <button
-            type="submit"
-            disabled={!ecpayEnabled}
-            className={
-              ecpayEnabled
-                ? "w-full rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-3 py-3 text-base font-black text-[#237849] transition hover:-translate-y-0.5 hover:border-[#9ed8b5] hover:bg-[#e3f7eb]"
-                : "w-full cursor-not-allowed rounded-xl bg-[#e9f0ec] px-3 py-3 text-base font-black text-[#91a298]"
-            }
+        {!checkoutEnabled ? (
+          <>
+            <div className="mb-2 text-center text-lg font-black text-[#17372a]">
+              NT${price.toLocaleString()}
+            </div>
+            <button
+              type="button"
+              disabled
+              className="w-full cursor-not-allowed rounded-xl border border-[#e4e9e6] bg-[#eef2ef] px-3 py-3 text-sm font-black text-[#91a298]"
+            >
+              金流審核中
+            </button>
+          </>
+        ) : isLoggedIn ? (
+          <form action="/api/payments/ecpay/checkout" method="post">
+            <input type="hidden" name="productId" value={id} />
+            <button
+              type="submit"
+              className="w-full rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-3 py-3 text-base font-black text-[#237849] transition hover:-translate-y-0.5 hover:border-[#9ed8b5] hover:bg-[#e3f7eb]"
+            >
+              NT${price.toLocaleString()}
+            </button>
+          </form>
+        ) : (
+          <Link
+            href={`/auth/login?redirect=${encodeURIComponent("/shop")}`}
+            className="block w-full rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-3 py-3 text-center text-sm font-black text-[#237849]"
           >
-            NT${price.toLocaleString()}
-          </button>
-        </form>
+            登入後購買 · NT${price.toLocaleString()}
+          </Link>
+        )}
       </div>
     </article>
   );
