@@ -75,6 +75,10 @@ type Reward = {
   amount: number;
 };
 
+type PullOptions = {
+  forceSR?: boolean;
+};
+
 type GameStateContextValue = GameState & {
   isReady: boolean;
   addCoins: (amount: number) => void;
@@ -83,7 +87,7 @@ type GameStateContextValue = GameState & {
   spendTickets: (amount: number) => boolean;
   canUseFreePull: boolean;
   useFreePull: () => boolean;
-  pullOne: () => PullOutcome;
+  pullOne: (options?: PullOptions) => PullOutcome;
   unlockAccessory: (slimeId: string) => boolean;
   setAccessoryEquipped: (slimeId: string, equipped: boolean) => boolean;
   setCompanion: (slimeId: string) => void;
@@ -106,9 +110,9 @@ type GameStateContextValue = GameState & {
   }) => number;
 };
 
-const FOCUS_COIN_CAP = 30;
+const FOCUS_COIN_CAP = 60;
 const ACCESSORY_FRAGMENT_COST = 30;
-const SSR_PITY_PULLS = 50;
+const SSR_PITY_PULLS = 80;
 
 const starterState: GameState = {
   coins: 0,
@@ -298,21 +302,25 @@ function duplicateFragmentReward(rarity: SlimeRarity) {
   return 30;
 }
 
-function rollRarity(forceSSR: boolean): SlimeRarity {
+function rollRarity(forceSSR: boolean, forceSR: boolean): SlimeRarity {
   if (forceSSR) return "SSR";
+  if (forceSR) return "SR";
   const roll = Math.random() * 100;
-  if (roll < 44) return "N";
-  if (roll < 81.5) return "R";
-  if (roll < 99.5) return "SR";
+  if (roll < 45) return "N";
+  if (roll < 82) return "R";
+  if (roll < 99.7) return "SR";
   return "SSR";
 }
 
-function pickWeightedSlime(forceSSR: boolean, state: GameState) {
-  const rarity = rollRarity(forceSSR);
+function pickWeightedSlime(
+  forceSSR: boolean,
+  state: GameState,
+  forceSR = false,
+) {
+  const rarity = rollRarity(forceSSR, forceSR);
   const pool = SLIMES.filter((slime) => slime.rarity === rarity);
 
-  // 100 抽左右完成「角色 + 飾品」的收集保護：
-  // 先補同稀有度尚未擁有的角色，再優先補尚未解鎖飾品、碎片最少的角色。
+  // 收集保護：先補同稀有度尚未擁有的角色，再優先補尚未解鎖飾品、碎片最少的角色。
   const unowned = pool.filter((slime) => !state.slimes[slime.id]?.owned);
   if (unowned.length > 0) {
     return unowned[Math.floor(Math.random() * unowned.length)];
@@ -483,9 +491,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const pullOne = (): PullOutcome => {
+  const pullOne = (options?: PullOptions): PullOutcome => {
     const current = stateRef.current;
-    const slime = pickWeightedSlime(current.pity >= SSR_PITY_PULLS - 1, current);
+    const slime = pickWeightedSlime(
+      current.pity >= SSR_PITY_PULLS - 1,
+      current,
+      options?.forceSR === true,
+    );
     const playerSlime = current.slimes[slime.id];
     const owned = playerSlime?.owned ?? false;
     const nextPity = slime.rarity === "SSR" ? 0 : current.pity + 1;
@@ -724,7 +736,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       .reduce((sum, session) => sum + session.coinsEarned, 0);
     const eligible = input.completed && input.actualSeconds >= 10 * 60;
     const remainingCap = Math.max(0, FOCUS_COIN_CAP - earnedBefore);
-    const coinsEarned = eligible ? Math.min(5, remainingCap) : 0;
+    const sessionReward = Math.floor(input.actualSeconds / (5 * 60)) * 5;
+    const coinsEarned = eligible ? Math.min(sessionReward, remainingCap) : 0;
     const session: FocusSession = {
       id: `${input.endedAt}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
