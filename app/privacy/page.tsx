@@ -23,13 +23,14 @@ export default function PrivacyPage() {
             <li>學習資料，例如作答、錯題、任務、專注時間、成就與史萊姆收藏進度。</li>
             <li>你主動上傳的教材及為提供功能而擷取的必要內容。</li>
             <li>交易與額度資料，例如訂單編號、付款狀態、金幣與 AI 詳解額度；完整付款資訊由綠界付款頁處理。</li>
+            <li>你主動送出的問題回報，例如聯絡 Email、問題類型、描述、相關頁面網址與必要的瀏覽器資訊。</li>
             <li>維運所需的技術資訊，例如錯誤紀錄與基本請求資訊。</li>
           </ul>
         </PolicySection>
 
         <PolicySection title="資料用途">
           <p>
-            資料主要用於登入與帳號管理、保存學習進度、提供 AI 與教材功能、處理付款與虛擬資源入帳、偵錯、防止濫用，以及改善 MedSlime。
+            資料主要用於登入與帳號管理、保存學習進度、提供 AI 與教材功能、處理付款與虛擬資源入帳、處理使用者問題回報、偵錯、防止濫用，以及改善 MedSlime。
           </p>
         </PolicySection>
 
@@ -49,20 +50,23 @@ export default function PrivacyPage() {
 
         <PolicySection title="資料保存與安全">
           <p>
-            MedSlime 會在提供服務、維護帳號、處理交易與履行必要法令義務所需的期間保存相關資料，並採取合理的技術措施降低未授權存取、遺失或濫用的風險。但任何網路服務都無法保證絕對安全。
+            MedSlime 會在提供服務、維護帳號、處理交易、處理問題回報與履行必要法令義務所需的期間保存相關資料，並採取合理的技術措施降低未授權存取、遺失或濫用的風險。但任何網路服務都無法保證絕對安全。
           </p>
         </PolicySection>
 
         <PolicySection title="你的權利與聯絡方式">
           <p>
-            若你希望查詢、更正、停止使用或刪除與你帳號相關的個人資料，或對隱私處理有疑問，可透過下方 Email 聯絡。依法必須保留的交易或紀錄可能無法立即刪除。
+            若你希望查詢、更正、停止使用或刪除與你帳號相關的個人資料，或對隱私處理有疑問，可透過站內回報表單或下方 Email 聯絡。依法必須保留的交易或紀錄可能無法立即刪除。
           </p>
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("MedSlime 隱私權相關")}`}
-            className="mt-3 inline-flex font-black text-[#2a9d5e] underline underline-offset-4"
-          >
-            {CONTACT_EMAIL}
-          </a>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link
+              href="/feedback"
+              className="inline-flex rounded-xl bg-[#eefaf2] px-4 py-3 text-sm font-black text-[#237849]"
+            >
+              前往回報表單
+            </Link>
+            <span className="text-sm font-black text-[#557768]">{CONTACT_EMAIL}</span>
+          </div>
         </PolicySection>
 
         <div className="mt-6 flex flex-wrap gap-3 text-sm font-black">
