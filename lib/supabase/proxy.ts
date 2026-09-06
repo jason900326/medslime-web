@@ -45,11 +45,17 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/study/material") ||
     pathname.startsWith("/study/exam");
 
+  const isPublicInfoRoute =
+    pathname === "/about" ||
+    pathname === "/privacy" ||
+    pathname === "/terms";
+
   const isPublicRoute =
     pathname === "/" ||
     pathname === "/shop" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
+    isPublicInfoRoute ||
     isPublicStudyRoute;
 
   if (!user && !isPublicRoute) {
