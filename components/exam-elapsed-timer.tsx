@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
+const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
+const EXAM_FINISHED_EVENT = "medslime:exam-finished";
+
 function formatElapsed(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -17,11 +20,17 @@ function formatElapsed(totalSeconds: number) {
 export default function ExamElapsedTimer() {
   const startedAtRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (startedAtRef.current === null) {
-      startedAtRef.current = Date.now();
-    }
+    const storedStartedAt = Number(sessionStorage.getItem(EXAM_STARTED_AT_KEY));
+    const startedAt = Number.isFinite(storedStartedAt) && storedStartedAt > 0
+      ? storedStartedAt
+      : Date.now();
+
+    startedAtRef.current = startedAt;
+    sessionStorage.setItem(EXAM_STARTED_AT_KEY, String(startedAt));
+    setVisible(true);
 
     const update = () => {
       if (startedAtRef.current === null) return;
@@ -34,10 +43,23 @@ export default function ExamElapsedTimer() {
       );
     };
 
+    const handleFinished = () => {
+      update();
+      setVisible(false);
+    };
+
     update();
     const interval = window.setInterval(update, 1000);
-    return () => window.clearInterval(interval);
+    window.addEventListener(EXAM_FINISHED_EVENT, handleFinished);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(EXAM_FINISHED_EVENT, handleFinished);
+      sessionStorage.removeItem(EXAM_STARTED_AT_KEY);
+    };
   }, []);
+
+  if (!visible) return null;
 
   return (
     <div className="fixed right-4 top-4 z-[90] rounded-2xl border border-[#d7e7de] bg-white/95 px-4 py-2.5 text-right shadow-[0_10px_28px_rgba(31,83,53,0.12)] backdrop-blur sm:right-6 sm:top-6">

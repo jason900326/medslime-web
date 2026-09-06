@@ -29,14 +29,16 @@ export default function ScrollJumpButtons() {
         return;
       }
 
+      const distanceToBottom = Math.max(0, maxScroll - scrollTop);
+
       // 邏輯：
-      // - 靠近頁面頂部：只顯示「到底部」
-      // - 離開頂部後：只顯示「到頂部」
+      // - 只要還沒真正抵達頁面底部，就顯示「到底部」
+      // - 抵達底部附近後，才切換成「到頂部」
       // - 永遠不會同時出現
-      if (scrollTop <= 120) {
-        setVisibleButton("bottom");
-      } else {
+      if (distanceToBottom <= 80) {
         setVisibleButton("top");
+      } else {
+        setVisibleButton("bottom");
       }
     };
 
