@@ -211,7 +211,7 @@ export default function Home() {
                   ].join(" ")}
                 >
                   {showBubble && (
-                    <div className="pointer-events-none absolute bottom-[146px] left-1/2 z-30 w-max max-w-[210px] -translate-x-1/2 rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-3 py-2 text-center text-[11px] font-black leading-4 text-[#315b45] shadow-[0_6px_16px_rgba(31,83,53,0.09)] sm:max-w-[230px] sm:text-xs">
+                    <div className="pointer-events-none absolute bottom-[146px] left-1/2 z-30 w-[190px] max-w-[calc(100vw-64px)] -translate-x-1/2 whitespace-normal rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-3 py-2 text-center text-[11px] font-black leading-4 text-[#315b45] shadow-[0_6px_16px_rgba(31,83,53,0.09)] sm:w-[220px] sm:text-xs">
                       {bubbleText}
                     </div>
                   )}
