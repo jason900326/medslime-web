@@ -204,10 +204,6 @@ export default function GachaPage() {
             />
           </div>
         </section>
-
-        <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/75 px-5 py-4 text-sm font-bold text-[#70877b]">
-          抽卡後會直接進入揭曉畫面。單抽可以翻牌；十連抽可以把卡片一張一張滑開，也可以直接全部揭曉。
-        </section>
       </div>
 
       <GachaRevealOverlay
