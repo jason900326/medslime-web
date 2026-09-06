@@ -37,14 +37,24 @@ type LoadState =
 
 const TUTORIAL_STORAGE_KEY =
   "medslime_exam_tutorial_seen_v2";
+const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
+const EXAM_FINISHED_EVENT = "medslime:exam-finished";
+
+function formatElapsed(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  if (hours <= 0) return `${mm}:${ss}`;
+  return `${String(hours).padStart(2, "0")}:${mm}:${ss}`;
+}
 
 export default function ExamQuizPage() {
   return (
-    <Suspense
-      fallback={
-        <LoadingExam />
-      }
-    >
+    <Suspense fallback={<LoadingExam />}>
       <ExamQuizContent />
     </Suspense>
   );
@@ -57,85 +67,48 @@ function ExamQuizContent() {
 
   const year = searchParams.get("year") ?? "115";
   const session = searchParams.get("session") ?? "1";
-  const subject =
-    searchParams.get("subject") ?? "國考";
-
+  const subject = searchParams.get("subject") ?? "國考";
   const examKey = `${year}-${session}-${subject}`;
 
-  const [loadState, setLoadState] =
-    useState<LoadState>({
-      status: "loading",
-    });
-
+  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<
-    Record<string, number>
-  >({});
-  const [uncertain, setUncertain] = useState<
-    Record<string, boolean>
-  >({});
-  const [struckOptions, setStruckOptions] =
-    useState<Record<string, number[]>>({});
-  const [finished, setFinished] =
-    useState(false);
-  const [
-    showSubmitDialog,
-    setShowSubmitDialog,
-  ] = useState(false);
-  const [showTutorial, setShowTutorial] =
-    useState(false);
-  const [showOriginalQuestion, setShowOriginalQuestion] =
-    useState(false);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
+  const [struckOptions, setStruckOptions] = useState<Record<string, number[]>>({});
+  const [finished, setFinished] = useState(false);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showOriginalQuestion, setShowOriginalQuestion] = useState(false);
   const [recorded, setRecorded] = useState(false);
+  const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
 
   useEffect(() => {
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
 
     async function loadExam() {
-      setLoadState({
-        status: "loading",
-      });
-
+      setLoadState({ status: "loading" });
       setIndex(0);
       setAnswers({});
       setUncertain({});
       setStruckOptions({});
       setFinished(false);
       setRecorded(false);
+      setElapsedAtFinish(0);
       setShowSubmitDialog(false);
 
       try {
-        const params =
-          new URLSearchParams({
-            year,
-            session,
-            subject,
-          });
-
-        const response = await fetch(
-          `/api/national-exam?${params.toString()}`,
-          {
-            signal: controller.signal,
-            cache: "no-store",
-          },
-        );
-
-        const payload =
-          await response.json();
+        const params = new URLSearchParams({ year, session, subject });
+        const response = await fetch(`/api/national-exam?${params.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            payload?.error ||
-              "讀取國考題庫失敗。",
-          );
+          throw new Error(payload?.error || "讀取國考題庫失敗。");
         }
 
-        const questions = Array.isArray(
-          payload?.questions,
-        )
-          ? payload.questions
-          : [];
+        const questions = Array.isArray(payload?.questions) ? payload.questions : [];
 
         if (questions.length === 0) {
           throw new Error(
@@ -143,76 +116,41 @@ function ExamQuizContent() {
           );
         }
 
-        setLoadState({
-          status: "ready",
-          questions,
-        });
+        setLoadState({ status: "ready", questions });
       } catch (error) {
-        if (
-          error instanceof DOMException &&
-          error.name === "AbortError"
-        ) {
-          return;
-        }
+        if (error instanceof DOMException && error.name === "AbortError") return;
 
         setLoadState({
           status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "讀取國考題庫失敗。",
+          message: error instanceof Error ? error.message : "讀取國考題庫失敗。",
         });
       }
     }
 
     loadExam();
-
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [examKey, year, session, subject]);
 
   useEffect(() => {
-    const seen =
-      localStorage.getItem(
-        TUTORIAL_STORAGE_KEY,
-      );
-
-    if (!seen) {
-      setShowTutorial(true);
-    }
+    const seen = localStorage.getItem(TUTORIAL_STORAGE_KEY);
+    if (!seen) setShowTutorial(true);
   }, []);
 
-  if (loadState.status === "loading") {
-    return <LoadingExam />;
-  }
+  if (loadState.status === "loading") return <LoadingExam />;
 
   if (loadState.status === "error") {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-10">
-          <TopBar
-            showBack
-            backHref="/study/exam"
-            backLabel="返回選卷"
-          />
-
+          <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
           <div className="mt-10 rounded-[26px] border border-[#f0dddd] bg-white p-7">
-            <div className="text-2xl font-black text-[#9b5050]">
-              題庫讀取失敗
-            </div>
-
+            <div className="text-2xl font-black text-[#9b5050]">題庫讀取失敗</div>
             <div className="mt-3 font-bold leading-7 text-[#70877a]">
               {loadState.message}
             </div>
-
             <button
               type="button"
-              onClick={() =>
-                router.push(
-                  "/study/exam",
-                )
-              }
+              onClick={() => router.push("/study/exam")}
               className="mt-6 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
             >
               返回選卷
@@ -223,102 +161,49 @@ function ExamQuizContent() {
     );
   }
 
-  const questions =
-    loadState.questions;
-
+  const questions = loadState.questions;
   const question = questions[index];
 
-  const correctCount =
-    questions.reduce(
-      (sum, item) =>
-        sum +
-        (item.correctIndex !== null &&
-        answers[item.id] ===
-          item.correctIndex
-          ? 1
-          : 0),
-      0,
-    );
+  const correctCount = questions.reduce(
+    (sum, item) =>
+      sum +
+      (item.correctIndex !== null && answers[item.id] === item.correctIndex ? 1 : 0),
+    0,
+  );
 
-  const gradableCount =
-    questions.filter(
-      (item) =>
-        item.correctIndex !== null,
-    ).length;
+  const gradableCount = questions.filter((item) => item.correctIndex !== null).length;
+  const unansweredNumbers = questions
+    .filter((item) => answers[item.id] === undefined)
+    .map((item) => item.questionNumber);
+  const unansweredCount = unansweredNumbers.length;
+  const uncertainCount = Object.values(uncertain).filter(Boolean).length;
+  const score = correctCount * 1.25;
 
-  const unansweredNumbers =
-    questions
-      .filter(
-        (item) =>
-          answers[item.id] ===
-          undefined,
-      )
-      .map((item) => item.questionNumber);
-
-  const unansweredCount =
-    unansweredNumbers.length;
-
-  const uncertainCount =
-    Object.values(
-      uncertain,
-    ).filter(Boolean).length;
-
-  const score =
-    correctCount * 1.25;
-
-  const toggleStrike = (
-    questionId: string,
-    optionIndex: number,
-  ) => {
+  const toggleStrike = (questionId: string, optionIndex: number) => {
     setStruckOptions((current) => {
-      const list =
-        current[questionId] ?? [];
-      const exists =
-        list.includes(optionIndex);
-
+      const list = current[questionId] ?? [];
+      const exists = list.includes(optionIndex);
       return {
         ...current,
         [questionId]: exists
-          ? list.filter(
-              (item) =>
-                item !== optionIndex,
-            )
+          ? list.filter((item) => item !== optionIndex)
           : [...list, optionIndex],
       };
     });
   };
 
-  const getQuestionStatus = (
-    questionId: string,
-  ) => {
-    const hasAnswer =
-      answers[questionId] !==
-      undefined;
-    const isUncertain =
-      uncertain[questionId] ??
-      false;
+  const getQuestionStatus = (questionId: string) => {
+    const hasAnswer = answers[questionId] !== undefined;
+    const isUncertain = uncertain[questionId] ?? false;
 
-    if (
-      hasAnswer &&
-      isUncertain
-    ) {
-      return "yellow";
-    }
-
-    if (hasAnswer) {
-      return "green";
-    }
-
-    if (isUncertain) {
-      return "red";
-    }
-
+    if (hasAnswer && isUncertain) return "yellow";
+    if (hasAnswer) return "green";
+    if (isUncertain) return "red";
     return "gray";
   };
 
   const saveMistakes = async () => {
     const now = new Date().toISOString();
-
     const records = questions
       .filter((item) => {
         const userAnswer = answers[item.id];
@@ -326,9 +211,7 @@ function ExamQuizContent() {
           item.correctIndex !== null &&
           userAnswer !== undefined &&
           userAnswer !== item.correctIndex;
-
         const isUncertain = uncertain[item.id] ?? false;
-
         return isWrong || isUncertain;
       })
       .map((item) => ({
@@ -353,6 +236,15 @@ function ExamQuizContent() {
   };
 
   const finishExam = async () => {
+    const startedAt = Number(sessionStorage.getItem(EXAM_STARTED_AT_KEY));
+    const elapsed =
+      Number.isFinite(startedAt) && startedAt > 0
+        ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+        : 0;
+
+    setElapsedAtFinish(elapsed);
+    window.dispatchEvent(new Event(EXAM_FINISHED_EVENT));
+
     try {
       await saveMistakes();
     } catch (error) {
@@ -369,10 +261,7 @@ function ExamQuizContent() {
   };
 
   const closeTutorial = () => {
-    localStorage.setItem(
-      TUTORIAL_STORAGE_KEY,
-      "1",
-    );
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, "1");
     setShowTutorial(false);
   };
 
@@ -383,65 +272,76 @@ function ExamQuizContent() {
       userAnswer !== undefined &&
       userAnswer !== item.correctIndex;
     const isUncertain = uncertain[item.id] ?? false;
-
     return isWrong || isUncertain;
   });
 
   if (finished) {
+    const previewReviewQuestions = reviewQuestions.slice(0, 3);
+    const hiddenReviewCount = Math.max(0, reviewQuestions.length - previewReviewQuestions.length);
+
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-        <div className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-10">
-          <TopBar
-            showBack
-            backHref="/study/exam"
-            backLabel="返回選卷"
-          />
+        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
+          <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
 
-          <section className="mt-10 rounded-[30px] border border-[#dce9e1] bg-white p-8 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)]">
-            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+          <section className="mt-6 rounded-[26px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-10 sm:rounded-[30px] sm:p-8">
+            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962] sm:text-sm">
               RESULT
             </div>
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
+            <div className="mt-2 text-sm font-bold text-[#789083]">
+              作答時間 <span className="font-mono font-black text-[#315b45]">{formatElapsed(elapsedAtFinish)}</span>
+            </div>
 
-            <h1 className="mt-2 text-4xl font-black">
-              作答完成
-            </h1>
-
-            <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
-              <ResultCard
-                label="答對"
-                value={`${correctCount} / ${gradableCount}`}
-              />
-
-              <ResultCard
-                label="換算分數"
-                value={`${score.toFixed(2)} 分`}
-              />
-
-              <ResultCard
-                label="需要複習"
-                value={`${reviewQuestions.length} 題`}
-              />
+            <div className="mx-auto mt-6 grid max-w-3xl grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
+              <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
+              <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
+              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
             </div>
 
             {gradableCount < questions.length && (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-4 text-sm font-bold text-[#80651e]">
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
                 有 {questions.length - gradableCount} 題目前沒有可用的單一標準答案，因此未納入計分。
               </div>
             )}
 
             {uncertainCount > 0 && (
-              <div className="mt-4 text-sm font-bold text-[#789083]">
+              <div className="mt-3 text-xs font-bold text-[#789083] sm:text-sm">
                 你另外標記了 {uncertainCount} 題「我不確定」。
               </div>
             )}
 
+            <div className="mx-auto mt-5 flex max-w-3xl flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
+              {reviewQuestions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/study/mistakes")}
+                  className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
+                >
+                  前往錯題庫 · {reviewQuestions.length} 題待複習
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push("/study/exam")}
+                className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f5faf7] sm:px-6"
+              >
+                再選一份考卷
+              </button>
+            </div>
+
             {reviewQuestions.length > 0 ? (
-              <section className="mx-auto mt-8 max-w-3xl space-y-4 text-left">
-                <div className="text-lg font-black text-[#17372a]">
-                  需要複習的題目
+              <section className="mx-auto mt-7 max-w-3xl space-y-4 text-left sm:mt-8">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
+                    <div className="mt-1 text-xs font-bold text-[#789083]">
+                      先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題庫。
+                    </div>
+                  </div>
                 </div>
 
-                {reviewQuestions.map((item) => {
+                {previewReviewQuestions.map((item) => {
                   const userAnswer = answers[item.id];
                   const isUncertain = uncertain[item.id] ?? false;
                   const isWrong =
@@ -452,19 +352,17 @@ function ExamQuizContent() {
                   return (
                     <div
                       key={`result-review-${item.id}`}
-                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-5"
+                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-4 sm:p-5"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-black text-[#2ba962]">
                           第 {item.questionNumber} 題
                         </div>
-
                         {isWrong && (
                           <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
                             答錯
                           </span>
                         )}
-
                         {isUncertain && (
                           <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#80651e]">
                             ❓ 不確定
@@ -472,16 +370,14 @@ function ExamQuizContent() {
                         )}
                       </div>
 
-                      <div className="mt-3 font-black leading-7 text-[#17372a]">
+                      <div className="mt-3 text-base font-black leading-7 text-[#17372a]">
                         {item.stem}
                       </div>
 
                       <div className="mt-4 space-y-2">
                         {item.options.map((option, optionIndex) => {
-                          const isCorrect =
-                            item.correctIndex === optionIndex;
-                          const isChosen =
-                            userAnswer === optionIndex;
+                          const isCorrect = item.correctIndex === optionIndex;
+                          const isChosen = userAnswer === optionIndex;
 
                           return (
                             <div
@@ -512,10 +408,7 @@ function ExamQuizContent() {
                             stem: item.stem,
                             options: item.options,
                             correctIndex: item.correctIndex,
-                            userAnswer:
-                              userAnswer === undefined
-                                ? null
-                                : userAnswer,
+                            userAnswer: userAnswer === undefined ? null : userAnswer,
                             uncertain: isUncertain,
                           }}
                         />
@@ -523,38 +416,22 @@ function ExamQuizContent() {
                     </div>
                   );
                 })}
+
+                {hiddenReviewCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/study/mistakes")}
+                    className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
+                  >
+                    還有 {hiddenReviewCount} 題，前往錯題庫查看全部 →
+                  </button>
+                )}
               </section>
             ) : (
-              <div className="mx-auto mt-8 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
+              <div className="mx-auto mt-7 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
                 ✓ 這次沒有需要複習的錯題或不確定題目。
               </div>
             )}
-
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/study/mistakes",
-                  )
-                }
-                className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
-              >
-                前往錯題庫
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/study/exam",
-                  )
-                }
-                className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45] transition hover:bg-[#f5faf7]"
-              >
-                返回上一頁
-              </button>
-            </div>
           </section>
         </div>
       </main>
@@ -564,50 +441,30 @@ function ExamQuizContent() {
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
-        <TopBar
-          showBack
-          backHref="/study/exam"
-          backLabel="返回選卷"
-        />
+        <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
 
         <section className="mt-8">
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-            民國 {year} 年 · 第{" "}
-            {session} 次
+            民國 {year} 年 · 第 {session} 次
           </div>
-
-          <h1 className="mt-2 text-2xl font-black">
-            {subject}
-          </h1>
-
+          <h1 className="mt-2 text-2xl font-black">{subject}</h1>
         </section>
 
         <QuestionProgress
           questions={questions}
           currentIndex={index}
-          getStatus={
-            getQuestionStatus
-          }
+          getStatus={getQuestionStatus}
           onJump={setIndex}
         />
 
         <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-black text-[#789083]">
-              Q
-              {
-                question.questionNumber
-              }{" "}
-              / {questions.length}
+              Q{question.questionNumber} / {questions.length}
             </div>
-
             <button
               type="button"
-              onClick={() =>
-                setShowSubmitDialog(
-                  true,
-                )
-              }
+              onClick={() => setShowSubmitDialog(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
               結束測驗
@@ -641,109 +498,68 @@ function ExamQuizContent() {
           </div>
 
           <div className="mt-6 space-y-3">
-            {question.options.map(
-              (
-                option,
-                optionIndex,
-              ) => {
-                const selected =
-                  answers[
-                    question.id
-                  ] === optionIndex;
+            {question.options.map((option, optionIndex) => {
+              const selected = answers[question.id] === optionIndex;
+              const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
-                const struck =
-                  struckOptions[
-                    question.id
-                  ]?.includes(
-                    optionIndex,
-                  ) ?? false;
-
-                return (
-                  <div
-                    key={`${question.id}-${optionIndex}`}
-                    className={[
-                      "flex items-stretch rounded-2xl border transition",
-                      selected
-                        ? "border-[#65d795] bg-[#eaf9f0]"
-                        : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                    ].join(" ")}
+              return (
+                <div
+                  key={`${question.id}-${optionIndex}`}
+                  className={[
+                    "flex items-stretch rounded-2xl border transition",
+                    selected
+                      ? "border-[#65d795] bg-[#eaf9f0]"
+                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
+                  ].join(" ")}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAnswers((current) => ({
+                        ...current,
+                        [question.id]: optionIndex,
+                      }))
+                    }
+                    className="flex w-14 shrink-0 items-center justify-center"
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAnswers(
-                          (
-                            current,
-                          ) => ({
-                            ...current,
-                            [question.id]:
-                              optionIndex,
-                          }),
-                        )
-                      }
-                      className="flex w-14 shrink-0 items-center justify-center"
-                    >
-                      <span
-                        className={[
-                          "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                          selected
-                            ? "border-[#31c978] bg-[#31c978]"
-                            : "border-[#b8c9bf] bg-white",
-                        ].join(
-                          " ",
-                        )}
-                      >
-                        {selected && (
-                          <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                        )}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toggleStrike(
-                          question.id,
-                          optionIndex,
-                        )
-                      }
+                    <span
                       className={[
-                        "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                        struck
-                          ? "line-through opacity-45"
-                          : "",
+                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
+                        selected
+                          ? "border-[#31c978] bg-[#31c978]"
+                          : "border-[#b8c9bf] bg-white",
                       ].join(" ")}
                     >
-                      {String.fromCharCode(
-                        65 +
-                          optionIndex,
-                      )}
-                      . {option}
-                    </button>
-                  </div>
-                );
-              },
-            )}
+                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleStrike(question.id, optionIndex)}
+                    className={[
+                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
+                      struck ? "line-through opacity-45" : "",
+                    ].join(" ")}
+                  >
+                    {String.fromCharCode(65 + optionIndex)}. {option}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <button
             type="button"
             onClick={() =>
-              setUncertain(
-                (current) => ({
-                  ...current,
-                  [question.id]:
-                    !current[
-                      question.id
-                    ],
-                }),
-              )
+              setUncertain((current) => ({
+                ...current,
+                [question.id]: !current[question.id],
+              }))
             }
             className={[
               "mt-4 flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left font-black transition",
-              uncertain[
-                question.id
-              ]
+              uncertain[question.id]
                 ? "border-[#e2b94f] bg-[#fff8df] text-[#8a6814]"
                 : "border-[#dfe8e2] bg-white text-[#557768] hover:bg-[#f7faf8]",
             ].join(" ")}
@@ -751,16 +567,12 @@ function ExamQuizContent() {
             <span
               className={[
                 "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
-                uncertain[
-                  question.id
-                ]
+                uncertain[question.id]
                   ? "border-[#e2b94f] bg-[#e2b94f]"
                   : "border-[#b8c9bf] bg-white",
               ].join(" ")}
             >
-              {uncertain[
-                question.id
-              ] && (
+              {uncertain[question.id] && (
                 <span className="h-2.5 w-2.5 rounded-full bg-white" />
               )}
             </span>
@@ -771,33 +583,17 @@ function ExamQuizContent() {
             <button
               type="button"
               disabled={index === 0}
-              onClick={() =>
-                setIndex(
-                  (current) =>
-                    Math.max(
-                      0,
-                      current - 1,
-                    ),
-                )
-              }
+              onClick={() => setIndex((current) => Math.max(0, current - 1))}
               className="rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45] disabled:cursor-not-allowed disabled:opacity-40"
             >
               ← 上一題
             </button>
 
-            {index <
-            questions.length - 1 ? (
+            {index < questions.length - 1 ? (
               <button
                 type="button"
                 onClick={() =>
-                  setIndex(
-                    (current) =>
-                      Math.min(
-                        questions.length -
-                          1,
-                        current + 1,
-                      ),
-                  )
+                  setIndex((current) => Math.min(questions.length - 1, current + 1))
                 }
                 className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
@@ -806,11 +602,7 @@ function ExamQuizContent() {
             ) : (
               <button
                 type="button"
-                onClick={() =>
-                  setShowSubmitDialog(
-                    true,
-                  )
-                }
+                onClick={() => setShowSubmitDialog(true)}
                 className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
                 完成測驗
@@ -823,44 +615,28 @@ function ExamQuizContent() {
       {showSubmitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-5">
           <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
-            <div className="text-2xl font-black">
-              是否要交卷？
-            </div>
+            <div className="text-2xl font-black">是否要交卷？</div>
 
-            {unansweredCount >
-            0 ? (
+            {unansweredCount > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
-                尚有{" "}
-                {
-                  unansweredCount
-                }{" "}
-                題未作答。
+                尚有 {unansweredCount} 題未作答。
                 <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
                   未作答題號：{unansweredNumbers.join("、")}
                 </div>
-                <div className="mt-3">
-                  確定仍要交卷嗎？
-                </div>
+                <div className="mt-3">確定仍要交卷嗎？</div>
               </div>
             ) : (
-              <p className="mt-3 text-sm font-bold text-[#70877a]">
-                已完成所有題目。
-              </p>
+              <p className="mt-3 text-sm font-bold text-[#70877a]">已完成所有題目。</p>
             )}
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() =>
-                  setShowSubmitDialog(
-                    false,
-                  )
-                }
+                onClick={() => setShowSubmitDialog(false)}
                 className="rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-black text-[#315b45]"
               >
                 繼續作答
               </button>
-
               <button
                 type="button"
                 onClick={finishExam}
@@ -885,7 +661,6 @@ function ExamQuizContent() {
                   官方原題 · 第 {question.questionNumber} 題
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={() => setShowOriginalQuestion(false)}
@@ -906,13 +681,7 @@ function ExamQuizContent() {
         </div>
       )}
 
-      {showTutorial && (
-        <ExamTutorial
-          onClose={
-            closeTutorial
-          }
-        />
-      )}
+      {showTutorial && <ExamTutorial onClose={closeTutorial} />}
     </main>
   );
 }
@@ -925,16 +694,8 @@ function QuestionProgress({
 }: {
   questions: Question[];
   currentIndex: number;
-  getStatus: (
-    questionId: string,
-  ) =>
-    | "green"
-    | "yellow"
-    | "red"
-    | "gray";
-  onJump: (
-    index: number,
-  ) => void;
+  getStatus: (questionId: string) => "green" | "yellow" | "red" | "gray";
+  onJump: (index: number) => void;
 }) {
   const segmentSize = 10;
   const segmentCount = Math.ceil(questions.length / segmentSize);
@@ -964,16 +725,13 @@ function QuestionProgress({
     <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-3 py-4 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:px-4">
       <div className="flex items-center gap-3 overflow-x-auto pb-1 text-[11px] font-black text-[#70877a] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <span className="flex shrink-0 items-center gap-1.5">
-          <LegendDot color="green" />
-          已作答
+          <LegendDot color="green" />已作答
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <LegendDot color="yellow" />
-          作答＋不確定
+          <LegendDot color="yellow" />作答＋不確定
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <LegendDot color="red" />
-          只有不確定
+          <LegendDot color="red" />只有不確定
         </span>
       </div>
 
@@ -982,10 +740,7 @@ function QuestionProgress({
           const active = segmentIndex === currentSegment;
           const status = getSegmentStatus(segmentIndex);
           const firstQuestionIndex = segmentIndex * segmentSize;
-          const lastQuestionNumber = Math.min(
-            firstQuestionIndex + segmentSize,
-            questions.length,
-          );
+          const lastQuestionNumber = Math.min(firstQuestionIndex + segmentSize, questions.length);
 
           return (
             <button
@@ -1000,11 +755,7 @@ function QuestionProgress({
               ].join(" ")}
               title={`第 ${firstQuestionIndex + 1}–${lastQuestionNumber} 題`}
             >
-              <SimpleSlime
-                status={status}
-                size="segment"
-                active={active}
-              />
+              <SimpleSlime status={status} size="segment" active={active} />
               <span
                 className={[
                   "text-[11px] font-black",
@@ -1060,35 +811,15 @@ function SimpleSlime({
   size,
   active,
 }: {
-  status:
-    | "green"
-    | "yellow"
-    | "red"
-    | "gray";
+  status: "green" | "yellow" | "red" | "gray";
   size: "segment" | "question";
   active: boolean;
 }) {
   const colors = {
-    green: {
-      body: "#b9efd1",
-      border: "#55b97b",
-      face: "#315b45",
-    },
-    yellow: {
-      body: "#ffe8a3",
-      border: "#e2b94f",
-      face: "#6f5a1d",
-    },
-    red: {
-      body: "#ffc9cf",
-      border: "#de7777",
-      face: "#7c3d46",
-    },
-    gray: {
-      body: "#eef6f1",
-      border: "#d6e5dc",
-      face: "#759184",
-    },
+    green: { body: "#b9efd1", border: "#55b97b", face: "#315b45" },
+    yellow: { body: "#ffe8a3", border: "#e2b94f", face: "#6f5a1d" },
+    red: { body: "#ffc9cf", border: "#de7777", face: "#7c3d46" },
+    gray: { body: "#eef6f1", border: "#d6e5dc", face: "#759184" },
   }[status];
 
   const segment = size === "segment";
@@ -1101,13 +832,10 @@ function SimpleSlime({
       style={{
         width,
         height,
-        borderRadius:
-          "48% 48% 42% 42% / 56% 56% 42% 42%",
+        borderRadius: "48% 48% 42% 42% / 56% 56% 42% 42%",
         background: colors.body,
         border: `1.5px solid ${colors.border}`,
-        boxShadow: active
-          ? "0 0 0 3px rgba(49,201,120,0.12)"
-          : "none",
+        boxShadow: active ? "0 0 0 3px rgba(49,201,120,0.12)" : "none",
       }}
     >
       <span
@@ -1145,14 +873,7 @@ function SimpleSlime({
   );
 }
 
-function LegendDot({
-  color,
-}: {
-  color:
-    | "green"
-    | "yellow"
-    | "red";
-}) {
+function LegendDot({ color }: { color: "green" | "yellow" | "red" }) {
   const colorMap = {
     green: "#55b97b",
     yellow: "#e2b94f",
@@ -1163,19 +884,14 @@ function LegendDot({
     <span
       className="inline-block h-3 w-3 rounded-full"
       style={{
-        background:
-          colorMap[color],
+        background: colorMap[color],
         boxShadow: `0 0 8px ${colorMap[color]}66`,
       }}
     />
   );
 }
 
-function ExamTutorial({
-  onClose,
-}: {
-  onClose: () => void;
-}) {
+function ExamTutorial({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[120] overflow-y-auto bg-[#f6fcf8]/96 px-4 py-8 backdrop-blur-sm">
       <div className="mx-auto max-w-5xl">
@@ -1183,34 +899,18 @@ function ExamTutorial({
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
             第一次作答？
           </div>
-          <h2 className="mt-2 text-3xl font-black">
-            三個操作就夠了
-          </h2>
+          <h2 className="mt-2 text-3xl font-black">三個操作就夠了</h2>
         </div>
 
         <div className="mx-auto mt-8 max-w-4xl rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_36px_rgba(31,83,53,0.06)]">
           <div className="grid gap-5 md:grid-cols-3">
-            <TutorialItem
-              icon="◯"
-              title="點圓圈"
-              copy="選擇正式答案"
-            />
-            <TutorialItem
-              icon="Aa"
-              title="點選項文字"
-              copy="劃掉／取消劃掉選項"
-            />
-            <TutorialItem
-              icon="?"
-              title="我不確定"
-              copy="答案照樣保留，同時標記這題不熟"
-            />
+            <TutorialItem icon="◯" title="點圓圈" copy="選擇正式答案" />
+            <TutorialItem icon="Aa" title="點選項文字" copy="劃掉／取消劃掉選項" />
+            <TutorialItem icon="?" title="我不確定" copy="答案照樣保留，同時標記這題不熟" />
           </div>
 
           <div className="mt-6 border-t border-[#e4ece7] pt-5">
-            <div className="text-sm font-black text-[#315b45]">
-              上方導覽列可以自由跳題
-            </div>
+            <div className="text-sm font-black text-[#315b45]">上方導覽列可以自由跳題</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
               第一排切換每 10 題的區段，第二排直接跳到單一題目；史萊姆的顏色會保留你的作答與「不確定」標記。
             </div>
@@ -1246,32 +946,21 @@ function TutorialItem({
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d7e7de] bg-white text-lg font-black">
         {icon}
       </div>
-
       <div>
-        <div className="text-lg font-black">
-          {title}
-        </div>
-        <div className="mt-1 text-sm font-bold leading-6 text-[#789083]">
-          {copy}
-        </div>
+        <div className="text-lg font-black">{title}</div>
+        <div className="mt-1 text-sm font-bold leading-6 text-[#789083]">{copy}</div>
       </div>
     </div>
   );
 }
 
-function ResultCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function ResultCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-[#dfece4] bg-[#f8fcf9] p-5">
-      <div className="text-sm font-bold text-[#789083]">
+    <div className="min-w-0 rounded-[16px] border border-[#dfece4] bg-[#f8fcf9] px-2 py-3 sm:rounded-[20px] sm:p-5">
+      <div className="text-[10px] font-bold leading-4 text-[#789083] sm:text-sm">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-black">
+      <div className="mt-1 break-keep text-base font-black leading-tight sm:text-2xl">
         {value}
       </div>
     </div>
@@ -1284,12 +973,8 @@ function LoadingExam() {
       <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-5">
         <div className="text-center">
           <div className="mx-auto h-16 w-20 rounded-[50%_50%_42%_42%/56%_56%_42%_42%] border-2 border-[#69c88f] bg-[#b9efd1]" />
-          <div className="mt-5 text-xl font-black">
-            正在搬出國考題庫...
-          </div>
-          <div className="mt-2 text-sm font-bold text-[#789083]">
-            從 Supabase 讀取真題中
-          </div>
+          <div className="mt-5 text-xl font-black">正在搬出國考題庫...</div>
+          <div className="mt-2 text-sm font-bold text-[#789083]">從 Supabase 讀取真題中</div>
         </div>
       </div>
     </main>
