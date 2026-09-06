@@ -9,8 +9,6 @@ import {
 } from "@/lib/ecpay";
 import { SHOP_PRODUCT_BY_ID } from "@/lib/shop-products";
 
-export const runtime = "nodejs";
-
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
