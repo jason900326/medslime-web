@@ -53,7 +53,7 @@ export function SignUpForm() {
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
       },
     });
 
