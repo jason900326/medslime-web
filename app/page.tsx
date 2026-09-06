@@ -122,7 +122,7 @@ export default function Home() {
       label: "完成 5 題",
       progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
       complete: today.questionsAnswered >= 5,
-      reward: { type: "coins" as const, amount: 25 },
+      reward: { type: "coins" as const, amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
@@ -130,7 +130,7 @@ export default function Home() {
       label: "訂正 1 題",
       progress: `${Math.min(today.mistakesReviewed, 1)} / 1 題`,
       complete: today.mistakesReviewed >= 1,
-      reward: { type: "coins" as const, amount: 25 },
+      reward: { type: "coins" as const, amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:review`,
     },
     {
@@ -138,7 +138,7 @@ export default function Home() {
       label: "專注 20 分鐘",
       progress: `${Math.min(Math.floor(today.focusSeconds / 60), 20)} / 20 分`,
       complete: today.focusSeconds >= 20 * 60,
-      reward: { type: "coins" as const, amount: 25 },
+      reward: { type: "coins" as const, amount: 40 },
       claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
