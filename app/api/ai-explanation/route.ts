@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type ExplanationPayload = {
   questionKey?: string;
@@ -67,12 +68,6 @@ const explanationSchema = {
       items: { type: "string" },
     },
     memoryPoint: { type: "string" },
-
-    /*
-     * 不再使用 null。
-     * 如果沒有明顯陷阱，請回傳空字串 ""。
-     * 前端看到空字串就不顯示「常見陷阱」區塊。
-     */
     commonTrap: { type: "string" },
   },
   required: [
@@ -87,10 +82,7 @@ const explanationSchema = {
 } as const;
 
 function getOutputText(payload: OpenAIResponse) {
-  if (
-    typeof payload.output_text === "string" &&
-    payload.output_text.trim()
-  ) {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text;
   }
 
@@ -109,12 +101,8 @@ function getOutputText(payload: OpenAIResponse) {
   return "";
 }
 
-function normalizeSource(
-  value: unknown,
-): "national-exam" | "material" {
-  return value === "material"
-    ? "material"
-    : "national-exam";
+function normalizeSource(value: unknown): "national-exam" | "material" {
+  return value === "material" ? "material" : "national-exam";
 }
 
 async function readCachedExplanation(input: {
@@ -123,18 +111,9 @@ async function readCachedExplanation(input: {
   source: "national-exam" | "material";
   questionKey: string;
 }) {
-  const {
-    supabase,
-    userId,
-    source,
-    questionKey,
-  } = input;
+  const { supabase, userId, source, questionKey } = input;
 
   if (source === "national-exam") {
-    /*
-     * 國考 AI 基礎解析：
-     * 全站共用，同一題只生成一次。
-     */
     const { data, error } = await supabase
       .from("shared_ai_explanations")
       .select("explanation")
@@ -142,21 +121,12 @@ async function readCachedExplanation(input: {
       .maybeSingle();
 
     if (error) {
-      throw new Error(
-        `共用 AI 解析讀取失敗：${error.message}`,
-      );
+      throw new Error(`共用 AI 解析讀取失敗：${error.message}`);
     }
 
-    return (
-      (data?.explanation as ExplanationResult | null) ??
-      null
-    );
+    return (data?.explanation as ExplanationResult | null) ?? null;
   }
 
-  /*
-   * 教材解析：
-   * 教材是使用者自己的內容，所以維持個人快取。
-   */
   const { data, error } = await supabase
     .from("ai_question_explanations")
     .select("explanation")
@@ -165,15 +135,10 @@ async function readCachedExplanation(input: {
     .maybeSingle();
 
   if (error) {
-    throw new Error(
-      `教材 AI 解析讀取失敗：${error.message}`,
-    );
+    throw new Error(`教材 AI 解析讀取失敗：${error.message}`);
   }
 
-  return (
-    (data?.explanation as ExplanationResult | null) ??
-    null
-  );
+  return (data?.explanation as ExplanationResult | null) ?? null;
 }
 
 async function saveExplanation(input: {
@@ -184,15 +149,7 @@ async function saveExplanation(input: {
   questionKey: string;
   explanation: ExplanationResult;
 }) {
-  const {
-    supabase,
-    userId,
-    source,
-    sourceLabel,
-    questionKey,
-    explanation,
-  } = input;
-
+  const { supabase, userId, source, sourceLabel, questionKey, explanation } = input;
   const now = new Date().toISOString();
 
   if (source === "national-exam") {
@@ -206,17 +163,12 @@ async function saveExplanation(input: {
           explanation,
           updated_at: now,
         },
-        {
-          onConflict: "question_key",
-        },
+        { onConflict: "question_key" },
       );
 
     if (error) {
-      throw new Error(
-        `共用 AI 解析儲存失敗：${error.message}`,
-      );
+      throw new Error(`共用 AI 解析儲存失敗：${error.message}`);
     }
-
     return;
   }
 
@@ -231,15 +183,11 @@ async function saveExplanation(input: {
         explanation,
         updated_at: now,
       },
-      {
-        onConflict: "user_id,question_key",
-      },
+      { onConflict: "user_id,question_key" },
     );
 
   if (error) {
-    throw new Error(
-      `教材 AI 解析儲存失敗：${error.message}`,
-    );
+    throw new Error(`教材 AI 解析儲存失敗：${error.message}`);
   }
 }
 
@@ -250,72 +198,75 @@ async function recordExplanationEvent(input: {
   source: "national-exam" | "material";
   eventType: "cache_view" | "generated";
 }) {
-  const {
-    supabase,
-    userId,
-    questionKey,
+  const { supabase, userId, questionKey, source, eventType } = input;
+  const { error } = await supabase.from("ai_explanation_events").insert({
+    user_id: userId,
+    question_key: questionKey,
     source,
-    eventType,
-  } = input;
-
-  const { error } = await supabase
-    .from("ai_explanation_events")
-    .insert({
-      user_id: userId,
-      question_key: questionKey,
-      source,
-      event_type: eventType,
-    });
+    event_type: eventType,
+  });
 
   if (error) {
-    console.error(
-      "AI 解析事件統計寫入失敗：",
-      error,
-    );
+    console.error("AI 解析事件統計寫入失敗：", error);
+  }
+}
+
+async function consumeDetailCredit(userId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("consume_ai_detail_credit", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    if (error.message.includes("AI_DETAIL_CREDIT_REQUIRED")) {
+      return { ok: false as const, remaining: 0 };
+    }
+    throw new Error(`AI 詳解額度扣除失敗：${error.message}`);
+  }
+
+  return { ok: true as const, remaining: Number(data ?? 0) };
+}
+
+async function refundDetailCredit(userId: string) {
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("refund_ai_detail_credit", {
+      p_user_id: userId,
+    });
+    if (error) {
+      console.error("AI 詳解額度退回失敗：", error);
+    }
+  } catch (error) {
+    console.error("AI 詳解額度退回失敗：", error);
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        {
-          error: "請先登入才能使用 AI 詳解。",
-        },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "請先登入才能使用 AI 詳解。" }, { status: 401 });
     }
 
     const questionKey = String(
       request.nextUrl.searchParams.get("questionKey") ?? "",
     ).trim();
-
-    const source = normalizeSource(
-      request.nextUrl.searchParams.get("source"),
-    );
+    const source = normalizeSource(request.nextUrl.searchParams.get("source"));
 
     if (!questionKey) {
-      return NextResponse.json(
-        {
-          error: "缺少 questionKey。",
-        },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "缺少 questionKey。" }, { status: 400 });
     }
 
-    const cached =
-      await readCachedExplanation({
-        supabase,
-        userId: user.id,
-        source,
-        questionKey,
-      });
+    const cached = await readCachedExplanation({
+      supabase,
+      userId: user.id,
+      source,
+      questionKey,
+    });
 
     if (cached) {
       await recordExplanationEvent({
@@ -334,10 +285,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "AI 詳解讀取失敗。",
+        error: error instanceof Error ? error.message : "AI 詳解讀取失敗。",
       },
       { status: 500 },
     );
@@ -345,65 +293,38 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
+  let reservedCreditUserId: string | null = null;
+
   try {
     const apiKey = process.env.OPENAI_API_KEY;
-
     if (!apiKey) {
       return NextResponse.json(
-        {
-          error:
-            "伺服器尚未設定 OPENAI_API_KEY。",
-        },
+        { error: "伺服器尚未設定 OPENAI_API_KEY。" },
         { status: 500 },
       );
     }
 
     const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        {
-          error: "請先登入才能使用 AI 詳解。",
-        },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "請先登入才能使用 AI 詳解。" }, { status: 401 });
     }
 
-    const body =
-      (await request.json()) as ExplanationPayload;
-
-    const source =
-      normalizeSource(body.source);
-
+    const body = (await request.json()) as ExplanationPayload;
+    const source = normalizeSource(body.source);
     const questionKey =
-      typeof body.questionKey === "string"
-        ? body.questionKey.trim()
-        : "";
-
+      typeof body.questionKey === "string" ? body.questionKey.trim() : "";
     const sourceLabel =
-      typeof body.sourceLabel === "string"
-        ? body.sourceLabel.trim()
-        : "";
-
-    const stem =
-      typeof body.stem === "string"
-        ? body.stem.trim()
-        : "";
-
+      typeof body.sourceLabel === "string" ? body.sourceLabel.trim() : "";
+    const stem = typeof body.stem === "string" ? body.stem.trim() : "";
     const options = Array.isArray(body.options)
-      ? body.options.map((item) =>
-          String(item ?? "").trim(),
-        )
+      ? body.options.map((item) => String(item ?? "").trim())
       : [];
-
     const correctIndex =
-      typeof body.correctIndex === "number"
-        ? body.correctIndex
-        : null;
+      typeof body.correctIndex === "number" ? body.correctIndex : null;
 
     if (
       !questionKey ||
@@ -422,18 +343,12 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * 先查快取，避免同一題重複呼叫 OpenAI。
-     * 國考：全站共用。
-     * 教材：每個使用者自己的教材解析。
-     */
-    const cached =
-      await readCachedExplanation({
-        supabase,
-        userId: user.id,
-        source,
-        questionKey,
-      });
+    const cached = await readCachedExplanation({
+      supabase,
+      userId: user.id,
+      source,
+      questionKey,
+    });
 
     if (cached) {
       await recordExplanationEvent({
@@ -444,43 +359,33 @@ export async function POST(request: Request) {
         eventType: "cache_view",
       });
 
-      return NextResponse.json({
-        cached: true,
-        explanation: cached,
-      });
+      return NextResponse.json({ cached: true, explanation: cached });
     }
 
-    const userAnswer =
-      typeof body.userAnswer === "number"
-        ? body.userAnswer
-        : null;
+    const credit = await consumeDetailCredit(user.id);
+    if (!credit.ok) {
+      return NextResponse.json(
+        {
+          error: "AI 詳解額度已用完，請先前往商城補充額度。",
+          code: "AI_DETAIL_CREDIT_REQUIRED",
+          aiDetailCredits: 0,
+        },
+        { status: 402 },
+      );
+    }
+    reservedCreditUserId = user.id;
 
-    const correctLabel =
-      `${String.fromCharCode(65 + correctIndex)}. ${options[correctIndex]}`;
-
+    const userAnswer = typeof body.userAnswer === "number" ? body.userAnswer : null;
+    const correctLabel = `${String.fromCharCode(65 + correctIndex)}. ${options[correctIndex]}`;
     const userAnswerLabel =
-      userAnswer === null ||
-      userAnswer < 0 ||
-      userAnswer > 3
+      userAnswer === null || userAnswer < 0 || userAnswer > 3
         ? "未作答"
         : `${String.fromCharCode(65 + userAnswer)}. ${options[userAnswer]}`;
-
     const existingExplanation =
       typeof body.existingExplanation === "string"
         ? body.existingExplanation.trim()
         : "";
 
-    /*
-     * MedSlime AI 解析 Prompt
-     *
-     * 依照「訓練 MedSlime AI 解析」規範：
-     * - 醫檢師國考學習解析助手
-     * - 冷靜、清楚、像很會教人的學長姐
-     * - 不過度鼓勵、不裝可愛、不責備
-     * - 不把每題講成教科書
-     * - 固定解析結構
-     * - 專有名詞保留原文
-     */
     const instructions = [
       "你是 MedSlime 的醫檢師國考學習解析助手。",
       "你的任務不是只告訴學生答案，而是幫他理解這題在考什麼、為什麼正解成立、其他選項錯在哪，以及下次遇到類似題型怎麼辨認。",
@@ -531,8 +436,7 @@ export async function POST(request: Request) {
       "",
       "選項：",
       ...options.map(
-        (option, index) =>
-          `${String.fromCharCode(65 + index)}. ${option}`,
+        (option, index) => `${String.fromCharCode(65 + index)}. ${option}`,
       ),
       "",
       `官方正確答案：${correctLabel}`,
@@ -545,43 +449,37 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join("\n");
 
-    const openAIResponse = await fetch(
-      "https://api.openai.com/v1/responses",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model:
-            process.env.OPENAI_EXPLANATION_MODEL ??
-            process.env.OPENAI_MATERIAL_MODEL ??
-            "gpt-5-mini",
-          store: false,
-          instructions,
-          input: prompt,
-          text: {
-            format: {
-              type: "json_schema",
-              name: "medslime_ai_explanation",
-              strict: true,
-              schema: explanationSchema,
-            },
-          },
-        }),
+    const openAIResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        model:
+          process.env.OPENAI_EXPLANATION_MODEL ??
+          process.env.OPENAI_MATERIAL_MODEL ??
+          "gpt-5-mini",
+        store: false,
+        instructions,
+        input: prompt,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "medslime_ai_explanation",
+            strict: true,
+            schema: explanationSchema,
+          },
+        },
+      }),
+    });
 
-    const openAIPayload =
-      (await openAIResponse.json()) as OpenAIResponse;
+    const openAIPayload = (await openAIResponse.json()) as OpenAIResponse;
 
     if (!openAIResponse.ok) {
-      console.error(
-        "OpenAI explanation failed:",
-        openAIPayload,
-      );
-
+      console.error("OpenAI explanation failed:", openAIPayload);
+      await refundDetailCredit(user.id);
+      reservedCreditUserId = null;
       return NextResponse.json(
         {
           error:
@@ -592,30 +490,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const outputText =
-      getOutputText(openAIPayload);
-
+    const outputText = getOutputText(openAIPayload);
     if (!outputText) {
+      await refundDetailCredit(user.id);
+      reservedCreditUserId = null;
       return NextResponse.json(
-        {
-          error:
-            "OpenAI 已回應，但沒有取得可解析的詳解。",
-        },
+        { error: "OpenAI 已回應，但沒有取得可解析的詳解。" },
         { status: 502 },
       );
     }
 
     let explanation: ExplanationResult;
-
     try {
-      explanation =
-        JSON.parse(outputText) as ExplanationResult;
+      explanation = JSON.parse(outputText) as ExplanationResult;
     } catch {
+      await refundDetailCredit(user.id);
+      reservedCreditUserId = null;
       return NextResponse.json(
-        {
-          error:
-            "AI 詳解格式異常，請再試一次。",
-        },
+        { error: "AI 詳解格式異常，請再試一次。" },
         { status: 502 },
       );
     }
@@ -637,22 +529,22 @@ export async function POST(request: Request) {
       eventType: "generated",
     });
 
+    reservedCreditUserId = null;
     return NextResponse.json({
       cached: false,
       explanation,
+      aiDetailCredits: credit.remaining,
     });
   } catch (error) {
-    console.error(
-      "AI explanation route failed:",
-      error,
-    );
+    if (reservedCreditUserId) {
+      await refundDetailCredit(reservedCreditUserId);
+    }
 
+    console.error("AI explanation route failed:", error);
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "AI 詳解發生未知錯誤。",
+          error instanceof Error ? error.message : "AI 詳解發生未知錯誤。",
       },
       { status: 500 },
     );
