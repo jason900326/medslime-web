@@ -259,6 +259,13 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-2 gap-3">
             <MiniGameCard
+              href="/shop"
+              icon="🛒"
+              title="商城"
+              value="金幣與 AI 詳解"
+              wide
+            />
+            <MiniGameCard
               href={protectedHref("/slimes")}
               icon="🐾"
               title="收藏"
