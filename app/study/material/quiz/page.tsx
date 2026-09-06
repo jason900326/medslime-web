@@ -141,16 +141,13 @@ export default function MaterialQuizPage() {
     () =>
       questions.filter((item) => {
         const userAnswer = answers[item.id];
-        const isWrong =
-          userAnswer !== undefined && userAnswer !== item.answer;
+        const isWrong = userAnswer !== undefined && userAnswer !== item.answer;
         return isWrong || (uncertain[item.id] ?? false);
       }),
     [answers, questions, uncertain],
   );
 
-  const score = questions.length > 0
-    ? (correctCount / questions.length) * 100
-    : 0;
+  const score = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
 
   const unansweredNumbers = useMemo(
     () =>
@@ -196,8 +193,7 @@ export default function MaterialQuizPage() {
         isUncertain: uncertain[item.id] ?? false,
       }))
       .filter(({ item, userAnswer, isUncertain }) => {
-        const isWrong =
-          userAnswer !== undefined && userAnswer !== item.answer;
+        const isWrong = userAnswer !== undefined && userAnswer !== item.answer;
         return isWrong || isUncertain;
       })
       .map(({ item, questionIndex, userAnswer, isUncertain }) => ({
@@ -264,42 +260,86 @@ export default function MaterialQuizPage() {
   }
 
   if (finished) {
+    const previewReviewQuestions = reviewQuestions.slice(0, 3);
+    const hiddenReviewCount = Math.max(
+      0,
+      reviewQuestions.length - previewReviewQuestions.length,
+    );
+
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-        <div className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-10">
+        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
           <TopBar showBack backHref="/study/material" backLabel="返回教材" />
 
-          <section className="mt-10 rounded-[30px] border border-[#dce9e1] bg-white p-8 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)]">
-            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">RESULT</div>
-            <h1 className="mt-2 text-4xl font-black">作答完成</h1>
+          <section className="mt-6 rounded-[26px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-10 sm:rounded-[30px] sm:p-8">
+            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962] sm:text-sm">
+              RESULT
+            </div>
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
 
-            <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
-              <ResultCard label="答對" value={`${correctCount} / ${questions.length}`} />
-              <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
-              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
+            <div className="mx-auto mt-6 max-w-xl sm:mt-8">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <ResultCard
+                  label="答對"
+                  value={`${correctCount} / ${questions.length}`}
+                />
+                <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
+              </div>
+
+              <div className="mx-auto mt-2 max-w-[240px] sm:mt-3 sm:max-w-[280px]">
+                <ResultCard
+                  label="需要複習"
+                  value={`${reviewQuestions.length} 題`}
+                />
+              </div>
             </div>
 
             {uncertainCount > 0 && (
-              <div className="mt-4 text-sm font-bold text-[#789083]">
+              <div className="mt-3 text-xs font-bold text-[#789083] sm:text-sm">
                 你另外標記了 {uncertainCount} 題「我不確定」。
               </div>
             )}
 
-            {reviewQuestions.length > 0 ? (
-              <section className="mx-auto mt-8 max-w-3xl space-y-4 text-left">
-                <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
+            <div className="mx-auto mt-5 flex max-w-3xl flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
+              {reviewQuestions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/study/mistakes")}
+                  className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
+                >
+                  前往錯題庫 · {reviewQuestions.length} 題待複習
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push("/study/material")}
+                className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f5faf7] sm:px-6"
+              >
+                返回教材
+              </button>
+            </div>
 
-                {reviewQuestions.map((item) => {
-                  const questionIndex = questions.findIndex((questionItem) => questionItem.id === item.id);
+            {reviewQuestions.length > 0 ? (
+              <section className="mx-auto mt-7 max-w-3xl space-y-4 text-left sm:mt-8">
+                <div>
+                  <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
+                  <div className="mt-1 text-xs font-bold text-[#789083]">
+                    先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題庫。
+                  </div>
+                </div>
+
+                {previewReviewQuestions.map((item) => {
+                  const questionIndex = questions.findIndex(
+                    (questionItem) => questionItem.id === item.id,
+                  );
                   const userAnswer = answers[item.id];
                   const isUncertain = uncertain[item.id] ?? false;
-                  const isWrong =
-                    userAnswer !== undefined && userAnswer !== item.answer;
+                  const isWrong = userAnswer !== undefined && userAnswer !== item.answer;
 
                   return (
                     <div
                       key={`result-review-${item.id}`}
-                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-5"
+                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-4 sm:p-5"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-black text-[#2ba962]">
@@ -318,7 +358,7 @@ export default function MaterialQuizPage() {
                         )}
                       </div>
 
-                      <div className="mt-3 font-black leading-7 text-[#17372a]">
+                      <div className="mt-3 text-base font-black leading-7 text-[#17372a]">
                         {item.stem}
                       </div>
 
@@ -365,29 +405,22 @@ export default function MaterialQuizPage() {
                     </div>
                   );
                 })}
+
+                {hiddenReviewCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/study/mistakes")}
+                    className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
+                  >
+                    還有 {hiddenReviewCount} 題，前往錯題庫查看全部 →
+                  </button>
+                )}
               </section>
             ) : (
-              <div className="mx-auto mt-8 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
+              <div className="mx-auto mt-7 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
                 ✓ 這次沒有需要複習的錯題或不確定題目。
               </div>
             )}
-
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => router.push("/study/mistakes")}
-                className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
-              >
-                前往錯題庫
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/study/material")}
-                className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45] transition hover:bg-[#f5faf7]"
-              >
-                返回上一頁
-              </button>
-            </div>
           </section>
         </div>
       </main>
@@ -464,13 +497,17 @@ export default function MaterialQuizPage() {
                     }
                     className="flex w-14 shrink-0 items-center justify-center"
                   >
-                    <span className={[
-                      "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                      selected
-                        ? "border-[#31c978] bg-[#31c978]"
-                        : "border-[#b8c9bf] bg-white",
-                    ].join(" ")}>
-                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                    <span
+                      className={[
+                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
+                        selected
+                          ? "border-[#31c978] bg-[#31c978]"
+                          : "border-[#b8c9bf] bg-white",
+                      ].join(" ")}
+                    >
+                      {selected && (
+                        <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                      )}
                     </span>
                   </button>
 
@@ -504,12 +541,14 @@ export default function MaterialQuizPage() {
                 : "border-[#dfe8e2] bg-white text-[#557768] hover:bg-[#f7faf8]",
             ].join(" ")}
           >
-            <span className={[
-              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
-              uncertain[question.id]
-                ? "border-[#e2b94f] bg-[#e2b94f]"
-                : "border-[#b8c9bf] bg-white",
-            ].join(" ")}>
+            <span
+              className={[
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
+                uncertain[question.id]
+                  ? "border-[#e2b94f] bg-[#e2b94f]"
+                  : "border-[#b8c9bf] bg-white",
+              ].join(" ")}
+            >
               {uncertain[question.id] && (
                 <span className="h-2.5 w-2.5 rounded-full bg-white" />
               )}
@@ -531,7 +570,9 @@ export default function MaterialQuizPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setIndex((current) => Math.min(questions.length - 1, current + 1))
+                  setIndex((current) =>
+                    Math.min(questions.length - 1, current + 1),
+                  )
                 }
                 className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
@@ -672,9 +713,13 @@ function SimpleSlime({
 
 function ResultCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-[#dfece4] bg-[#f8fcf9] p-5">
-      <div className="text-sm font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
+    <div className="min-w-0 rounded-[16px] border border-[#dfece4] bg-[#f8fcf9] px-3 py-3 sm:rounded-[18px] sm:px-4 sm:py-4">
+      <div className="text-[10px] font-bold leading-4 text-[#789083] sm:text-sm">
+        {label}
+      </div>
+      <div className="mt-1 break-keep text-lg font-black leading-tight sm:text-2xl">
+        {value}
+      </div>
     </div>
   );
 }
