@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const MONTHLY_FREE_AI_DETAILS = 10;
+
+function currentTaipeiPeriod() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+  })
+    .format(new Date())
+    .replace("-", "-");
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -16,14 +28,24 @@ export async function GET() {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("player_entitlements")
-      .select("ai_detail_credits,updated_at")
+      .select("ai_detail_credits,ai_detail_free_period,ai_detail_free_used,updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
 
+    const period = currentTaipeiPeriod();
+    const paidCredits = Math.max(0, Number(data?.ai_detail_credits ?? 0));
+    const storedFreeUsed = data?.ai_detail_free_period === period
+      ? Math.max(0, Number(data?.ai_detail_free_used ?? 0))
+      : 0;
+    const freeRemaining = Math.max(0, MONTHLY_FREE_AI_DETAILS - storedFreeUsed);
+
     return NextResponse.json({
-      aiDetailCredits: data?.ai_detail_credits ?? 0,
+      aiDetailCredits: paidCredits + freeRemaining,
+      aiDetailPaidCredits: paidCredits,
+      aiDetailFreeRemaining: freeRemaining,
+      aiDetailFreeMonthlyLimit: MONTHLY_FREE_AI_DETAILS,
       updatedAt: data?.updated_at ?? null,
     });
   } catch (error) {
