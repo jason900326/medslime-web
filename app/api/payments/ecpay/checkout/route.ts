@@ -19,6 +19,13 @@ function escapeHtml(value: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (process.env.SHOP_CHECKOUT_ENABLED !== "true") {
+      return NextResponse.json(
+        { error: "商城付款功能目前正在金流審核中。" },
+        { status: 503 },
+      );
+    }
+
     const merchantId = process.env.ECPAY_MERCHANT_ID;
     const hashKey = process.env.ECPAY_HASH_KEY;
     const hashIv = process.env.ECPAY_HASH_IV;
