@@ -108,7 +108,7 @@ type GameStateContextValue = GameState & {
 
 const FOCUS_COIN_CAP = 30;
 const ACCESSORY_FRAGMENT_COST = 30;
-const SSR_PITY_PULLS = 50;
+const SSR_PITY_PULLS = 150;
 
 const starterState: GameState = {
   coins: 0,
@@ -301,9 +301,9 @@ function duplicateFragmentReward(rarity: SlimeRarity) {
 function rollRarity(forceSSR: boolean): SlimeRarity {
   if (forceSSR) return "SSR";
   const roll = Math.random() * 100;
-  if (roll < 44) return "N";
-  if (roll < 81.5) return "R";
-  if (roll < 99.5) return "SR";
+  if (roll < 45) return "N";
+  if (roll < 82) return "R";
+  if (roll < 99.8) return "SR";
   return "SSR";
 }
 
@@ -311,7 +311,7 @@ function pickWeightedSlime(forceSSR: boolean, state: GameState) {
   const rarity = rollRarity(forceSSR);
   const pool = SLIMES.filter((slime) => slime.rarity === rarity);
 
-  // 100 抽左右完成「角色 + 飾品」的收集保護：
+  // 約 100 天活躍學習週期完成「角色 + 飾品」：
   // 先補同稀有度尚未擁有的角色，再優先補尚未解鎖飾品、碎片最少的角色。
   const unowned = pool.filter((slime) => !state.slimes[slime.id]?.owned);
   if (unowned.length > 0) {
@@ -472,7 +472,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   };
   const spendTickets = (amount: number) => {
     if (!userId || amount <= 0 || stateRef.current.tickets < amount) return false;
-    updateState((current) => ({ ...current, tickets: current.tickets - amount }));
+    updateState((current) => ({
+      ...current,
+      tickets: current.tickets - amount,
+    }));
     return true;
   };
   const useFreePull = () => {
