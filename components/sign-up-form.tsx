@@ -12,6 +12,24 @@ export function SignUpForm() {
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+
+    if (error) {
+      setError(`Google 註冊失敗：${error.message}`);
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -35,7 +53,7 @@ export function SignUpForm() {
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
       },
     });
 
@@ -45,11 +63,6 @@ export function SignUpForm() {
       return;
     }
 
-    /*
-     * 若 Supabase 已關閉 Confirm email，signUp 會直接拿到 session，
-     * 可以立刻回首頁。
-     * 若仍開啟 Email confirmation，則導向既有成功提示頁。
-     */
     if (data.session) {
       router.push("/");
       router.refresh();
@@ -70,10 +83,28 @@ export function SignUpForm() {
       </h1>
 
       <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        第一版只使用 Email＋密碼，不加入其他社群登入。
+        建立帳號後，史萊姆收藏、學習紀錄與任務進度都會跟著你保存。
       </p>
 
-      <form onSubmit={handleSignUp} className="mt-7 space-y-5">
+      <button
+        type="button"
+        onClick={handleGoogleSignUp}
+        disabled={googleLoading || isLoading}
+        className="mt-7 flex w-full items-center justify-center gap-3 rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f7fbf8] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#dfe8e2] bg-white text-sm font-black text-[#4285f4]">
+          G
+        </span>
+        {googleLoading ? "正在前往 Google..." : "使用 Google 繼續"}
+      </button>
+
+      <div className="my-5 flex items-center gap-3 text-xs font-black text-[#9aaba1]">
+        <div className="h-px flex-1 bg-[#e5ece8]" />
+        或使用 Email
+        <div className="h-px flex-1 bg-[#e5ece8]" />
+      </div>
+
+      <form onSubmit={handleSignUp} className="space-y-5">
         <Field
           label="Email"
           type="email"
@@ -107,7 +138,7 @@ export function SignUpForm() {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || googleLoading}
           className="w-full rounded-2xl bg-[#31c978] px-5 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? "建立帳號中..." : "建立帳號"}

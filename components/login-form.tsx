@@ -22,6 +22,26 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const next = getSafeRedirect();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+
+    if (error) {
+      setError(`Google 登入失敗：${error.message}`);
+      setGoogleLoading(false);
+    }
+  };
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -46,9 +66,6 @@ export function LoginForm() {
       return;
     }
 
-    // 這裡使用完整頁面導向，而不是只做 client-side push。
-    // 可確保 Supabase 剛寫入的 session cookie 會立刻帶到下一個受保護頁面，
-    // 避免從錯題庫被導到登入頁後又被判定成未登入。
     window.location.assign(getSafeRedirect());
   };
 
@@ -66,7 +83,25 @@ export function LoginForm() {
         登入後可以保存你的史萊姆、任務、成就與學習紀錄。
       </p>
 
-      <form onSubmit={handleLogin} className="mt-7 space-y-5">
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={googleLoading || isLoading}
+        className="mt-7 flex w-full items-center justify-center gap-3 rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f7fbf8] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#dfe8e2] bg-white text-sm font-black text-[#4285f4]">
+          G
+        </span>
+        {googleLoading ? "正在前往 Google..." : "使用 Google 繼續"}
+      </button>
+
+      <div className="my-5 flex items-center gap-3 text-xs font-black text-[#9aaba1]">
+        <div className="h-px flex-1 bg-[#e5ece8]" />
+        或使用 Email
+        <div className="h-px flex-1 bg-[#e5ece8]" />
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-5">
         <label className="block">
           <span className="mb-2 block text-sm font-black text-[#557768]">
             Email
@@ -114,7 +149,7 @@ export function LoginForm() {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || googleLoading}
           className="w-full rounded-2xl bg-[#31c978] px-5 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? "登入中..." : "登入"}
