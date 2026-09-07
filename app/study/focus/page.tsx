@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "@/components/top-bar";
+import InfoDialogButton from "@/components/info-dialog-button";
 import {
   getPlayerDisplayName,
   useGameState,
@@ -165,9 +166,16 @@ export default function FocusPage() {
           <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
             FOCUS
           </div>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
-            專心讀書
-          </h1>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <h1 className="text-3xl font-black tracking-[-0.04em] md:text-4xl">
+              專心讀書
+            </h1>
+            <InfoDialogButton title="專注獎勵說明">
+              <p>完成至少 10 分鐘即可獲得獎勵。</p>
+              <p>每完整 5 分鐘可獲得 🪙5，每日最多可從讀書計時器取得 🪙{game.focusCoinCap}。</p>
+              <p>提前結束的專注不會獲得本輪金幣。</p>
+            </InfoDialogButton>
+          </div>
         </section>
 
         <section className="mt-5 grid grid-cols-3 gap-2">
@@ -175,10 +183,6 @@ export default function FocusPage() {
           <SummaryCard label="今日獎勵" value={`${game.todayFocusCoins}`} suffix={`/ ${game.focusCoinCap}`} />
           <SummaryCard label="最近紀錄" value={`${game.focusHistory.length}`} suffix="次" />
         </section>
-
-        <div className="mt-3 rounded-2xl border border-[#dfece4] bg-[#f3fbf6] px-4 py-3 text-sm font-bold leading-6 text-[#557768]">
-          完成至少 10 分鐘即可獲得獎勵；每完整 5 分鐘 +🪙5，每日最多 🪙{game.focusCoinCap}。
-        </div>
 
         <section className="mt-5 rounded-[26px] border border-[#d8e9df] bg-white p-5 shadow-[0_12px_30px_rgba(40,106,69,0.05)] md:p-7">
           <div className="flex flex-wrap gap-2">
