@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import InfoDialogButton from "@/components/info-dialog-button";
 import { useAuthUser } from "@/hooks/use-auth-user";
 
 type AnalysisState = "idle" | "reading" | "analyzing" | "ready" | "error";
@@ -295,10 +296,14 @@ export default function MaterialPage() {
 
         <section className="mt-8">
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">MATERIAL</div>
-          <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">我有教材</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            上傳 PDF，MedSlime 會讀取教材內容、整理重點，並產生 10 題四選一測驗。
-          </p>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <h1 className="text-4xl font-black tracking-[-0.04em]">我有教材</h1>
+            <InfoDialogButton title="教材上傳說明">
+              <p>上傳 PDF，MedSlime 會讀取教材內容、整理重點，並產生 10 題四選一測驗。</p>
+              <p>單檔上限 10 MB；文字型 PDF 的讀取效果最好，掃描圖片型教材可能暫時無法產生測驗。</p>
+              <p>每個帳號每天最多可分析 {DAILY_ANALYSIS_LIMIT} 份教材。</p>
+            </InfoDialogButton>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-[#70877a]">
             <span className="rounded-full bg-white px-3 py-1.5">單檔上限 10 MB</span>
             <span className="rounded-full bg-white px-3 py-1.5">今日剩餘 {remaining} / {DAILY_ANALYSIS_LIMIT} 次</span>
