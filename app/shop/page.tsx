@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import InfoDialogButton from "@/components/info-dialog-button";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { SHOP_PRODUCTS, type ShopProduct } from "@/lib/shop-products";
 
@@ -75,7 +76,13 @@ export default function ShopPage() {
         <ShopSection
           eyebrow="COINS"
           title="金幣"
-          description="100 金幣可抽 1 次。金幣也能透過每日任務、專注學習與成就免費取得。"
+          infoTitle="金幣怎麼使用？"
+          infoContent={
+            <>
+              <p>100 金幣可抽 1 次；1,000 金幣可進行 10 連抽。</p>
+              <p>金幣也能透過每日任務、專注學習與成就免費取得，不一定要購買。</p>
+            </>
+          }
         >
           <PackageGrid
             products={coinPackages}
@@ -87,7 +94,13 @@ export default function ShopPage() {
         <ShopSection
           eyebrow="AI DETAIL"
           title="AI 詳解額度"
-          description="每個帳號每天有 10 次免費的新詳解；免費次數用完後才會使用購買額度。已存在的詳解快取不會扣任何次數。"
+          infoTitle="AI 詳解額度怎麼算？"
+          infoContent={
+            <>
+              <p>每個帳號每天有 10 次免費的新 AI 詳解。</p>
+              <p>免費次數用完後，才會使用你購買的額度；已存在的詳解快取不會扣任何次數。</p>
+            </>
+          }
         >
           {auth.isLoggedIn ? (
             <div className="mb-5 rounded-2xl border border-[#dfece4] bg-[#f7fcf9] px-4 py-4">
@@ -139,19 +152,23 @@ export default function ShopPage() {
 function ShopSection({
   eyebrow,
   title,
-  description,
+  infoTitle,
+  infoContent,
   children,
 }: {
   eyebrow: string;
   title: string;
-  description: string;
+  infoTitle: string;
+  infoContent: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6">
       <div className="text-[11px] font-black tracking-[0.12em] text-[#2ba962]">{eyebrow}</div>
-      <h2 className="mt-1 text-2xl font-black">{title}</h2>
-      <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">{description}</p>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-black">{title}</h2>
+        <InfoDialogButton title={infoTitle}>{infoContent}</InfoDialogButton>
+      </div>
       <div className="mt-5">{children}</div>
     </section>
   );
@@ -231,15 +248,11 @@ function PackageCard({
         {amount.toLocaleString()}
         {isAi ? " 次" : ""}
       </div>
-      <div className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">{note}</div>
+      {isAi && (
+        <div className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">{note}</div>
+      )}
 
       <div className="mt-auto pt-5">
-        {bonusPercent > 0 && (
-          <div className="mb-2 text-center text-[11px] font-black text-[#789083]">
-            相較基準方案多 {bonusPercent}% 價值
-          </div>
-        )}
-
         {!checkoutEnabled ? (
           <>
             <div className="mb-2 text-center text-lg font-black text-[#17372a]">
