@@ -239,36 +239,33 @@ async function renderQuestionCrops(
 
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // 讓 Next.js 負責把 worker 打包成可部署的 module URL。
-  // 之前改成 /public/pdf.worker.min.mjs 後，Vercel 正式站會在 fake worker
-  // 階段動態 import 失敗，造成整個官方原題都無法 render。
-  // 原本的 bundler URL 在正式站可正常啟動 worker，因此恢復此方式；
-  // JPEG2000 / JPX 的修正則保留在 getDocument 選項中。
+  // Worker 繼續交給 Next.js bundler，這條路徑已證實能在 Vercel 正常啟動。
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url,
   ).toString();
 
+  // PDF.js v5 的 JPX/JPEG2000 decoder 需要 OpenJPEG 資源。
+  // 使用完整同源 URL 傳給 worker，避免 worker / module URL 對相對路徑的解析差異。
+  const pdfjsAssetBase = `${window.location.origin}/pdfjs`;
+
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
     isEvalSupported: false,
 
-    // 考選部部分 PDF 的圖片使用 JPEG2000 / JPX。
-    // PDF.js v5 在部分 Chrome / Safari 組合會讓圖片解碼失敗卻仍完成頁面 render，
-    // 結果就是「題幹與選項存在，但圖片區整片空白」。
-    // 這個元件一次只 render 少量頁面，因此優先穩定性：
-    // 關閉瀏覽器原生 ImageDecoder，並強制使用 PDF.js 的 OpenJPEG JS fallback。
-    // fallback 檔案與 WASM 都由 postinstall 複製到 /public/pdfjs/wasm/。
-    wasmUrl: "/pdfjs/wasm/",
-    useWasm: false,
+    // 考選部部分圖片使用 JPEG2000 / JPX。
+    // 先前強制 useWasm:false 會走較脆弱的 JS fallback；
+    // 改回 PDF.js 官方建議的 OpenJPEG WASM 路徑，並保留停用原生 ImageDecoder，
+    // 避免瀏覽器 ImageDecoder 對部分 JPX 檔案的相容性問題。
+    wasmUrl: `${pdfjsAssetBase}/wasm/`,
+    useWasm: true,
     isImageDecoderSupported: false,
 
-    // 一併提供 PDF.js 常用輔助資源，
-    // 避免不同年份官方 PDF 的字型 / CMap / ICC 差異造成缺字或色彩問題。
-    cMapUrl: "/pdfjs/cmaps/",
+    // 輔助資源也使用完整同源 URL，讓 worker 在各部署網域都能一致取得。
+    cMapUrl: `${pdfjsAssetBase}/cmaps/`,
     cMapPacked: true,
-    standardFontDataUrl: "/pdfjs/standard_fonts/",
-    iccUrl: "/pdfjs/iccs/",
+    standardFontDataUrl: `${pdfjsAssetBase}/standard_fonts/`,
+    iccUrl: `${pdfjsAssetBase}/iccs/`,
   });
 
   const pdf = await loadingTask.promise;
