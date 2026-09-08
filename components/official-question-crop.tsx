@@ -239,20 +239,23 @@ async function renderQuestionCrops(
 
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url,
-  ).toString();
+  // Worker 與其餘 PDF.js 輔助資源都從 public/ 同源載入，
+  // 避免 Next.js bundler 產生的 worker URL 與部署環境不一致。
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
     isEvalSupported: false,
 
-    // PDF.js v5 的部分圖片格式（尤其 JPEG2000 / JPX）
-    // 需要 OpenJPEG WASM 才能解碼。
-    // 如果沒提供 wasmUrl，常見症狀就是：
-    // 題幹和選項正常，但中間的圖片完全空白。
+    // 考選部部分 PDF 的圖片使用 JPEG2000 / JPX。
+    // PDF.js v5 在部分 Chrome / Safari 組合會讓圖片解碼失敗卻仍完成頁面 render，
+    // 結果就是「題幹與選項存在，但圖片區整片空白」。
+    // 這個元件一次只 render 少量頁面，因此優先穩定性：
+    // 關閉瀏覽器原生 ImageDecoder，並強制使用 PDF.js 的 OpenJPEG JS fallback。
+    // fallback 檔案與 WASM 都由 postinstall 複製到 /public/pdfjs/wasm/。
     wasmUrl: "/pdfjs/wasm/",
+    useWasm: false,
+    isImageDecoderSupported: false,
 
     // 一併提供 PDF.js 常用輔助資源，
     // 避免不同年份官方 PDF 的字型 / CMap / ICC 差異造成缺字或色彩問題。
