@@ -239,33 +239,28 @@ async function renderQuestionCrops(
 
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // Worker 繼續交給 Next.js bundler，這條路徑已證實能在 Vercel 正常啟動。
+  // 使用 PDF.js 4.10.38：這是 OpenJPEG decoder 外部化成獨立 WASM
+  // 之前的穩定版本。worker 仍交給 Next.js bundler，避免固定 public URL
+  // 在 Vercel 觸發 fake-worker import 問題。
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url,
   ).toString();
 
-  // PDF.js v5 的 JPX/JPEG2000 decoder 需要 OpenJPEG 資源。
-  // 使用完整同源 URL 傳給 worker，避免 worker / module URL 對相對路徑的解析差異。
   const pdfjsAssetBase = `${window.location.origin}/pdfjs`;
 
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
     isEvalSupported: false,
 
-    // 考選部部分圖片使用 JPEG2000 / JPX。
-    // 先前強制 useWasm:false 會走較脆弱的 JS fallback；
-    // 改回 PDF.js 官方建議的 OpenJPEG WASM 路徑，並保留停用原生 ImageDecoder，
-    // 避免瀏覽器 ImageDecoder 對部分 JPX 檔案的相容性問題。
-    wasmUrl: `${pdfjsAssetBase}/wasm/`,
-    useWasm: true,
+    // 不再傳 PDF.js v5 的 wasmUrl/useWasm/iccUrl 組態。
+    // 4.10.38 的 JPEG2000 解碼器隨 build 提供，避免載入 repo 中
+    // 與 v5 綁定的 OpenJPEG WASM，正面避開目前的 JPX 白圖 regression。
     isImageDecoderSupported: false,
 
-    // 輔助資源也使用完整同源 URL，讓 worker 在各部署網域都能一致取得。
     cMapUrl: `${pdfjsAssetBase}/cmaps/`,
     cMapPacked: true,
     standardFontDataUrl: `${pdfjsAssetBase}/standard_fonts/`,
-    iccUrl: `${pdfjsAssetBase}/iccs/`,
   });
 
   const pdf = await loadingTask.promise;
