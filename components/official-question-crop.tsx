@@ -239,9 +239,15 @@ async function renderQuestionCrops(
 
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // Worker 與其餘 PDF.js 輔助資源都從 public/ 同源載入，
-  // 避免 Next.js bundler 產生的 worker URL 與部署環境不一致。
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+  // 讓 Next.js 負責把 worker 打包成可部署的 module URL。
+  // 之前改成 /public/pdf.worker.min.mjs 後，Vercel 正式站會在 fake worker
+  // 階段動態 import 失敗，造成整個官方原題都無法 render。
+  // 原本的 bundler URL 在正式站可正常啟動 worker，因此恢復此方式；
+  // JPEG2000 / JPX 的修正則保留在 getDocument 選項中。
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
 
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
