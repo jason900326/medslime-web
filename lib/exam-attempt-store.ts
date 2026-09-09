@@ -76,7 +76,6 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
     .limit(Math.max(1, Math.min(300, limit)));
 
   if (error) {
-    // Migration may not have been run yet. Do not break the study flow.
     if (error.message.includes("exam_attempts")) return [];
     console.error("讀取國考作答紀錄失敗：", error);
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
@@ -111,19 +110,28 @@ function getDurationSeconds() {
 }
 
 /**
- * The current quiz page already calls upsertMistakes() immediately before it
- * records the number of answered questions in player_account_state. To avoid a
- * risky large quiz-page rewrite during the 2.0 migration, capture the baseline
- * counter here and poll briefly for that existing counter update. Once it
- * changes, we can persist an accurate attempt summary (score included).
- *
- * This is intentionally isolated in one module so the quiz can later move to a
- * direct saveExamAttempt() call without changing the database/UI contract.
+ * Capture the total-question baseline before the quiz records this attempt, then
+ * poll briefly for the existing game-state counter update. This keeps the new
+ * history feature isolated while the quiz page is being migrated.
  */
-export function scheduleNationalExamAttemptCapture(records: ReviewLike[]) {
+export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
   if (typeof window === "undefined") return;
   const identity = getExamIdentityFromLocation();
   if (!identity) return;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: beforeRow } = await supabase
+    .from("player_account_state")
+    .select("state")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const beforeState = (beforeRow?.state ?? {}) as { totalQuestionsAnswered?: unknown };
+  const baseline = Math.max(0, Number(beforeState.totalQuestionsAnswered ?? 0));
 
   const captureKey = `${identity.examKey}:${Date.now()}`;
   window.sessionStorage.setItem(CAPTURE_LOCK_KEY, captureKey);
@@ -139,23 +147,9 @@ export function scheduleNationalExamAttemptCapture(records: ReviewLike[]) {
   const durationSeconds = getDurationSeconds();
 
   void (async () => {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: beforeRow } = await supabase
-      .from("player_account_state")
-      .select("state")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const beforeState = (beforeRow?.state ?? {}) as { totalQuestionsAnswered?: unknown };
-    const baseline = Math.max(0, Number(beforeState.totalQuestionsAnswered ?? 0));
     const waits = [450, 900, 1600, 2800, 4500];
-
     let answeredCount = 0;
+
     for (const wait of waits) {
       await new Promise((resolve) => window.setTimeout(resolve, wait));
       if (window.sessionStorage.getItem(CAPTURE_LOCK_KEY) !== captureKey) return;
