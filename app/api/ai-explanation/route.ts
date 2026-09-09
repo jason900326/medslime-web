@@ -30,11 +30,9 @@ type OpenAIResponse = {
   error?: { message?: string };
 };
 
-type CreditSource = "free" | "paid";
-
-type CreditConsumeResult =
+type DailyUseResult =
   | { ok: false; remaining: 0 }
-  | { ok: true; remaining: number; source: CreditSource };
+  | { ok: true; remaining: number };
 
 const explanationSchema = {
   type: "object",
@@ -210,7 +208,7 @@ function normalizeRpcPayload(data: unknown): Record<string, unknown> {
   return {};
 }
 
-async function consumeDetailCredit(userId: string): Promise<CreditConsumeResult> {
+async function consumeDailyDetailUse(userId: string): Promise<DailyUseResult> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("consume_ai_detail_credit", {
     p_user_id: userId,
@@ -220,25 +218,24 @@ async function consumeDetailCredit(userId: string): Promise<CreditConsumeResult>
     if (error.message.includes("AI_DETAIL_CREDIT_REQUIRED")) {
       return { ok: false, remaining: 0 };
     }
-    throw new Error(`AI 詳解額度扣除失敗：${error.message}`);
+    throw new Error(`完整詳解每日使用次數更新失敗：${error.message}`);
   }
 
   const payload = normalizeRpcPayload(data);
-  const source: CreditSource = payload.source === "paid" ? "paid" : "free";
   const remaining = Math.max(0, Number(payload.remaining ?? 0));
-  return { ok: true, remaining, source };
+  return { ok: true, remaining };
 }
 
-async function refundDetailCredit(userId: string, source: CreditSource) {
+async function refundDailyDetailUse(userId: string) {
   try {
     const admin = createAdminClient();
     const { error } = await admin.rpc("refund_ai_detail_credit", {
       p_user_id: userId,
-      p_source: source,
+      p_source: "free",
     });
-    if (error) console.error("AI 詳解額度退回失敗：", error);
+    if (error) console.error("完整詳解每日使用次數退回失敗：", error);
   } catch (error) {
-    console.error("AI 詳解額度退回失敗：", error);
+    console.error("完整詳解每日使用次數退回失敗：", error);
   }
 }
 
@@ -250,7 +247,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "請先登入才能使用 AI 詳解。" }, { status: 401 });
+      return NextResponse.json({ error: "請先登入才能查看完整詳解。" }, { status: 401 });
     }
 
     const questionKey = String(
@@ -269,47 +266,29 @@ export async function GET(request: NextRequest) {
       questionKey,
     });
 
-    if (cached) {
-      await recordExplanationEvent({
-        supabase,
-        userId: user.id,
-        questionKey,
-        source,
-        eventType: "cache_view",
-      });
-    }
-
-    return NextResponse.json({
-      cached: Boolean(cached),
-      explanation: cached ?? undefined,
-    });
+    // Do not return the explanation through GET. Access must go through POST so
+    // the daily service limit (or future purchased-exam entitlement) is checked
+    // before content is revealed.
+    return NextResponse.json({ available: Boolean(cached) });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI 詳解讀取失敗。" },
+      { error: error instanceof Error ? error.message : "完整詳解讀取失敗。" },
       { status: 500 },
     );
   }
 }
 
 export async function POST(request: Request) {
-  let reservedCredit: { userId: string; source: CreditSource } | null = null;
+  let reservedDailyUse: { userId: string } | null = null;
 
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "伺服器尚未設定 OPENAI_API_KEY。" },
-        { status: 500 },
-      );
-    }
-
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "請先登入才能使用 AI 詳解。" }, { status: 401 });
+      return NextResponse.json({ error: "請先登入才能查看完整詳解。" }, { status: 401 });
     }
 
     const body = (await request.json()) as ExplanationPayload;
@@ -336,11 +315,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "這題缺少完整題幹、四個選項或單一正確答案，暫時無法產生 AI 詳解。",
+            "這題缺少完整題幹、四個選項或單一正確答案，暫時無法提供完整詳解。",
         },
         { status: 400 },
       );
     }
+
+    const dailyUse = await consumeDailyDetailUse(user.id);
+    if (!dailyUse.ok) {
+      return NextResponse.json(
+        {
+          error: "今日完整詳解使用次數已達上限。",
+          code: "AI_DETAIL_DAILY_LIMIT_REACHED",
+        },
+        { status: 402 },
+      );
+    }
+    reservedDailyUse = { userId: user.id };
 
     const cached = await readCachedExplanation({
       supabase,
@@ -357,21 +348,23 @@ export async function POST(request: Request) {
         source,
         eventType: "cache_view",
       });
-      return NextResponse.json({ cached: true, explanation: cached });
+      reservedDailyUse = null;
+      return NextResponse.json({
+        cached: true,
+        explanation: cached,
+        aiDetailRemaining: dailyUse.remaining,
+      });
     }
 
-    const credit = await consumeDetailCredit(user.id);
-    if (!credit.ok) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      await refundDailyDetailUse(user.id);
+      reservedDailyUse = null;
       return NextResponse.json(
-        {
-          error: "本月免費 AI 詳解與購買額度都已用完，請先前往商城補充額度。",
-          code: "AI_DETAIL_CREDIT_REQUIRED",
-          aiDetailCredits: 0,
-        },
-        { status: 402 },
+        { error: "伺服器尚未設定 OPENAI_API_KEY。" },
+        { status: 500 },
       );
     }
-    reservedCredit = { userId: user.id, source: credit.source };
 
     const userAnswer = typeof body.userAnswer === "number" ? body.userAnswer : null;
     const correctLabel = `${String.fromCharCode(65 + correctIndex)}. ${options[correctIndex]}`;
@@ -476,8 +469,8 @@ export async function POST(request: Request) {
 
     if (!openAIResponse.ok) {
       console.error("OpenAI explanation failed:", openAIPayload);
-      await refundDetailCredit(user.id, credit.source);
-      reservedCredit = null;
+      await refundDailyDetailUse(user.id);
+      reservedDailyUse = null;
       return NextResponse.json(
         {
           error:
@@ -490,8 +483,8 @@ export async function POST(request: Request) {
 
     const outputText = getOutputText(openAIPayload);
     if (!outputText) {
-      await refundDetailCredit(user.id, credit.source);
-      reservedCredit = null;
+      await refundDailyDetailUse(user.id);
+      reservedDailyUse = null;
       return NextResponse.json(
         { error: "OpenAI 已回應，但沒有取得可解析的詳解。" },
         { status: 502 },
@@ -502,8 +495,8 @@ export async function POST(request: Request) {
     try {
       explanation = JSON.parse(outputText) as ExplanationResult;
     } catch {
-      await refundDetailCredit(user.id, credit.source);
-      reservedCredit = null;
+      await refundDailyDetailUse(user.id);
+      reservedDailyUse = null;
       return NextResponse.json(
         { error: "AI 詳解格式異常，請再試一次。" },
         { status: 502 },
@@ -527,16 +520,15 @@ export async function POST(request: Request) {
       eventType: "generated",
     });
 
-    reservedCredit = null;
+    reservedDailyUse = null;
     return NextResponse.json({
       cached: false,
       explanation,
-      aiDetailCredits: credit.remaining,
-      aiDetailCreditSource: credit.source,
+      aiDetailRemaining: dailyUse.remaining,
     });
   } catch (error) {
-    if (reservedCredit) {
-      await refundDetailCredit(reservedCredit.userId, reservedCredit.source);
+    if (reservedDailyUse) {
+      await refundDailyDetailUse(reservedDailyUse.userId);
     }
 
     console.error("AI explanation route failed:", error);
