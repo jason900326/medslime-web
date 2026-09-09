@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const productId = String(form.get("productId") ?? "");
     const product = SHOP_PRODUCT_BY_ID[productId];
 
-    if (!product) {
+    if (!product || product.kind !== "ai_detail") {
       return NextResponse.json({ error: "找不到這個商品。" }, { status: 400 });
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       merchant_trade_no: merchantTradeNo,
       product_id: product.id,
       total_amount: product.price,
-      grant_type: product.kind,
+      grant_type: "ai_detail",
       grant_amount: product.amount,
       status: "pending",
       provider: "ecpay",
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       MerchantTradeDate: formatMerchantTradeDate(),
       PaymentType: "aio",
       TotalAmount: String(product.price),
-      TradeDesc: "MedSlime recharge",
+      TradeDesc: "MedSlime AI detail service",
       ItemName: product.itemName,
       ReturnURL: `${siteUrl}/api/payments/ecpay/return`,
       ChoosePayment: "ALL",
