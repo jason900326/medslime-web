@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const DAILY_FREE_AI_DETAILS = 10;
+const DAILY_FREE_AI_DETAILS = 5;
 
 function currentTaipeiPeriod() {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -30,31 +30,31 @@ export async function GET() {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("player_entitlements")
-      .select("ai_detail_credits,ai_detail_free_period,ai_detail_free_used,updated_at")
+      .select("ai_detail_free_period,ai_detail_free_used,updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
 
     const period = currentTaipeiPeriod();
-    const paidCredits = Math.max(0, Number(data?.ai_detail_credits ?? 0));
-    const freeUsed = data?.ai_detail_free_period === period
+    const usedToday = data?.ai_detail_free_period === period
       ? Math.max(0, Number(data?.ai_detail_free_used ?? 0))
       : 0;
-    const freeRemaining = Math.max(0, DAILY_FREE_AI_DETAILS - freeUsed);
+    const freeRemaining = Math.max(0, DAILY_FREE_AI_DETAILS - usedToday);
 
     return NextResponse.json({
-      aiDetailCredits: paidCredits + freeRemaining,
-      aiDetailPaidCredits: paidCredits,
       aiDetailFreeRemaining: freeRemaining,
       aiDetailFreeDailyLimit: DAILY_FREE_AI_DETAILS,
+      aiDetailUsedToday: usedToday,
       updatedAt: data?.updated_at ?? null,
     });
   } catch (error) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "讀取 AI 詳解額度失敗。",
+          error instanceof Error
+            ? error.message
+            : "讀取 AI 詳解每日使用狀態失敗。",
       },
       { status: 500 },
     );
