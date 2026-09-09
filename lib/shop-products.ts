@@ -1,4 +1,4 @@
-export type ShopProductKind = "pro_monthly" | "exam_explanation";
+export type ShopProductKind = "pro_30d" | "exam_explanation";
 
 export type ShopProduct = {
   id: string;
@@ -16,22 +16,22 @@ export type ShopProduct = {
 
 export const SHOP_PRODUCTS: ShopProduct[] = [
   {
-    id: "pro-monthly",
-    kind: "pro_monthly",
+    id: "pro-30d",
+    kind: "pro_30d",
     title: "MedSlime Pro",
     price: 149,
-    priceSuffix: "/ 月",
-    itemName: "MedSlime Pro 月方案",
-    note: "適合國考備考期間持續刷題與檢討",
+    priceSuffix: "/ 30 天",
+    itemName: "MedSlime Pro 30 天方案",
+    note: "適合國考備考期間持續刷題、追蹤弱點與安排複習",
     description:
-      "訂閱期間解鎖完整國考詳解與進階學習分析。Pro 是學習會員服務，不是 AI 次數或點數儲值。",
+      "一次付款開通 30 天進階學習功能。Pro 的核心是個人化分析、複習工具與 AI 追問，不包含全站所有國考完整詳解。",
     features: [
-      "完整國考詳解庫",
-      "每個選項為什麼對／錯",
-      "錯題與弱點進階分析",
+      "跨考卷弱點與錯題趨勢分析",
       "考後個人化分析報告",
-      "個人化複習建議",
-      "AI 進階追問與較高每日使用上限",
+      "依弱點產生個人化複習建議",
+      "進階錯題整理與複習追蹤",
+      "AI 追問每日 10 次",
+      "30 天內持續使用 Pro 進階學習功能",
     ],
     badge: "備考推薦",
     featured: true,
@@ -45,13 +45,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     itemName: "MedSlime 單份國考完整詳解",
     note: "只想完整檢討指定一份考卷時使用",
     description:
-      "單次購買指定國考考卷的完整數位詳解；購買後解鎖該份考卷內容，不建立可消耗的 AI 額度。",
+      "單次購買指定國考考卷的完整數位詳解。購買後永久保留該份考卷的完整詳解存取權，不是購買 AI 次數。",
     features: [
       "指定一份國考考卷",
-      "全題完整詳解",
+      "該份考卷全題完整詳解存取權",
       "每個選項逐一解析",
       "核心考點與易混淆概念",
-      "購買後保留該份詳解存取權",
+      "購買後永久保留該份詳解存取權",
     ],
   },
 ];
