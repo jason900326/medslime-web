@@ -6,6 +6,7 @@ import ScrollJumpButtons from "@/components/scroll-jump-buttons";
 import FirstLoginOnboarding from "@/components/first-login-onboarding";
 import RouteUtilities from "@/components/route-utilities";
 import SiteFooter from "@/components/site-footer";
+import LegacyEraLabelNormalizer from "@/components/legacy-era-label-normalizer";
 
 export const metadata: Metadata = {
   title: "MedSlime",
@@ -27,6 +28,7 @@ export default function RootLayout({
             <FirstLoginOnboarding />
             <ScrollJumpButtons />
             <RouteUtilities />
+            <LegacyEraLabelNormalizer />
           </GameStateProvider>
         </Suspense>
       </body>
