@@ -53,6 +53,7 @@ type LoadState =
 const ANALYSIS_CACHE_PREFIX = "medslime_pro_analysis_v1";
 const ANALYSIS_CACHE_TTL_MS = 15 * 60 * 1000;
 const ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
+const PANEL_OPEN_PREFIX = "medslime_pro_panel_open_v1";
 
 type StoredAnalysis = {
   savedAt: number;
@@ -61,6 +62,24 @@ type StoredAnalysis = {
 
 function cacheKey(userId: string) {
   return `${ANALYSIS_CACHE_PREFIX}:${userId}`;
+}
+
+function panelOpenKey(userId: string) {
+  return `${PANEL_OPEN_PREFIX}:${userId}`;
+}
+
+function readPanelOpen(userId: string) {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(panelOpenKey(userId)) === "1";
+}
+
+function writePanelOpen(userId: string, open: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(panelOpenKey(userId), open ? "1" : "0");
+  } catch {
+    // Panel preference is only a UX convenience.
+  }
 }
 
 function readCachedAnalysis(userId: string): ProAnalysisPayload | null {
@@ -106,13 +125,21 @@ export default function ProAnalysisPanel() {
   const [state, setState] = useState<LoadState>(
     initial ? { status: "ready", data: initial } : { status: "loading" },
   );
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [overviewOpen, setOverviewOpen] = useState(true);
-  const [recommendationOpen, setRecommendationOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [recommendationOpen, setRecommendationOpen] = useState(false);
   const [weaknessOpen, setWeaknessOpen] = useState(false);
-  const [priorityOpen, setPriorityOpen] = useState(true);
+  const [priorityOpen, setPriorityOpen] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(false);
   const [showAllPriorities, setShowAllPriorities] = useState(false);
+
+  useEffect(() => {
+    if (!pro.userId) {
+      setPanelOpen(false);
+      return;
+    }
+    setPanelOpen(readPanelOpen(pro.userId));
+  }, [pro.userId]);
 
   useEffect(() => {
     if (pro.loading) return;
@@ -164,6 +191,14 @@ export default function ProAnalysisPanel() {
     return () => controller.abort();
   }, [pro.isLoggedIn, pro.isPro, pro.loading, pro.userId]);
 
+  const togglePanel = () => {
+    setPanelOpen((current) => {
+      const next = !current;
+      if (pro.userId) writePanelOpen(pro.userId, next);
+      return next;
+    });
+  };
+
   if (pro.loading) return null;
 
   if (state.status === "loading") {
@@ -201,7 +236,7 @@ export default function ProAnalysisPanel() {
             </div>
             <div className="mt-1 text-lg font-black text-[#237849]">Pro 分析已開通</div>
           </div>
-          <ExpiryBadge value={data.proExpiresAt} />
+          <ActiveBadge />
         </div>
         <div className="mt-3 text-sm font-bold leading-6 text-[#668276]">
           先完成幾份國考，系統就會開始整理跨考卷趨勢、反覆弱點與複習優先順序。
@@ -224,10 +259,10 @@ export default function ProAnalysisPanel() {
           <h2 className="mt-1 text-xl font-black">你的備考趨勢</h2>
         </div>
         <div className="flex items-start gap-2">
-          <ExpiryBadge value={data.proExpiresAt} />
+          <ActiveBadge />
           <button
             type="button"
-            onClick={() => setPanelOpen((current) => !current)}
+            onClick={togglePanel}
             className="rounded-full border border-[#d8e7de] bg-white/90 px-3 py-1.5 text-xs font-black text-[#557768]"
             aria-expanded={panelOpen}
           >
@@ -236,11 +271,7 @@ export default function ProAnalysisPanel() {
         </div>
       </div>
 
-      {!panelOpen ? (
-        <div className="mt-3 text-sm font-bold text-[#789083]">
-          Pro 分析已收合，需要時再展開即可。
-        </div>
-      ) : (
+      {panelOpen && (
         <div className="mt-5 space-y-3">
           <Disclosure
             title="數據總覽"
@@ -507,18 +538,11 @@ function LockedPanel() {
   );
 }
 
-function ExpiryBadge({ value }: { value: string | null }) {
+function ActiveBadge() {
   return (
-    <div className="shrink-0 text-right">
-      <span className="rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">
-        已開通
-      </span>
-      {value && (
-        <div className="mt-2 text-[10px] font-bold text-[#8a9c92]">
-          有效至 {new Date(value).toLocaleDateString("zh-TW")}
-        </div>
-      )}
-    </div>
+    <span className="rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">
+      已開通
+    </span>
   );
 }
 
