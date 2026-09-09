@@ -10,8 +10,7 @@ import { SHOP_PRODUCTS, type ShopProduct } from "@/lib/shop-products";
 const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
 const checkoutEnabled =
   ecpayEnabled && process.env.NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED === "true";
-const coinPackages = SHOP_PRODUCTS.filter((item) => item.kind === "coins");
-const aiPackages = SHOP_PRODUCTS.filter((item) => item.kind === "ai_detail");
+const aiPackages = SHOP_PRODUCTS;
 
 type AiBalance = {
   total: number;
@@ -63,33 +62,22 @@ export default function ShopPage() {
           <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">SHOP</div>
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">MedSlime 商城</h1>
           <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#70877a] sm:text-base">
-            商城販售虛擬金幣與 AI 詳解使用額度。商品內容與價格公開展示，付款功能會在金流審核完成後開放。
+            商城目前僅提供學習服務型商品。MedSlime 金幣不提供現金購買，只能透過站內學習、任務與成就取得。
           </p>
         </section>
 
         {!checkoutEnabled && (
           <section className="mt-5 rounded-[22px] border border-[#f0dfaa] bg-[#fff9e8] px-5 py-4 text-sm font-black leading-6 text-[#80651e]">
-            🕒 目前金流審核中：可以查看所有商品與價格，但暫時無法付款。
+            🕒 目前金流審核中：可以查看商品內容與價格，但暫時無法付款。
           </section>
         )}
 
-        <ShopSection
-          eyebrow="COINS"
-          title="金幣"
-          infoTitle="金幣怎麼使用？"
-          infoContent={
-            <>
-              <p>100 金幣可抽 1 次；1,000 金幣可進行 10 連抽。</p>
-              <p>金幣也能透過每日任務、專注學習與成就免費取得，不一定要購買。</p>
-            </>
-          }
-        >
-          <PackageGrid
-            products={coinPackages}
-            icon="🪙"
-            isLoggedIn={auth.isLoggedIn}
-          />
-        </ShopSection>
+        <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+          <div className="font-black">🪙 金幣改為純學習獎勵</div>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
+            金幣仍可用於史萊姆抽卡，但不再販售。之後會依新版 MedSlime 經濟系統調整任務、專注學習與成就的金幣獎勵。
+          </p>
+        </section>
 
         <ShopSection
           eyebrow="AI DETAIL"
@@ -141,7 +129,7 @@ export default function ShopPage() {
         <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
           <div className="font-black">付款與入帳</div>
           <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-            金流開放後，點選商品價格會前往綠界科技付款頁；付款完成後由 MedSlime 伺服器驗證交易並自動將商品入帳至登入帳號。
+            金流開放後，點選商品價格會前往綠界科技付款頁；付款完成後由 MedSlime 伺服器驗證交易並自動將學習服務商品入帳至登入帳號。
           </p>
         </section>
       </div>
@@ -223,8 +211,7 @@ function PackageCard({
   bonusPercent: number;
   isLoggedIn: boolean;
 }) {
-  const isAi = id.startsWith("ai-");
-  const isBestValue = bonusPercent >= 50 || id === "coins-3300";
+  const isBestValue = bonusPercent >= 50;
 
   return (
     <article className="relative flex min-h-[220px] flex-col rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] px-4 pb-4 pt-5 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
@@ -245,12 +232,9 @@ function PackageCard({
 
       <div className="text-3xl">{icon}</div>
       <div className="mt-3 text-2xl font-black tracking-[-0.03em]">
-        {amount.toLocaleString()}
-        {isAi ? " 次" : ""}
+        {amount.toLocaleString()} 次
       </div>
-      {isAi && (
-        <div className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">{note}</div>
-      )}
+      <div className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">{note}</div>
 
       <div className="mt-auto pt-5">
         {!checkoutEnabled ? (
