@@ -30,7 +30,7 @@ export async function GET() {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("player_entitlements")
-      .select("ai_detail_free_period,ai_detail_free_used,updated_at")
+      .select("ai_detail_free_period,ai_detail_free_used,pro_expires_at,updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -41,11 +41,17 @@ export async function GET() {
       ? Math.max(0, Number(data?.ai_detail_free_used ?? 0))
       : 0;
     const freeRemaining = Math.max(0, DAILY_FREE_AI_DETAILS - usedToday);
+    const proExpiresAt = data?.pro_expires_at ?? null;
+    const isPro = Boolean(
+      proExpiresAt && new Date(proExpiresAt).getTime() > Date.now(),
+    );
 
     return NextResponse.json({
       aiDetailFreeRemaining: freeRemaining,
       aiDetailFreeDailyLimit: DAILY_FREE_AI_DETAILS,
       aiDetailUsedToday: usedToday,
+      isPro,
+      proExpiresAt,
       updatedAt: data?.updated_at ?? null,
     });
   } catch (error) {
@@ -54,7 +60,7 @@ export async function GET() {
         error:
           error instanceof Error
             ? error.message
-            : "讀取 AI 詳解每日使用狀態失敗。",
+            : "讀取學習服務狀態失敗。",
       },
       { status: 500 },
     );
