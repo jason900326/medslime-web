@@ -28,7 +28,7 @@ export default function ShopPage() {
             需要什麼，就買什麼。
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-[#70877a] sm:text-base">
-            想提升整段備考效率，選 MedSlime Pro；只想把某一份國考徹底檢討完，單獨解鎖該份完整詳解即可。
+            想追蹤整段備考表現，選 MedSlime Pro；只想把某一份國考徹底檢討完，單獨解鎖該份完整詳解即可。
           </p>
         </section>
 
@@ -48,34 +48,11 @@ export default function ShopPage() {
           ))}
         </section>
 
-        <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-            AI 使用方式
-          </div>
-          <h2 className="mt-1 text-xl font-black">完整詳解和 AI 追問是兩件事</h2>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-[#dce9e1] bg-[#f8fcf9] p-4">
-              <div className="text-sm font-black text-[#315b45]">Free · 每日 5 次完整詳解</div>
-              <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-                刷題遇到不懂的題目，可以查看完整解析。每日重新計算，未使用次數不累積，也不能另外購買次數。
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] p-4">
-              <div className="text-sm font-black text-[#237849]">Pro · 每日 10 次 AI 追問</div>
-              <p className="mt-2 text-sm font-bold leading-6 text-[#668276]">
-                看完解析仍然卡住時，再針對觀念繼續問 AI。這是個人化追問，不是把完整詳解再生成一次。
-              </p>
-            </div>
-          </div>
-        </section>
-
         <section className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e2ebe5] bg-white px-5 py-4 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
           <div>
             <div className="text-sm font-black text-[#315b45]">付款與虛擬獎勵說明</div>
             <div className="mt-1 text-xs font-bold text-[#8a9c92]">
-              想了解 AI 次數、金幣與付款之間的關係，可查看完整說明。
+              金幣、免費 AI 使用上限與付費服務的關係，可在這裡查看。
             </div>
           </div>
           <InfoDialogButton title="付款與虛擬獎勵說明" label="查看">
@@ -83,13 +60,10 @@ export default function ShopPage() {
               MedSlime 的付費商品為 30 天 Pro 學習服務，以及指定一份國考考卷的完整數位詳解。
             </p>
             <p>
-              免費 AI 詳解的每日使用上限不屬於帳戶餘額，不可購買、加值、累積或轉讓。
+              免費 AI 詳解的每日使用上限不可購買、加值、累積或轉讓。
             </p>
             <p>
               站內金幣只能透過學習、任務、專注與成就取得，不提供現金購買，也不能兌現、交易或轉讓。
-            </p>
-            <p>
-              付款不會轉換成站內點數、錢包餘額、抽卡資源或其他可再次消耗的儲值資產。
             </p>
           </InfoDialogButton>
         </section>
