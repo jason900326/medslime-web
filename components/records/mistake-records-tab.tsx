@@ -229,11 +229,24 @@ function MistakeRecordCard({
         ].join(" ")}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
-              {item.source === "national-exam" ? "NATIONAL EXAM" : "MATERIAL"}
-            </div>
-            <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+          <div className="min-w-0 flex-1">
+            {item.source === "national-exam" ? (
+              <>
+                <div className="text-xs font-black text-[#2ba962]">
+                  民國 {item.year ?? "—"} 年・第 {item.session ?? "—"} 次
+                </div>
+                <h3 className="mt-1 text-base font-black leading-7 text-[#17372a]">
+                  {item.subject ?? item.sourceLabel}
+                </h3>
+              </>
+            ) : (
+              <>
+                <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
+                  MATERIAL
+                </div>
+                <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+              </>
+            )}
           </div>
           <div className="flex gap-2">
             {item.uncertain && (
