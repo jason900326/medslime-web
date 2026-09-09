@@ -2,18 +2,15 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import AttemptCard from "@/components/records/attempt-card";
-import MistakeRecordsTab from "@/components/records/mistake-records-tab";
 import ProAnalysisPanel from "@/components/records/pro-analysis-panel";
 import {
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
 import { readMistakes, type MistakeRecord } from "@/lib/mistake-store";
-
-type Tab = "attempts" | "mistakes";
 
 export default function RecordsPage() {
   return (
@@ -24,10 +21,8 @@ export default function RecordsPage() {
 }
 
 function RecordsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedTab: Tab =
-    searchParams.get("tab") === "mistakes" ? "mistakes" : "attempts";
-  const [tab, setTab] = useState<Tab>(requestedTab);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,10 +31,18 @@ function RecordsContent() {
   const filterSession = searchParams.get("session")?.trim() ?? "";
   const filterSubject = searchParams.get("subject")?.trim() ?? "";
   const hasExamFilter = Boolean(filterYear && filterSession && filterSubject);
+  const legacyMistakeRoute = searchParams.get("tab") === "mistakes";
 
   useEffect(() => {
-    setTab(requestedTab);
-  }, [requestedTab]);
+    if (!legacyMistakeRoute) return;
+
+    const params = new URLSearchParams();
+    if (filterYear) params.set("year", filterYear);
+    if (filterSession) params.set("session", filterSession);
+    if (filterSubject) params.set("subject", filterSubject);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    router.replace(`/study/mistakes${suffix}`);
+  }, [legacyMistakeRoute, filterYear, filterSession, filterSubject, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +75,8 @@ function RecordsContent() {
   const pendingMistakes = mistakes.filter((item) => !item.reviewed);
   const subjectCount = new Set(attempts.map((item) => item.subject)).size;
 
+  if (legacyMistakeRoute) return <LoadingRecords />;
+
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
@@ -81,34 +86,15 @@ function RecordsContent() {
           <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
             LEARNING RECORDS
           </div>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
-            學習紀錄
-          </h1>
+          <h1 className="ms-page-title mt-2">學習紀錄</h1>
           <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            作答紀錄保留每次考卷表現；錯題紀錄則集中整理需要反覆複習的題目。
+            這裡專門保留每次作答、成績趨勢與 Pro 備考分析；錯題複習已獨立成另一個功能。
           </p>
-        </section>
-
-        <section className="mt-5 grid grid-cols-2 gap-2 rounded-2xl border border-[#dce9e1] bg-white p-1.5">
-          <button
-            type="button"
-            onClick={() => setTab("attempts")}
-            className={tabClass(tab === "attempts")}
-          >
-            作答紀錄
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("mistakes")}
-            className={tabClass(tab === "mistakes")}
-          >
-            錯題紀錄
-          </button>
         </section>
 
         {loading ? (
           <LoadingCard />
-        ) : tab === "attempts" ? (
+        ) : (
           <>
             <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <SummaryCard label="作答次數" value={`${attempts.length} 次`} />
@@ -124,6 +110,15 @@ function RecordsContent() {
               <SummaryCard label="有紀錄科目" value={`${subjectCount} 科`} />
             </section>
 
+            <div className="mt-3 flex justify-end">
+              <Link
+                href="/study/mistakes"
+                className="text-xs font-black text-[#237849] underline decoration-[#cfe7d8] underline-offset-4"
+              >
+                前往錯題複習 →
+              </Link>
+            </div>
+
             <ProAnalysisPanel />
 
             {hasExamFilter && (
@@ -135,7 +130,7 @@ function RecordsContent() {
                   </div>
                 </div>
                 <Link
-                  href="/study/records?tab=attempts"
+                  href="/study/records"
                   className="shrink-0 rounded-xl border border-[#cfe7d8] bg-white px-3 py-2 text-xs font-black text-[#315b45]"
                 >
                   看全部
@@ -148,7 +143,7 @@ function RecordsContent() {
                 <EmptyState
                   icon="📝"
                   title="還沒有作答紀錄"
-                  copy="完成一份歷屆國考後，成績與當次需要複習的題目會出現在這裡。"
+                  copy="完成一份歷屆國考或自由測驗後，成績與作答摘要會出現在這裡。"
                   href="/study/exam"
                   action="去寫一份考卷"
                 />
@@ -163,14 +158,6 @@ function RecordsContent() {
               )}
             </section>
           </>
-        ) : (
-          <MistakeRecordsTab
-            mistakes={mistakes}
-            setMistakes={setMistakes}
-            filterYear={filterYear}
-            filterSession={filterSession}
-            filterSubject={filterSubject}
-          />
         )}
       </div>
     </main>
@@ -180,13 +167,6 @@ function RecordsContent() {
 function average(values: number[]) {
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function tabClass(active: boolean) {
-  return [
-    "rounded-xl px-4 py-3 text-sm font-black transition",
-    active ? "bg-[#31c978] text-white" : "bg-white text-[#557768]",
-  ].join(" ");
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {

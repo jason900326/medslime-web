@@ -11,7 +11,7 @@ import { SLIME_BY_ID } from "@/lib/slime-data";
 
 type TimerMode = "idle" | "running" | "paused" | "finished";
 
-const presets = [25, 30, 45, 60, 90] as const;
+const presets = [25, 30, 45, 60] as const;
 
 export default function FocusPage() {
   const game = useGameState();
