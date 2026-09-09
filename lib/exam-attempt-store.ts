@@ -61,6 +61,16 @@ type AttemptRow = {
 const ATTEMPT_SELECT_BASE =
   "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
 const ATTEMPT_SELECT = `${ATTEMPT_SELECT_BASE},review_items`;
+const PRO_ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
+
+function markProAnalysisStale() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(PRO_ANALYSIS_STALE_KEY, "1");
+  } catch {
+    // Cache invalidation is only a UX optimization.
+  }
+}
 
 function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
   if (!Array.isArray(value)) return [];
@@ -237,6 +247,7 @@ export async function saveNationalExamAttempt(
       console.error("儲存國考作答紀錄失敗：", legacyResult.error);
       throw new Error("作答紀錄儲存失敗，請稍後再試。");
     }
+    markProAnalysisStale();
     return;
   }
 
@@ -244,6 +255,8 @@ export async function saveNationalExamAttempt(
     console.error("儲存國考作答紀錄失敗：", result.error);
     throw new Error("作答紀錄儲存失敗，請稍後再試。");
   }
+
+  markProAnalysisStale();
 }
 
 export function latestAttemptMap(attempts: ExamAttempt[]) {
