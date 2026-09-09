@@ -15,11 +15,6 @@ import { readMistakes, type MistakeRecord } from "@/lib/mistake-store";
 
 type Tab = "attempts" | "mistakes";
 
-type EntitlementPayload = {
-  isPro?: boolean;
-  proExpiresAt?: string | null;
-};
-
 export default function RecordsPage() {
   return (
     <Suspense fallback={<LoadingRecords />}>
@@ -35,8 +30,6 @@ function RecordsContent() {
   );
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
-  const [isPro, setIsPro] = useState(false);
-  const [proExpiresAt, setProExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const filterYear = searchParams.get("year")?.trim() ?? "";
@@ -47,22 +40,11 @@ function RecordsContent() {
   useEffect(() => {
     let cancelled = false;
 
-    void Promise.all([
-      readExamAttempts(),
-      readMistakes(),
-      fetch("/api/entitlements", { cache: "no-store" })
-        .then(async (response) => {
-          if (!response.ok) return {} as EntitlementPayload;
-          return (await response.json()) as EntitlementPayload;
-        })
-        .catch(() => ({} as EntitlementPayload)),
-    ])
-      .then(([nextAttempts, nextMistakes, entitlements]) => {
+    void Promise.all([readExamAttempts(), readMistakes()])
+      .then(([nextAttempts, nextMistakes]) => {
         if (cancelled) return;
         setAttempts(nextAttempts);
         setMistakes(nextMistakes);
-        setIsPro(Boolean(entitlements.isPro));
-        setProExpiresAt(entitlements.proExpiresAt ?? null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -138,12 +120,7 @@ function RecordsContent() {
               <SummaryCard label="有紀錄科目" value={`${subjectCount} 科`} />
             </section>
 
-            <ProAnalysisPanel
-              isPro={isPro}
-              proExpiresAt={proExpiresAt}
-              attempts={attempts}
-              pendingMistakes={pendingMistakes}
-            />
+            <ProAnalysisPanel />
 
             {hasExamFilter && (
               <section className="mt-5 flex items-center justify-between gap-3 rounded-[20px] border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3">
