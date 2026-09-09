@@ -96,7 +96,7 @@
    * users move between quiz, result, attempt-history and mistake-review screens.
    */
   .ms-page-title {
-    @apply text-3xl font-black tracking-[-0.04em] md:text-4xl;
+    @apply text-3xl font-black tracking-[-0.04em];
   }
 
   .ms-section-title {
@@ -112,11 +112,27 @@
   }
 
   .ms-question-stem {
-    @apply text-base font-black leading-7 sm:text-lg sm:leading-8;
+    @apply text-base font-black leading-7;
   }
 
   .ms-question-option {
-    @apply text-sm font-bold leading-6 sm:text-base;
+    @apply text-sm font-bold leading-6;
+  }
+
+  @media (min-width: 640px) {
+    .ms-question-stem {
+      @apply text-lg leading-8;
+    }
+
+    .ms-question-option {
+      @apply text-base;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ms-page-title {
+      @apply text-4xl;
+    }
   }
 }
 
