@@ -26,9 +26,6 @@ function ownerTestState() {
     slimes: {
       "n-green": {
         owned: true,
-        fragments: 0,
-        accessoryUnlocked: false,
-        accessoryEquipped: false,
       },
     },
   };
