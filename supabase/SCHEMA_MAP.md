@@ -11,7 +11,7 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `player_account_state` | Game-state source of truth | Coins, tickets, streak, companion, slimes, pity, pulls, activity, task claims, achievement claims, focus history |
 | `player_mistakes` | User mistake library | Current mistake read/write store |
 | `player_entitlements` | AI-detail entitlements | Daily free allowance + purchased AI-detail balance |
-| `payment_orders` | Payment ledger | ECPay checkout / callback / order status |
+| `payment_orders` | Payment ledger | ECPay checkout / callback / order status; real-money purchases must not grant gameplay coins |
 | `national_exam_questions` | National-exam question bank | Current national-exam API |
 | `shared_ai_explanations` | Shared national-exam AI cache | Shared quick/detail explanations |
 | `ai_question_explanations` | Per-user material AI cache | Material quick/detail explanations |
@@ -22,9 +22,9 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `beta_feedback` | Beta feedback | Authenticated beta feedback |
 | `feedback_reports` | User problem reports | Current feedback-report API |
 
-## Legacy tables to archive
+## Legacy tables archived in `medslime_legacy`
 
-The current default branch has no application references to these tables. They should be moved to `medslime_legacy` by `cleanup_legacy_schema.sql`, not dropped immediately.
+The current default branch has no application references to these tables. They are archived by `cleanup_legacy_schema.sql` instead of being dropped immediately.
 
 - `achievement_claims`
 - `ai_explanation_usage`
@@ -81,6 +81,30 @@ If MedSlime 2.0 later normalizes parts of this JSON into relational tables, do i
 5. Keep the legacy schema during the MedSlime 2.0 transition.
 6. Only drop archived tables after the new version has been stable and a backup exists.
 
-## Payment note
+## Payment rule
 
-`payment_orders` is still active and must not be archived while ECPay code exists. The current payment schema still supports `grant_type = 'coins'`; removing real-money coin purchases is a separate MedSlime 2.0 migration and should update the product catalog, checkout validation, and fulfillment RPC together.
+Gameplay currency and paid services are deliberately separated.
+
+```text
+Study / tasks / achievements
+        ↓
+      coins
+        ↓
+  slime gacha
+```
+
+There must be no payment path that turns real money into `coins`, tickets, gacha pulls, fragments, accessories or any other randomized gameplay resource.
+
+The payment path currently allowed by the code/database is:
+
+```text
+ECPay payment
+      ↓
+payment_orders (grant_type = ai_detail)
+      ↓
+player_entitlements.ai_detail_credits
+```
+
+`supabase/remove_coin_purchases.sql` is the production migration for existing databases. It preserves historical coin order rows for audit, cancels unfinished coin orders, blocks new coin-granting orders, and replaces `fulfill_payment_order()` with AI-detail-only fulfillment.
+
+If the AI-detail commercial model is later replaced by MedSlime Pro or another non-credit product, update the product catalog, checkout validation, fulfillment RPC, entitlement schema and this document together.
