@@ -130,8 +130,8 @@ export default function AttemptDetailPage() {
           <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
             {freeQuiz
-              ? `自由測驗 · 民國 ${attempt.year.replace("-", "–")} 年 · ${attempt.subject}`
-              : `民國 ${attempt.year} 年・第 ${attempt.session} 次・${attempt.subject}`}
+              ? `自由測驗 · ${attempt.year.replace("-", "–")} 年 · ${attempt.subject}`
+              : `${attempt.year} 年・第 ${attempt.session} 次・${attempt.subject}`}
           </div>
           <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(attempt.completedAt)}</div>
         </section>
@@ -227,7 +227,7 @@ function ReviewCard({ item, freeQuiz }: { item: ExamAttemptReviewItem; freeQuiz:
       <div className="flex flex-wrap items-center gap-2">
         <div className="text-sm font-black text-[#2ba962]">
           {source
-            ? `民國 ${source.year} 年・第 ${source.session} 次・第 ${source.questionNumber} 題`
+            ? `${source.year} 年・第 ${source.session} 次・第 ${source.questionNumber} 題`
             : item.questionNumber
               ? `第 ${item.questionNumber} 題`
               : "題目"}
