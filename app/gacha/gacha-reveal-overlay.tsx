@@ -8,7 +8,7 @@ type GachaResult = {
   slimeId: string;
   isNew: boolean;
   duplicateReward: null | {
-    type: string;
+    type: "coins";
     amount: number;
   };
 };
@@ -578,25 +578,9 @@ function RewardBadge({
 
   if (!result.duplicateReward) return null;
 
-  if (result.duplicateReward.type === "coins") {
-    return (
-      <div className={`${base} bg-[#fff4d8] text-[#996719]`}>
-        重複 · +{result.duplicateReward.amount} 金幣
-      </div>
-    );
-  }
-
-  if (result.duplicateReward.type === "fragments_full") {
-    return (
-      <div className={`${base} bg-[#eef3f0] text-[#557768]`}>
-        碎片已滿 · 可解鎖飾品
-      </div>
-    );
-  }
-
   return (
-    <div className={`${base} bg-[#eef3f0] text-[#557768]`}>
-      重複 · +{result.duplicateReward.amount} 碎片
+    <div className={`${base} bg-[#fff4d8] text-[#996719]`}>
+      重複 · +{result.duplicateReward.amount} 金幣
     </div>
   );
 }
