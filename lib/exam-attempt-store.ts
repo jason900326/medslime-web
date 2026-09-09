@@ -13,6 +13,17 @@ export type ExamAttemptReviewItem = {
   officialPdfUrl: string | null;
 };
 
+export type ExamQuestionOutcome = {
+  questionId: string;
+  questionKey: string;
+  questionNumber: number | null;
+  userAnswer: number | null;
+  correctIndex: number | null;
+  answered: boolean;
+  correct: boolean | null;
+  uncertain: boolean;
+};
+
 export type ExamAttempt = {
   id: string;
   year: string;
@@ -27,6 +38,7 @@ export type ExamAttempt = {
   durationSeconds: number;
   completedAt: string;
   reviewItems: ExamAttemptReviewItem[];
+  questionOutcomes: ExamQuestionOutcome[];
 };
 
 export type SaveExamAttemptInput = {
@@ -40,6 +52,7 @@ export type SaveExamAttemptInput = {
   uncertainCount: number;
   durationSeconds: number;
   reviewItems: ExamAttemptReviewItem[];
+  questionOutcomes: ExamQuestionOutcome[];
 };
 
 type AttemptRow = {
@@ -56,11 +69,13 @@ type AttemptRow = {
   duration_seconds: number;
   completed_at: string;
   review_items?: unknown;
+  question_outcomes?: unknown;
 };
 
 const ATTEMPT_SELECT_BASE =
   "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
-const ATTEMPT_SELECT = `${ATTEMPT_SELECT_BASE},review_items`;
+const ATTEMPT_SELECT_WITH_REVIEW = `${ATTEMPT_SELECT_BASE},review_items`;
+const ATTEMPT_SELECT = `${ATTEMPT_SELECT_WITH_REVIEW},question_outcomes`;
 const PRO_ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
 
 function markProAnalysisStale() {
@@ -105,6 +120,50 @@ function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
     .filter((item): item is ExamAttemptReviewItem => Boolean(item));
 }
 
+function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as Partial<ExamQuestionOutcome>;
+      const questionId = typeof raw.questionId === "string" ? raw.questionId.trim() : "";
+      const questionKey = typeof raw.questionKey === "string" ? raw.questionKey.trim() : "";
+      if (!questionId || !questionKey) return null;
+
+      const userAnswer =
+        typeof raw.userAnswer === "number" && Number.isFinite(raw.userAnswer)
+          ? raw.userAnswer
+          : null;
+      const correctIndex =
+        typeof raw.correctIndex === "number" && Number.isFinite(raw.correctIndex)
+          ? raw.correctIndex
+          : null;
+      const answered = raw.answered === true;
+      const correct =
+        typeof raw.correct === "boolean"
+          ? raw.correct
+          : answered && userAnswer !== null && correctIndex !== null
+            ? userAnswer === correctIndex
+            : null;
+
+      return {
+        questionId,
+        questionKey,
+        questionNumber:
+          typeof raw.questionNumber === "number" && Number.isFinite(raw.questionNumber)
+            ? raw.questionNumber
+            : null,
+        userAnswer,
+        correctIndex,
+        answered,
+        correct,
+        uncertain: raw.uncertain === true,
+      } satisfies ExamQuestionOutcome;
+    })
+    .filter((item): item is ExamQuestionOutcome => Boolean(item));
+}
+
 function mapRow(row: AttemptRow): ExamAttempt {
   return {
     id: row.id,
@@ -120,11 +179,40 @@ function mapRow(row: AttemptRow): ExamAttempt {
     durationSeconds: Math.max(0, Number(row.duration_seconds ?? 0)),
     completedAt: row.completed_at,
     reviewItems: normalizeReviewItems(row.review_items),
+    questionOutcomes: normalizeQuestionOutcomes(row.question_outcomes),
   };
 }
 
-function missingReviewItemsColumn(message: string) {
-  return message.toLowerCase().includes("review_items");
+function missingColumn(message: string, column: string) {
+  return message.toLowerCase().includes(column.toLowerCase());
+}
+
+async function readAttemptRows(input: {
+  userId: string;
+  limit?: number;
+  id?: string;
+}) {
+  const supabase = createClient();
+  const run = async (select: string) => {
+    let query = supabase
+      .from("exam_attempts")
+      .select(select)
+      .eq("user_id", input.userId)
+      .order("completed_at", { ascending: false });
+
+    if (input.id) query = query.eq("id", input.id).limit(1);
+    else query = query.limit(input.limit ?? 120);
+    return query;
+  };
+
+  let result = await run(ATTEMPT_SELECT);
+  if (result.error && missingColumn(result.error.message, "question_outcomes")) {
+    result = await run(ATTEMPT_SELECT_WITH_REVIEW);
+  }
+  if (result.error && missingColumn(result.error.message, "review_items")) {
+    result = await run(ATTEMPT_SELECT_BASE);
+  }
+  return result;
 }
 
 export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
@@ -136,29 +224,7 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   if (!user) return [];
 
   const safeLimit = Math.max(1, Math.min(300, limit));
-  const result = await supabase
-    .from("exam_attempts")
-    .select(ATTEMPT_SELECT)
-    .eq("user_id", user.id)
-    .order("completed_at", { ascending: false })
-    .limit(safeLimit);
-
-  if (result.error && missingReviewItemsColumn(result.error.message)) {
-    const legacyResult = await supabase
-      .from("exam_attempts")
-      .select(ATTEMPT_SELECT_BASE)
-      .eq("user_id", user.id)
-      .order("completed_at", { ascending: false })
-      .limit(safeLimit);
-
-    if (legacyResult.error) {
-      if (legacyResult.error.message.includes("exam_attempts")) return [];
-      console.error("讀取國考作答紀錄失敗：", legacyResult.error);
-      throw new Error("作答紀錄讀取失敗，請稍後再試。");
-    }
-
-    return ((legacyResult.data ?? []) as AttemptRow[]).map(mapRow);
-  }
+  const result = await readAttemptRows({ userId: user.id, limit: safeLimit });
 
   if (result.error) {
     if (result.error.message.includes("exam_attempts")) return [];
@@ -166,7 +232,7 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  return ((result.data ?? []) as AttemptRow[]).map(mapRow);
+  return ((result.data ?? []) as unknown as AttemptRow[]).map(mapRow);
 }
 
 export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
@@ -177,37 +243,15 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
 
   if (!user || !id) return null;
 
-  const result = await supabase
-    .from("exam_attempts")
-    .select(ATTEMPT_SELECT)
-    .eq("user_id", user.id)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (result.error && missingReviewItemsColumn(result.error.message)) {
-    const legacyResult = await supabase
-      .from("exam_attempts")
-      .select(ATTEMPT_SELECT_BASE)
-      .eq("user_id", user.id)
-      .eq("id", id)
-      .maybeSingle();
-
-    if (legacyResult.error) {
-      if (legacyResult.error.message.includes("exam_attempts")) return null;
-      console.error("讀取單次作答紀錄失敗：", legacyResult.error);
-      throw new Error("作答紀錄讀取失敗，請稍後再試。");
-    }
-
-    return legacyResult.data ? mapRow(legacyResult.data as AttemptRow) : null;
-  }
-
+  const result = await readAttemptRows({ userId: user.id, id });
   if (result.error) {
     if (result.error.message.includes("exam_attempts")) return null;
     console.error("讀取單次作答紀錄失敗：", result.error);
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  return result.data ? mapRow(result.data as AttemptRow) : null;
+  const row = ((result.data ?? []) as unknown as AttemptRow[])[0];
+  return row ? mapRow(row) : null;
 }
 
 export async function saveNationalExamAttempt(
@@ -236,19 +280,21 @@ export async function saveNationalExamAttempt(
     completed_at: new Date().toISOString(),
   };
 
-  const result = await supabase.from("exam_attempts").insert({
+  let result = await supabase.from("exam_attempts").insert({
     ...baseInsert,
     review_items: input.reviewItems,
+    question_outcomes: input.questionOutcomes,
   });
 
-  if (result.error && missingReviewItemsColumn(result.error.message)) {
-    const legacyResult = await supabase.from("exam_attempts").insert(baseInsert);
-    if (legacyResult.error) {
-      console.error("儲存國考作答紀錄失敗：", legacyResult.error);
-      throw new Error("作答紀錄儲存失敗，請稍後再試。");
-    }
-    markProAnalysisStale();
-    return;
+  if (result.error && missingColumn(result.error.message, "question_outcomes")) {
+    result = await supabase.from("exam_attempts").insert({
+      ...baseInsert,
+      review_items: input.reviewItems,
+    });
+  }
+
+  if (result.error && missingColumn(result.error.message, "review_items")) {
+    result = await supabase.from("exam_attempts").insert(baseInsert);
   }
 
   if (result.error) {
