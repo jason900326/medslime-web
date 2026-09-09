@@ -122,8 +122,9 @@ export default function ProAnalysisPanel() {
       setState({ status: "locked" });
       return;
     }
+    const activeUserId: string = userId;
 
-    const cached = readCachedAnalysis(userId);
+    const cached = readCachedAnalysis(activeUserId);
     if (cached) {
       setState({ status: "ready", data: cached });
       return;
@@ -148,7 +149,7 @@ export default function ProAnalysisPanel() {
           throw new Error(payload.error ?? "Pro 分析讀取失敗。");
         }
 
-        writeCachedAnalysis(userId, payload);
+        writeCachedAnalysis(activeUserId, payload);
         setState({ status: "ready", data: payload });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
