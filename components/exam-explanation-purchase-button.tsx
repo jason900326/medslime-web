@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
 const checkoutEnabled =
   ecpayEnabled && process.env.NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED === "true";
@@ -13,9 +17,57 @@ export default function ExamExplanationPurchaseButton({
   subject: string;
   compact?: boolean;
 }) {
+  const [purchased, setPurchased] = useState<boolean | null>(null);
   const baseClass = compact
     ? "rounded-xl px-4 py-2.5 text-sm font-black"
     : "w-full rounded-xl px-4 py-3 text-sm font-black";
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadAccess() {
+      try {
+        const params = new URLSearchParams({ year, session, subject });
+        const response = await fetch(
+          `/api/exam-explanation-access?${params.toString()}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? "讀取權限失敗。");
+        setPurchased(Boolean(payload?.purchased));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setPurchased(false);
+      }
+    }
+
+    void loadAccess();
+    return () => controller.abort();
+  }, [year, session, subject]);
+
+  if (purchased) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={`${baseClass} cursor-default border border-[#bfe1cb] bg-[#eaf9f0] text-[#237849]`}
+      >
+        ✓ 已永久解鎖
+      </button>
+    );
+  }
+
+  if (purchased === null) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={`${baseClass} cursor-wait border border-[#e4e9e6] bg-[#f7faf8] text-[#91a298]`}
+      >
+        確認詳解權限中…
+      </button>
+    );
+  }
 
   if (!checkoutEnabled) {
     return (
