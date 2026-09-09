@@ -15,10 +15,10 @@ const studyItems = [
     href: "/study/material",
   },
   {
-    icon: "📘",
-    title: "錯題庫",
-    copy: "整理答錯與不確定的題目",
-    href: "/study/mistakes",
+    icon: "📊",
+    title: "學習紀錄",
+    copy: "查看歷史作答、成績與錯題整理",
+    href: "/study/records",
   },
   {
     icon: "⏱️",
