@@ -122,8 +122,10 @@ export async function GET(request: NextRequest) {
 
     const restUrl = new URL("/rest/v1/national_exam_questions", supabaseUrl);
     restUrl.searchParams.set("select", "*");
-    restUrl.searchParams.set("exam_year", `gte.${fromRoc + 1911}`);
-    restUrl.searchParams.append("exam_year", `lte.${toRoc + 1911}`);
+    restUrl.searchParams.set(
+      "and",
+      `(exam_year.gte.${fromRoc + 1911},exam_year.lte.${toRoc + 1911})`,
+    );
     restUrl.searchParams.set("order", "exam_year.desc,question_number.asc");
     restUrl.searchParams.set("limit", "5000");
 
@@ -189,9 +191,10 @@ export async function GET(request: NextRequest) {
       .filter((item) => item.sourceQuestionNumber > 0);
 
     if (candidates.length === 0) {
-      return NextResponse.json({
-        error: "這個年份範圍與科目目前找不到可用題目。",
-      }, { status: 404 });
+      return NextResponse.json(
+        { error: "這個年份範圍與科目目前找不到可用題目。" },
+        { status: 404 },
+      );
     }
 
     const selected = shuffle(candidates)
