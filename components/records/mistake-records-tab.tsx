@@ -249,7 +249,7 @@ function MistakeRecordCard({
           </div>
         </div>
 
-        <div className="mt-5 text-base font-black leading-7 sm:text-lg sm:leading-8">
+        <div className="ms-question-stem mt-5">
           {item.questionNumber ? `${item.questionNumber}. ` : ""}
           {item.stem}
         </div>
@@ -262,7 +262,7 @@ function MistakeRecordCard({
               <div
                 key={`${item.id}-${index}`}
                 className={[
-                  "rounded-xl border px-4 py-3 font-bold",
+                  "ms-question-option rounded-xl border px-4 py-3",
                   correct
                     ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
                     : chosen

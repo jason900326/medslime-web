@@ -118,7 +118,7 @@ export default function AttemptDetailPage() {
 
         <section className="mt-6">
           <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">ATTEMPT DETAIL</div>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">這次作答</h1>
+          <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
             民國 {attempt.year} 年・第 {attempt.session} 次・{attempt.subject}
           </div>
@@ -218,7 +218,7 @@ function ReviewCard({ item }: { item: ExamAttemptReviewItem }) {
         )}
       </div>
 
-      <div className="mt-3 text-base font-black leading-7">{item.stem}</div>
+      <div className="ms-question-stem mt-3">{item.stem}</div>
 
       <div className="mt-4 space-y-2">
         {item.options.map((option, index) => {
@@ -228,7 +228,7 @@ function ReviewCard({ item }: { item: ExamAttemptReviewItem }) {
             <div
               key={`${item.id}-${index}`}
               className={[
-                "rounded-xl border px-4 py-3 text-sm font-bold",
+                "ms-question-option rounded-xl border px-4 py-3",
                 correct
                   ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
                   : chosen

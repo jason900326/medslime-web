@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useGameState } from "@/components/game-state-provider";
-import { useAuthUser } from "@/hooks/use-auth-user";
+import { useProStatus } from "@/hooks/use-pro-status";
 
 type TopBarProps = {
   showBack?: boolean;
@@ -19,7 +19,7 @@ export default function TopBar({
 }: TopBarProps) {
   const router = useRouter();
   const game = useGameState();
-  const auth = useAuthUser();
+  const pro = useProStatus();
 
   const logout = async () => {
     const supabase = createClient();
@@ -49,10 +49,12 @@ export default function TopBar({
         >
           MedSlime.
         </button>
+
+        {!showBack && pro.isPro && <GoldenProBadge />}
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {!auth.loading && auth.isLoggedIn && (
+        {!pro.loading && pro.isLoggedIn && (
           <>
             <ResourcePill label={`🔥 ${game.streak} 天`} />
             <ResourcePill label={`🪙 ${game.coins}`} href="/shop" ariaLabel="前往資源頁" />
@@ -68,7 +70,7 @@ export default function TopBar({
           </>
         )}
 
-        {!auth.loading && !auth.isLoggedIn && (
+        {!pro.loading && !pro.isLoggedIn && (
           <Link
             href="/auth/login"
             className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7]"
@@ -78,6 +80,23 @@ export default function TopBar({
         )}
       </div>
     </header>
+  );
+}
+
+function GoldenProBadge() {
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-full border border-[#efd78a] bg-gradient-to-r from-[#fff6cf] to-[#fffaf0] px-2.5 py-1 shadow-sm"
+      title="MedSlime Pro 已開通"
+      aria-label="MedSlime Pro 已開通"
+    >
+      <span className="relative block h-[18px] w-[22px] shrink-0 rounded-[48%_48%_42%_42%/58%_58%_42%_42%] border border-[#c99a27] bg-gradient-to-b from-[#ffe889] to-[#f5bf35] shadow-[0_2px_5px_rgba(188,136,25,0.2)]">
+        <span className="absolute left-[6px] top-[6px] h-[2px] w-[2px] rounded-full bg-[#694d16]" />
+        <span className="absolute right-[6px] top-[6px] h-[2px] w-[2px] rounded-full bg-[#694d16]" />
+        <span className="absolute bottom-[4px] left-1/2 h-[2px] w-[5px] -translate-x-1/2 rounded-b-full border-b border-[#694d16]" />
+      </span>
+      <span className="text-[11px] font-black tracking-[0.02em] text-[#94660f]">PRO</span>
+    </div>
   );
 }
 

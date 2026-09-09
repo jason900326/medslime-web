@@ -89,6 +89,66 @@
   }
 }
 
+/*
+ * MedSlime shared typography scale.
+ * New screens should use these classes instead of selecting ad-hoc text sizes.
+ */
+.ms-page-title {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.ms-section-title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ms-body-text {
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+}
+
+.ms-meta-text {
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.ms-question-stem {
+  font-size: 1rem;
+  line-height: 1.75rem;
+  font-weight: 900;
+}
+
+.ms-question-option {
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+}
+
+@media (min-width: 640px) {
+  .ms-question-stem {
+    font-size: 1.125rem;
+    line-height: 2rem;
+  }
+
+  .ms-question-option {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .ms-page-title {
+    font-size: 2.25rem;
+    line-height: 2.5rem;
+  }
+}
+
 html {
   background: var(--brand-bg);
 }

@@ -25,9 +25,9 @@ export default function RecordsPage() {
 
 function RecordsContent() {
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(
-    searchParams.get("tab") === "mistakes" ? "mistakes" : "attempts",
-  );
+  const requestedTab: Tab =
+    searchParams.get("tab") === "mistakes" ? "mistakes" : "attempts";
+  const [tab, setTab] = useState<Tab>(requestedTab);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,10 @@ function RecordsContent() {
   const filterSession = searchParams.get("session")?.trim() ?? "";
   const filterSubject = searchParams.get("subject")?.trim() ?? "";
   const hasExamFilter = Boolean(filterYear && filterSession && filterSubject);
+
+  useEffect(() => {
+    setTab(requestedTab);
+  }, [requestedTab]);
 
   useEffect(() => {
     let cancelled = false;
