@@ -4,15 +4,24 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import OfficialQuestionCrop from "@/components/official-question-crop";
+import AIExplanationButton from "@/components/ai-explanation-button";
+import { useGameState } from "@/components/game-state-provider";
 import {
   formatAttemptDate,
   formatAttemptDuration,
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
-import { readMistakes, type MistakeRecord } from "@/lib/mistake-store";
+import {
+  readMistakes,
+  removeMistake,
+  setMistakeReviewed,
+  type MistakeRecord,
+} from "@/lib/mistake-store";
 
 type Tab = "attempts" | "mistakes";
+type MistakeFilter = "全部" | "國考" | "教材" | "已複習";
 
 type EntitlementPayload = {
   isPro?: boolean;
@@ -123,7 +132,7 @@ function RecordsContent() {
             onClick={() => setTab("mistakes")}
             className={tabClass(tab === "mistakes")}
           >
-            錯題整理
+            錯題紀錄
           </button>
         </section>
 
@@ -135,7 +144,11 @@ function RecordsContent() {
               <SummaryCard label="作答次數" value={`${attempts.length} 次`} />
               <SummaryCard
                 label="最近 5 次平均"
-                value={attempts.length ? `${average(attempts.slice(0, 5).map((item) => item.score)).toFixed(1)}` : "—"}
+                value={
+                  attempts.length
+                    ? `${average(attempts.slice(0, 5).map((item) => item.score)).toFixed(1)}`
+                    : "—"
+                }
               />
               <SummaryCard label="待複習錯題" value={`${pendingMistakes.length} 題`} />
               <SummaryCard label="有紀錄科目" value={`${subjectStats.length} 科`} />
@@ -187,7 +200,13 @@ function RecordsContent() {
             </section>
           </>
         ) : (
-          <MistakeTab mistakes={mistakes} />
+          <MistakeTab
+            mistakes={mistakes}
+            setMistakes={setMistakes}
+            filterYear={filterYear}
+            filterSession={filterSession}
+            filterSubject={filterSubject}
+          />
         )}
       </div>
     </main>
@@ -249,7 +268,9 @@ function ProAnalysisPanel({
   const previous = attempts[1] ?? null;
   const overallDelta = previous ? latest.score - previous.score : null;
   const topMistakeSubject = mostCommon(
-    pendingMistakes.map((item) => item.subject).filter((item): item is string => Boolean(item)),
+    pendingMistakes
+      .map((item) => item.subject)
+      .filter((item): item is string => Boolean(item)),
   );
 
   return (
@@ -271,11 +292,19 @@ function ProAnalysisPanel({
         <InsightCard label="最近 5 次平均" value={`${recentAverage.toFixed(1)} 分`} />
         <InsightCard
           label="最近一次變化"
-          value={overallDelta === null ? "資料累積中" : `${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(1)} 分`}
+          value={
+            overallDelta === null
+              ? "資料累積中"
+              : `${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(1)} 分`
+          }
         />
         <InsightCard
           label="目前最弱科"
-          value={weakest ? `${shortSubject(weakest.subject)} ${weakest.average.toFixed(1)}` : "資料累積中"}
+          value={
+            weakest
+              ? `${shortSubject(weakest.subject)} ${weakest.average.toFixed(1)}`
+              : "資料累積中"
+          }
         />
       </div>
 
@@ -290,15 +319,24 @@ function ProAnalysisPanel({
         <div className="mt-5 space-y-2">
           <div className="text-sm font-black text-[#315b45]">科目表現</div>
           {subjectStats.map((stat) => (
-            <div key={stat.subject} className="flex items-center gap-3 rounded-xl bg-white/75 px-3 py-3">
+            <div
+              key={stat.subject}
+              className="flex items-center gap-3 rounded-xl bg-white/75 px-3 py-3"
+            >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-black text-[#315b45]">{stat.subject}</div>
-                <div className="mt-1 text-[11px] font-bold text-[#8a9c92]">{stat.attempts} 次作答</div>
+                <div className="mt-1 text-[11px] font-bold text-[#8a9c92]">
+                  {stat.attempts} 次作答
+                </div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-black text-[#237849]">平均 {stat.average.toFixed(1)}</div>
+                <div className="text-sm font-black text-[#237849]">
+                  平均 {stat.average.toFixed(1)}
+                </div>
                 <div className="mt-1 text-[11px] font-bold text-[#8a9c92]">
-                  {stat.delta === null ? "尚無前次比較" : `最近 ${stat.delta >= 0 ? "+" : ""}${stat.delta.toFixed(1)}`}
+                  {stat.delta === null
+                    ? "尚無前次比較"
+                    : `最近 ${stat.delta >= 0 ? "+" : ""}${stat.delta.toFixed(1)}`}
                 </div>
               </div>
             </div>
@@ -309,8 +347,20 @@ function ProAnalysisPanel({
   );
 }
 
-function AttemptCard({ attempt, previous }: { attempt: ExamAttempt; previous: ExamAttempt | null }) {
-  const params = new URLSearchParams({
+function AttemptCard({
+  attempt,
+  previous,
+}: {
+  attempt: ExamAttempt;
+  previous: ExamAttempt | null;
+}) {
+  const quizParams = new URLSearchParams({
+    year: attempt.year,
+    session: attempt.session,
+    subject: attempt.subject,
+  });
+  const mistakeParams = new URLSearchParams({
+    tab: "mistakes",
     year: attempt.year,
     session: attempt.session,
     subject: attempt.subject,
@@ -326,10 +376,14 @@ function AttemptCard({ attempt, previous }: { attempt: ExamAttempt; previous: Ex
             民國 {attempt.year} 年・第 {attempt.session} 次
           </div>
           <h3 className="mt-1 text-base font-black leading-7">{attempt.subject}</h3>
-          <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(attempt.completedAt)}</div>
+          <div className="mt-1 text-xs font-bold text-[#8a9c92]">
+            {formatAttemptDate(attempt.completedAt)}
+          </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-3xl font-black tracking-[-0.04em] text-[#17372a]">{attempt.score.toFixed(2)}</div>
+          <div className="text-3xl font-black tracking-[-0.04em] text-[#17372a]">
+            {attempt.score.toFixed(2)}
+          </div>
           <div className="text-[11px] font-bold text-[#8a9c92]">分</div>
         </div>
       </div>
@@ -342,33 +396,107 @@ function AttemptCard({ attempt, previous }: { attempt: ExamAttempt; previous: Ex
 
       {delta !== null && (
         <div className="mt-3 text-xs font-black text-[#557768]">
-          相較這份考卷前一次：<span className={delta >= 0 ? "text-[#237849]" : "text-[#a15a5a]"}>{delta >= 0 ? "+" : ""}{delta.toFixed(2)} 分</span>
+          相較這份考卷前一次：
+          <span className={delta >= 0 ? "text-[#237849]" : "text-[#a15a5a]"}>
+            {delta >= 0 ? "+" : ""}
+            {delta.toFixed(2)} 分
+          </span>
         </div>
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
-          href={`/study/exam/quiz?${params.toString()}`}
+          href={`/study/exam/quiz?${quizParams.toString()}`}
           className="rounded-xl bg-[#31c978] px-4 py-2.5 text-sm font-black text-white"
         >
           再次作答
         </Link>
         {attempt.reviewCount > 0 && (
-          <button
-            type="button"
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          <Link
+            href={`/study/records?${mistakeParams.toString()}`}
             className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2.5 text-sm font-black text-[#315b45]"
           >
-            {attempt.reviewCount} 題需複習
-          </button>
+            查看這次錯題 · {attempt.reviewCount} 題
+          </Link>
         )}
       </div>
     </article>
   );
 }
 
-function MistakeTab({ mistakes }: { mistakes: MistakeRecord[] }) {
+function MistakeTab({
+  mistakes,
+  setMistakes,
+  filterYear,
+  filterSession,
+  filterSubject,
+}: {
+  mistakes: MistakeRecord[];
+  setMistakes: (items: MistakeRecord[]) => void;
+  filterYear: string;
+  filterSession: string;
+  filterSubject: string;
+}) {
+  const [filter, setFilter] = useState<MistakeFilter>("全部");
+  const [subjectFilter, setSubjectFilter] = useState("全部科目");
+  const hasExamFilter = Boolean(filterYear && filterSession && filterSubject);
+
+  const nationalSubjects = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          mistakes
+            .filter((item) => item.source === "national-exam")
+            .map((item) => item.subject?.trim())
+            .filter((item): item is string => Boolean(item)),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "zh-Hant")),
+    [mistakes],
+  );
+
+  const filtered = useMemo(() => {
+    return mistakes
+      .filter((item) => {
+        if (
+          hasExamFilter &&
+          !(
+            item.source === "national-exam" &&
+            item.year === filterYear &&
+            item.session === filterSession &&
+            item.subject === filterSubject
+          )
+        ) {
+          return false;
+        }
+        if (filter === "國考" && item.source !== "national-exam") return false;
+        if (filter === "教材" && item.source !== "material") return false;
+        if (filter === "已複習" && !item.reviewed) return false;
+        if (
+          !hasExamFilter &&
+          filter === "國考" &&
+          subjectFilter !== "全部科目" &&
+          item.subject !== subjectFilter
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.reviewed !== b.reviewed) return Number(a.reviewed) - Number(b.reviewed);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }, [
+    mistakes,
+    filter,
+    subjectFilter,
+    hasExamFilter,
+    filterYear,
+    filterSession,
+    filterSubject,
+  ]);
+
   const pending = mistakes.filter((item) => !item.reviewed);
+
   return (
     <>
       <section className="mt-5 grid grid-cols-2 gap-3">
@@ -376,42 +504,284 @@ function MistakeTab({ mistakes }: { mistakes: MistakeRecord[] }) {
         <SummaryCard label="待複習" value={`${pending.length} 題`} />
       </section>
 
-      <section className="mt-5 space-y-3">
-        {mistakes.length === 0 ? (
+      {hasExamFilter && (
+        <section className="mt-4 flex items-center justify-between gap-3 rounded-[20px] border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#2ba962]">目前只看這次考卷</div>
+            <div className="mt-1 truncate text-sm font-black text-[#315b45]">
+              民國 {filterYear} 年・第 {filterSession} 次・{filterSubject}
+            </div>
+          </div>
+          <Link
+            href="/study/records?tab=mistakes"
+            className="shrink-0 rounded-xl border border-[#cfe7d8] bg-white px-3 py-2 text-xs font-black text-[#315b45]"
+          >
+            看全部
+          </Link>
+        </section>
+      )}
+
+      {!hasExamFilter && (
+        <>
+          <section className="mt-4 flex flex-wrap gap-2">
+            {(["全部", "國考", "教材", "已複習"] as MistakeFilter[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setFilter(item);
+                  if (item !== "國考") setSubjectFilter("全部科目");
+                }}
+                className={[
+                  "rounded-full border px-4 py-2 text-sm font-black transition",
+                  filter === item
+                    ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
+                    : "border-[#dbe9e1] bg-white text-[#466a58]",
+                ].join(" ")}
+              >
+                {item}
+              </button>
+            ))}
+          </section>
+
+          {filter === "國考" && nationalSubjects.length > 0 && (
+            <label className="mt-3 block">
+              <span className="mb-2 block text-xs font-black text-[#789083]">科目</span>
+              <select
+                value={subjectFilter}
+                onChange={(event) => setSubjectFilter(event.target.value)}
+                className="w-full rounded-2xl border border-[#d7e7de] bg-white px-4 py-3 text-sm font-black text-[#315b45] outline-none focus:border-[#65d795]"
+              >
+                <option value="全部科目">全部科目</option>
+                {nationalSubjects.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </>
+      )}
+
+      <section className="mt-5 space-y-5">
+        {filtered.length === 0 ? (
           <EmptyState
             icon="📘"
-            title="目前沒有錯題"
-            copy="國考或教材測驗中答錯、標記不確定的題目會整理在這裡。"
+            title="目前沒有符合條件的錯題"
+            copy="答錯或標記不確定的題目會整理在這裡。"
             href="/study/exam"
             action="去刷國考題"
           />
         ) : (
-          mistakes.slice(0, 20).map((item) => (
-            <article key={item.id} className="rounded-[20px] border border-[#dce9e1] bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-black text-[#2ba962]">{item.source === "national-exam" ? "國考" : "教材"}</div>
-                  <div className="mt-1 truncate text-xs font-bold text-[#8a9c92]">{item.sourceLabel}</div>
-                </div>
-                <span className={item.reviewed ? "text-xs font-black text-[#8a9c92]" : "rounded-full bg-[#fff1f1] px-2.5 py-1 text-[11px] font-black text-[#9b5050]"}>
-                  {item.reviewed ? "已複習" : "待複習"}
-                </span>
-              </div>
-              <div className="mt-3 line-clamp-2 text-sm font-black leading-6 text-[#315b45]">
-                {item.questionNumber ? `${item.questionNumber}. ` : ""}{item.stem}
-              </div>
-            </article>
+          filtered.map((item) => (
+            <MistakeRecordCard
+              key={item.id}
+              item={item}
+              onItemsChange={setMistakes}
+            />
           ))
         )}
       </section>
+    </>
+  );
+}
 
-      {mistakes.length > 0 && (
-        <Link
-          href="/study/mistakes"
-          className="mt-5 block rounded-xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-center text-sm font-black text-[#237849]"
-        >
-          開啟完整錯題整理與 AI 詳解
-        </Link>
+function MistakeRecordCard({
+  item,
+  onItemsChange,
+}: {
+  item: MistakeRecord;
+  onItemsChange: (items: MistakeRecord[]) => void;
+}) {
+  const game = useGameState();
+  const [showOfficial, setShowOfficial] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const canShowOfficial =
+    item.source === "national-exam" &&
+    Boolean(item.officialPdfUrl) &&
+    Boolean(item.questionNumber);
+
+  const updateReviewed = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErrorMessage("");
+    try {
+      const nextReviewed = !item.reviewed;
+      if (nextReviewed && !item.reviewed) game.recordMistakesReviewed(1);
+      onItemsChange(await setMistakeReviewed(item.id, nextReviewed));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "更新失敗，請再試一次。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErrorMessage("");
+    try {
+      onItemsChange(await removeMistake(item.id));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "移除失敗，請再試一次。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <article
+        className={[
+          "rounded-[24px] border bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]",
+          item.reviewed ? "border-[#e5ebe7] opacity-80" : "border-[#dce9e1]",
+        ].join(" ")}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
+              {item.source === "national-exam" ? "NATIONAL EXAM" : "MATERIAL"}
+            </div>
+            <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+          </div>
+          <div className="flex gap-2">
+            {item.uncertain && (
+              <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#8a6814]">
+                ❓ 不確定
+              </span>
+            )}
+            {!item.reviewed && (
+              <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
+                待複習
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 text-base font-black leading-7 sm:text-lg sm:leading-8">
+          {item.questionNumber ? `${item.questionNumber}. ` : ""}
+          {item.stem}
+        </div>
+
+        <div className="mt-5 space-y-2">
+          {item.options.map((option, index) => {
+            const correct = item.correctIndex === index;
+            const chosen = item.userAnswer === index;
+            return (
+              <div
+                key={`${item.id}-${index}`}
+                className={[
+                  "rounded-xl border px-4 py-3 font-bold",
+                  correct
+                    ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
+                    : chosen
+                      ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
+                      : "border-[#e1e9e4] bg-white text-[#60786c]",
+                ].join(" ")}
+              >
+                {String.fromCharCode(65 + index)}. {option}
+                {correct && " ✓"}
+                {chosen && !correct && " ← 你的答案"}
+              </div>
+            );
+          })}
+        </div>
+
+        {item.userAnswer === null && (
+          <div className="mt-4 rounded-xl bg-[#fff8df] px-4 py-3 text-sm font-bold text-[#80651e]">
+            這題沒有正式作答，但你曾標記「我不確定」。
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mt-4 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={updateReviewed}
+            className={[
+              "rounded-xl px-4 py-2 text-sm font-black transition disabled:opacity-50",
+              item.reviewed
+                ? "border border-[#d7e7de] bg-white text-[#557768]"
+                : "bg-[#31c978] text-white",
+            ].join(" ")}
+          >
+            {item.reviewed ? "取消已複習" : "✓ 標記已複習"}
+          </button>
+
+          {canShowOfficial && (
+            <button
+              type="button"
+              onClick={() => setShowOfficial(true)}
+              className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45]"
+            >
+              📄 官方原題
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={remove}
+            className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050] disabled:opacity-50"
+          >
+            移除
+          </button>
+        </div>
+
+        {item.correctIndex !== null && (
+          <AIExplanationButton
+            payload={{
+              questionKey: item.id,
+              source: item.source,
+              sourceLabel: item.sourceLabel,
+              stem: item.stem,
+              options: item.options,
+              correctIndex: item.correctIndex,
+              userAnswer: item.userAnswer,
+              uncertain: item.uncertain,
+              existingExplanation: item.explanation ?? null,
+            }}
+          />
+        )}
+      </article>
+
+      {showOfficial && canShowOfficial && item.officialPdfUrl && item.questionNumber && (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/35 px-3 py-5 sm:px-5 sm:py-8">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce9e1] bg-white p-5 shadow-2xl sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
+                  OFFICIAL QUESTION
+                </div>
+                <div className="mt-1 text-xl font-black">
+                  官方原題 · 第 {item.questionNumber} 題
+                </div>
+                <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOfficial(false)}
+                className="rounded-xl border border-[#d7e7de] bg-white px-3 py-2 text-sm font-black text-[#60786c]"
+              >
+                關閉
+              </button>
+            </div>
+            <div className="mt-6">
+              <OfficialQuestionCrop
+                pdfUrl={item.officialPdfUrl}
+                questionNumber={item.questionNumber}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
@@ -440,11 +810,20 @@ function buildSubjectStats(attempts: ExamAttempt[]): SubjectStat[] {
     .sort((a, b) => a.average - b.average);
 }
 
-function buildRecommendation(weakest: SubjectStat | null, pendingCount: number, mistakeSubject: string | null) {
-  if (!weakest) return "先累積 2–3 份作答紀錄，MedSlime 才能開始比較你的科目趨勢。";
-  const mistakePart = pendingCount > 0
-    ? `目前還有 ${pendingCount} 題待複習${mistakeSubject ? `，其中可先從「${shortSubject(mistakeSubject)}」開始` : ""}。`
-    : "目前沒有待複習錯題，可以用下一份考卷確認弱點是否改善。";
+function buildRecommendation(
+  weakest: SubjectStat | null,
+  pendingCount: number,
+  mistakeSubject: string | null,
+) {
+  if (!weakest) {
+    return "先累積 2–3 份作答紀錄，MedSlime 才能開始比較你的科目趨勢。";
+  }
+  const mistakePart =
+    pendingCount > 0
+      ? `目前還有 ${pendingCount} 題待複習${
+          mistakeSubject ? `，其中可先從「${shortSubject(mistakeSubject)}」開始` : ""
+        }。`
+      : "目前沒有待複習錯題，可以用下一份考卷確認弱點是否改善。";
   return `目前平均最低的是「${shortSubject(weakest.subject)}」（${weakest.average.toFixed(1)} 分）。${mistakePart}`;
 }
 
@@ -499,7 +878,11 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 }
 
 function MiniFeature({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-[#eadba9] bg-white/80 px-3 py-3">✓ {children}</div>;
+  return (
+    <div className="rounded-xl border border-[#eadba9] bg-white/80 px-3 py-3">
+      ✓ {children}
+    </div>
+  );
 }
 
 function EmptyState({
@@ -520,7 +903,10 @@ function EmptyState({
       <div className="text-4xl">{icon}</div>
       <div className="mt-3 text-xl font-black">{title}</div>
       <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">{copy}</div>
-      <Link href={href} className="mt-5 inline-block rounded-xl bg-[#31c978] px-5 py-3 text-sm font-black text-white">
+      <Link
+        href={href}
+        className="mt-5 inline-block rounded-xl bg-[#31c978] px-5 py-3 text-sm font-black text-white"
+      >
         {action}
       </Link>
     </div>
