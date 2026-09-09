@@ -178,6 +178,57 @@ button {
 }
 
 /*
+ * Pro Analysis header: the account already communicates Pro status on the home
+ * badge, so this card only needs a quiet disclosure affordance. Keep the
+ * existing accessible button/aria state while presenting it as an icon control.
+ */
+div.flex.items-start.gap-2:has(> button[aria-expanded][class*="bg-white/90"]) > span {
+  display: none;
+}
+
+button[aria-expanded][class*="bg-white/90"] {
+  display: inline-grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  padding: 0;
+  border-color: rgba(184, 213, 196, 0.78);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 5px 14px rgba(31, 83, 53, 0.05);
+  color: transparent;
+  font-size: 0;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+button[aria-expanded][class*="bg-white/90"]::after {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid #557768;
+  border-bottom: 2px solid #557768;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+button[aria-expanded="true"][class*="bg-white/90"]::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+button[aria-expanded][class*="bg-white/90"]:hover {
+  border-color: rgba(101, 215, 149, 0.72);
+  background: rgba(243, 251, 246, 0.92);
+  box-shadow: 0 7px 18px rgba(31, 83, 53, 0.08);
+}
+
+button[aria-expanded][class*="bg-white/90"]:active {
+  transform: scale(0.96);
+}
+
+/*
  * Slime source PNGs were exported with different transparent margins.
  * Base images therefore looked much larger than their accessory variants even
  * inside the same image box. Use the visually smaller accessory render as the
