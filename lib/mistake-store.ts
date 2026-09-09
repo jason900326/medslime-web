@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { scheduleNationalExamAttemptCapture } from "@/lib/exam-attempt-store";
 
 export type MistakeSource = "national-exam" | "material";
 
@@ -110,6 +111,10 @@ export async function readMistakes(): Promise<MistakeRecord[]> {
 export async function upsertMistakes(
   records: MistakeRecord[],
 ): Promise<void> {
+  // 國考交卷時這個函式會在 recordQuestionsAnswered() 前被呼叫。
+  // 先排程保存本次作答摘要，讓成績可以回到「歷史作答」中查看。
+  scheduleNationalExamAttemptCapture(records);
+
   if (records.length === 0) return;
 
   const { supabase, userId } = await getCurrentUserId();
