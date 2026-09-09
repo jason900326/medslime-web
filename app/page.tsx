@@ -262,7 +262,7 @@ export default function Home() {
               href="/shop"
               icon="🛒"
               title="商城"
-              value="金幣與 AI 詳解"
+              value="Pro 與完整詳解"
               wide
             />
             <MiniGameCard
