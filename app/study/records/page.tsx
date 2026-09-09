@@ -131,7 +131,7 @@ function RecordsContent() {
                 <div className="min-w-0">
                   <div className="text-xs font-black text-[#2ba962]">目前只看這份考卷</div>
                   <div className="mt-1 truncate text-sm font-black text-[#315b45]">
-                    民國 {filterYear} 年・第 {filterSession} 次・{filterSubject}
+                    {filterYear} 年・第 {filterSession} 次・{filterSubject}
                   </div>
                 </div>
                 <Link
