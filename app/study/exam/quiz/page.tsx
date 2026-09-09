@@ -314,10 +314,10 @@ function ExamQuizContent() {
               {reviewQuestions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => router.push("/study/mistakes")}
+                  onClick={() => router.push("/study/records?tab=mistakes")}
                   className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
                 >
-                  前往錯題庫 · {reviewQuestions.length} 題待複習
+                  前往錯題紀錄
                 </button>
               )}
               <button
@@ -342,7 +342,7 @@ function ExamQuizContent() {
                   <div>
                     <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
                     <div className="mt-1 text-xs font-bold text-[#789083]">
-                      先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題庫。
+                      先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題紀錄。
                     </div>
                   </div>
                 </div>
@@ -426,10 +426,10 @@ function ExamQuizContent() {
                 {hiddenReviewCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => router.push("/study/mistakes")}
+                    onClick={() => router.push("/study/records?tab=mistakes")}
                     className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
                   >
-                    還有 {hiddenReviewCount} 題，前往錯題庫查看全部 →
+                    還有 {hiddenReviewCount} 題，前往錯題紀錄查看全部 →
                   </button>
                 )}
               </section>
