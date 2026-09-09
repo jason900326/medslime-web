@@ -21,3 +21,6 @@ commit;
 -- client policies. They are server-only tables accessed through trusted server
 -- routes/service_role. Supabase may report this as an informational lint; the
 -- deny-by-default behavior is intentional.
+--
+-- After deploying this file, re-run Supabase Security Advisor. The anon/authenticated
+-- SECURITY DEFINER executable warnings for rls_auto_enable should disappear.
