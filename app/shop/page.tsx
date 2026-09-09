@@ -21,12 +21,14 @@ export default function ShopPage() {
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
         <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-6 shadow-[0_16px_42px_rgba(30,78,50,0.06)] sm:p-8">
-          <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">MEDSLIME PRO</div>
+          <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">
+            MEDSLIME PRO
+          </div>
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
-            刷完題，不只是知道答案。
+            需要什麼，就買什麼。
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-[#70877a] sm:text-base">
-            MedSlime 的付費內容為線上學習會員服務與指定考卷的完整數位詳解。本站不販售金幣、抽卡券、AI 次數、點數或任何可儲值餘額。
+            想提升整段備考效率，選 MedSlime Pro；只想把某一份國考徹底檢討完，單獨解鎖該份完整詳解即可。
           </p>
         </section>
 
@@ -47,34 +49,49 @@ export default function ShopPage() {
         </section>
 
         <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">FREE AI DETAIL</div>
-              <h2 className="mt-1 text-xl font-black">免費 AI 即時詳解仍然保留</h2>
-            </div>
-            <InfoDialogButton title="每日 AI 詳解怎麼算？">
-              <p>免費帳號每天可使用 5 次新的 AI 即時詳解。</p>
-              <p>每日重新計算，未使用次數不累積，也不提供額外次數購買。</p>
-              <p>如果該題已有共用詳解快取，會直接讀取既有內容，不需要重新生成。</p>
-            </InfoDialogButton>
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
+            AI 使用方式
           </div>
-          <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-            每日次數只是學習服務的使用上限，不是帳戶餘額。MedSlime 不提供 AI Credits、加值次數或預付額度。
-          </p>
+          <h2 className="mt-1 text-xl font-black">完整詳解和 AI 追問是兩件事</h2>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[#dce9e1] bg-[#f8fcf9] p-4">
+              <div className="text-sm font-black text-[#315b45]">Free · 每日 5 次完整詳解</div>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
+                刷題遇到不懂的題目，可以查看完整解析。每日重新計算，未使用次數不累積，也不能另外購買次數。
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] p-4">
+              <div className="text-sm font-black text-[#237849]">Pro · 每日 10 次 AI 追問</div>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#668276]">
+                看完解析仍然卡住時，再針對觀念繼續問 AI。這是個人化追問，不是把完整詳解再生成一次。
+              </p>
+            </div>
+          </div>
         </section>
 
-        <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
-          <div className="font-black">🪙 金幣是學習獎勵，不是付費商品</div>
-          <p className="mt-2 text-sm font-bold leading-7 text-[#789083]">
-            MedSlime 金幣只能透過站內學習、任務、專注與成就取得，可用於史萊姆抽卡；無法以現金購買，也無法兌現、交易或轉讓。
-          </p>
-        </section>
-
-        <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
-          <div className="font-black">付款與服務開通</div>
-          <p className="mt-2 text-sm font-bold leading-7 text-[#789083]">
-            金流開放後，付款只會對應 MedSlime Pro 會員服務或你指定購買的單份國考完整詳解；付款不會轉換成站內點數、錢包餘額或任何可再次消耗的儲值資產。
-          </p>
+        <section className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e2ebe5] bg-white px-5 py-4 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
+          <div>
+            <div className="text-sm font-black text-[#315b45]">付款與虛擬獎勵說明</div>
+            <div className="mt-1 text-xs font-bold text-[#8a9c92]">
+              想了解 AI 次數、金幣與付款之間的關係，可查看完整說明。
+            </div>
+          </div>
+          <InfoDialogButton title="付款與虛擬獎勵說明" label="查看">
+            <p>
+              MedSlime 的付費商品為 30 天 Pro 學習服務，以及指定一份國考考卷的完整數位詳解。
+            </p>
+            <p>
+              免費 AI 詳解的每日使用上限不屬於帳戶餘額，不可購買、加值、累積或轉讓。
+            </p>
+            <p>
+              站內金幣只能透過學習、任務、專注與成就取得，不提供現金購買，也不能兌現、交易或轉讓。
+            </p>
+            <p>
+              付款不會轉換成站內點數、錢包餘額、抽卡資源或其他可再次消耗的儲值資產。
+            </p>
+          </InfoDialogButton>
         </section>
       </div>
     </main>
@@ -88,7 +105,7 @@ function ProductCard({
   product: ShopProduct;
   isLoggedIn: boolean;
 }) {
-  const isPro = product.kind === "pro_monthly";
+  const isPro = product.kind === "pro_30d";
 
   return (
     <article
@@ -107,7 +124,7 @@ function ProductCard({
 
       <div className="pr-24">
         <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-          {isPro ? "MEMBERSHIP" : "ONE-TIME PURCHASE"}
+          {isPro ? "30-DAY ACCESS" : "ONE-TIME PURCHASE"}
         </div>
         <h2 className="mt-2 text-2xl font-black tracking-[-0.03em]">{product.title}</h2>
       </div>
@@ -132,10 +149,10 @@ function ProductCard({
       <div className="mt-auto pt-6">
         {product.kind === "exam_explanation" ? (
           <Link
-            href="/study/exam"
+            href="/study/exam?mode=explanation"
             className="block w-full rounded-xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-3 text-center text-sm font-black text-[#237849] transition hover:-translate-y-0.5 hover:border-[#9ed8b5] hover:bg-[#e3f7eb]"
           >
-            到國考題庫選擇考卷
+            選擇考卷 · NT$59／份
           </Link>
         ) : !checkoutEnabled ? (
           <button
@@ -152,7 +169,7 @@ function ProductCard({
               type="submit"
               className="w-full rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#2dbc70]"
             >
-              加入 MedSlime Pro
+              開通 30 天 Pro
             </button>
           </form>
         ) : (
@@ -160,7 +177,7 @@ function ProductCard({
             href={`/auth/login?redirect=${encodeURIComponent("/shop")}`}
             className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
           >
-            登入後加入 Pro
+            登入後開通 Pro
           </Link>
         )}
       </div>
