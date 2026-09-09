@@ -30,6 +30,7 @@ export default function FocusPage() {
     playerSlime?.accessoryUnlocked && playerSlime?.accessoryEquipped
       ? companion.accessoryImage
       : companion.image;
+  const companionName = getPlayerDisplayName(companion.id, playerSlime);
 
   const totalSeconds = plannedMinutes * 60;
   const elapsedSeconds = Math.max(0, totalSeconds - secondsLeft);
@@ -155,7 +156,7 @@ export default function FocusPage() {
             <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">FOCUS</div>
             <h1 className="ms-page-title mt-2">專心讀書</h1>
             <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-              選一段時間，讓陪伴史萊姆跟你一起走完這輪。
+              選一段時間，和陪伴史萊姆一起完成這輪專注。
             </p>
           </div>
           <InfoDialogButton title="專注獎勵說明">
@@ -167,179 +168,169 @@ export default function FocusPage() {
 
         <section className="mt-5 grid grid-cols-2 gap-3">
           <SummaryCard label="今日專注" value={`${game.todayFocusMinutes} 分鐘`} />
-          <SummaryCard label="今日專注獎勵" value={`${game.todayFocusCoins} / ${game.focusCoinCap} 金幣`} />
+          <SummaryCard label="今日獎勵" value={`${game.todayFocusCoins} / ${game.focusCoinCap} 金幣`} />
         </section>
 
-        <section className="mt-5 overflow-hidden rounded-[30px] border border-[#d8e9df] bg-white shadow-[0_14px_34px_rgba(40,106,69,0.055)]">
-          <div className="px-5 pb-6 pt-5 sm:px-7 sm:pb-7 sm:pt-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">{statusText}</div>
-                <div className="mt-1 text-xs font-bold text-[#8a9c92]">本輪 {plannedMinutes} 分鐘</div>
+        <section className="mt-5 rounded-[30px] border border-[#d8e9df] bg-white p-5 shadow-[0_14px_34px_rgba(40,106,69,0.055)] sm:p-7">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">{statusText}</div>
+              <div className="mt-1 text-xs font-bold text-[#8a9c92]">本輪 {plannedMinutes} 分鐘</div>
+            </div>
+            <div className="text-xs font-black text-[#789083]">{Math.round(progress)}%</div>
+          </div>
+
+          <div className="mt-5 text-center text-6xl font-black tracking-[-0.065em] sm:text-7xl md:text-8xl">
+            {displayTime}
+          </div>
+
+          {mode === "idle" && (
+            <div className="mt-6">
+              <div className="flex flex-wrap justify-center gap-2">
+                {presets.map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => applyMinutes(minutes)}
+                    className={[
+                      "rounded-full border px-4 py-2 text-sm font-black transition",
+                      plannedMinutes === minutes
+                        ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
+                        : "border-[#dbe9e1] bg-white text-[#557768]",
+                    ].join(" ")}
+                  >
+                    {minutes} 分
+                  </button>
+                ))}
               </div>
-              <div className="text-xs font-black text-[#789083]">
-                {Math.round(progress)}%
+
+              <div className="mx-auto mt-3 flex max-w-sm gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={240}
+                  value={customMinutes}
+                  onChange={(event) => setCustomMinutes(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      applyCustom();
+                    }
+                  }}
+                  placeholder="自訂分鐘"
+                  className="min-w-0 flex-1 rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
+                />
+                <button
+                  type="button"
+                  onClick={applyCustom}
+                  className="rounded-xl border border-[#d7e7de] bg-[#f7faf8] px-4 text-base font-black text-[#315b45]"
+                >
+                  套用
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="mt-5 text-center text-6xl font-black tracking-[-0.065em] sm:text-7xl md:text-8xl">
-              {displayTime}
-            </div>
-
-            {mode === "idle" && (
-              <div className="mt-6">
-                <div className="flex flex-wrap justify-center gap-2">
-                  {presets.map((minutes) => (
-                    <button
-                      key={minutes}
-                      type="button"
-                      onClick={() => applyMinutes(minutes)}
-                      className={[
-                        "rounded-full border px-4 py-2 text-sm font-black transition",
-                        plannedMinutes === minutes
-                          ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                          : "border-[#dbe9e1] bg-white text-[#557768]",
-                      ].join(" ")}
-                    >
-                      {minutes} 分
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mx-auto mt-3 flex max-w-xs gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={240}
-                    value={customMinutes}
-                    onChange={(event) => setCustomMinutes(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        applyCustom();
-                      }
-                    }}
-                    placeholder="自訂分鐘"
-                    className="min-w-0 flex-1 rounded-xl border border-[#d7e7de] bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-[#65d795]"
+          <div className="mt-6 rounded-[22px] border border-[#deebe3] bg-[#f6fbf8] px-4 py-4 sm:px-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-end justify-center overflow-hidden sm:h-24 sm:w-24">
+                <img
+                  src={companionImage}
+                  alt={companionName}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-black tracking-[0.08em] text-[#2ba962]">陪伴史萊姆</div>
+                <div className="mt-1 truncate text-base font-black text-[#315b45]">{companionName}</div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#dce9e1]">
+                  <div
+                    className="h-full rounded-full bg-[#55b97b] transition-[width] duration-500"
+                    style={{ width: `${progress}%` }}
                   />
-                  <button
-                    type="button"
-                    onClick={applyCustom}
-                    className="rounded-xl border border-[#d7e7de] bg-[#f7faf8] px-4 text-sm font-black text-[#315b45]"
-                  >
-                    套用
-                  </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-5 text-center text-sm font-bold text-[#789083]">
+            {game.todayFocusCoins >= game.focusCoinCap
+              ? "今日專注金幣已達上限"
+              : plannedMinutes < 10
+                ? "至少設定 10 分鐘才有金幣獎勵"
+                : `完成本輪可獲得 🪙 ${plannedReward}`}
+          </div>
+
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            {mode === "idle" && (
+              <button
+                type="button"
+                onClick={startTimer}
+                className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
+              >
+                開始專注
+              </button>
             )}
-          </div>
 
-          <div className="relative h-[210px] overflow-hidden border-y border-[#d8e9df] bg-[#dcefdc] sm:h-[250px]">
-            <img
-              src="/backgrounds/slime-forest.png"
-              alt="史萊姆森林"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/10" />
-
-            <div
-              className="absolute bottom-[18%] z-10 -translate-x-1/2 transition-[left] duration-500 ease-out"
-              style={{ left: `clamp(9%, ${9 + progress * 0.82}%, 91%)` }}
-            >
-              <img
-                src={companionImage}
-                alt={getPlayerDisplayName(companion.id, playerSlime)}
-                className="h-24 w-24 max-w-none object-contain drop-shadow-[0_5px_6px_rgba(0,0,0,0.2)] sm:h-28 sm:w-28"
-              />
-            </div>
-
-            <div className="absolute inset-x-5 bottom-4 z-20 h-2 overflow-hidden rounded-full bg-white/65 shadow-sm sm:inset-x-7">
-              <div
-                className="h-full rounded-full bg-[#55b97b] transition-[width] duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="px-5 py-5 sm:px-7">
-            <div className="text-center text-sm font-bold text-[#789083]">
-              {game.todayFocusCoins >= game.focusCoinCap
-                ? "今日專注金幣已達上限"
-                : plannedMinutes < 10
-                  ? "至少設定 10 分鐘才有金幣獎勵"
-                  : `完成本輪可獲得 🪙 ${plannedReward}`}
-            </div>
-
-            <div className="mt-4 flex flex-wrap justify-center gap-3">
-              {mode === "idle" && (
+            {mode === "running" && (
+              <>
                 <button
                   type="button"
-                  onClick={startTimer}
-                  className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
+                  onClick={() => setMode("paused")}
+                  className="min-w-[150px] rounded-2xl bg-[#17372a] px-5 py-3 font-black text-white"
                 >
-                  開始專注
+                  暫停
                 </button>
-              )}
-
-              {mode === "running" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setMode("paused")}
-                    className="min-w-[150px] rounded-2xl bg-[#17372a] px-5 py-3 font-black text-white"
-                  >
-                    暫停
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowStopConfirm(true)}
-                    className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
-                  >
-                    提前結束
-                  </button>
-                </>
-              )}
-
-              {mode === "paused" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setMode("running")}
-                    className="min-w-[150px] rounded-2xl bg-[#31c978] px-5 py-3 font-black text-white"
-                  >
-                    繼續
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowStopConfirm(true)}
-                    className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
-                  >
-                    提前結束
-                  </button>
-                </>
-              )}
-
-              {mode === "finished" && (
                 <button
                   type="button"
-                  onClick={resetTimer}
-                  className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
+                  onClick={() => setShowStopConfirm(true)}
+                  className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
                 >
-                  再來一輪
+                  提前結束
                 </button>
-              )}
-            </div>
+              </>
+            )}
+
+            {mode === "paused" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMode("running")}
+                  className="min-w-[150px] rounded-2xl bg-[#31c978] px-5 py-3 font-black text-white"
+                >
+                  繼續
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowStopConfirm(true)}
+                  className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
+                >
+                  提前結束
+                </button>
+              </>
+            )}
 
             {mode === "finished" && (
-              <div className="mt-4 rounded-2xl bg-[#eefaf2] px-4 py-3 text-center text-sm font-bold text-[#557768]">
-                {earnedCoins > 0
-                  ? `完成！這輪獲得 🪙 ${earnedCoins}`
-                  : game.todayFocusCoins >= game.focusCoinCap
-                    ? "完成！今天的專注金幣已經領滿。"
-                    : "完成！本輪未達 10 分鐘，因此沒有金幣獎勵。"}
-              </div>
+              <button
+                type="button"
+                onClick={resetTimer}
+                className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
+              >
+                再來一輪
+              </button>
             )}
           </div>
+
+          {mode === "finished" && (
+            <div className="mt-4 rounded-2xl bg-[#eefaf2] px-4 py-3 text-center text-sm font-bold text-[#557768]">
+              {earnedCoins > 0
+                ? `完成！這輪獲得 🪙 ${earnedCoins}`
+                : game.todayFocusCoins >= game.focusCoinCap
+                  ? "完成！今天的專注金幣已經領滿。"
+                  : "完成！本輪未達 10 分鐘，因此沒有金幣獎勵。"}
+            </div>
+          )}
         </section>
 
         <section className="mt-5 rounded-[24px] border border-[#d8e9df] bg-white p-5 sm:p-6">
