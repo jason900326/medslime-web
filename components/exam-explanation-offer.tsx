@@ -127,7 +127,7 @@ export default function ExamExplanationOffer({
       </p>
 
       <div className="mt-3 rounded-2xl border border-[#dce9e1] bg-white/80 px-4 py-3 text-xs font-bold leading-5 text-[#668276]">
-        民國 {year} 年 · 第 {session} 次 · {subject}
+        {year} 年 · 第 {session} 次 · {subject}
       </div>
     </section>
   );
