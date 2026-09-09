@@ -9,7 +9,6 @@ import { useGameState } from "@/components/game-state-provider";
 import { RARITY_ORDER, SLIMES, type SlimeDefinition } from "@/lib/slime-data";
 
 const LOCKED_SSR_PLACEHOLDER = "/slimes/n-green.png";
-const ACCESSORY_COST = 30;
 
 export default function SlimesPage() {
   const auth = useAuthUser();
@@ -27,11 +26,9 @@ export default function SlimesPage() {
     [game.slimes],
   );
 
-  const accessoryCount = useMemo(
-    () =>
-      SLIMES.filter((slime) => game.slimes[slime.id]?.accessoryUnlocked)
-        .length,
-    [game.slimes],
+  const companionName = useMemo(
+    () => SLIMES.find((slime) => slime.id === game.companionId)?.defaultName ?? "綠色史萊姆",
+    [game.companionId],
   );
 
   const sortedSlimes = useMemo(() => {
@@ -68,7 +65,7 @@ export default function SlimesPage() {
     return (
       <LoginRequired
         title="登入後查看你的史萊姆"
-        description="史萊姆收藏、陪伴角色、碎片與專屬飾品都屬於你的個人帳號資料。"
+        description="史萊姆收藏與陪伴角色都會同步到你的個人帳號。"
       />
     );
   }
@@ -87,7 +84,7 @@ export default function SlimesPage() {
               史萊姆圖鑑
             </h1>
             <p className="mt-3 text-sm font-bold text-[#70877a]">
-              收集角色、累積碎片並解鎖每隻史萊姆的專屬飾品。
+              收集更多史萊姆，挑一隻陪你一起讀書。
             </p>
           </div>
 
@@ -101,10 +98,7 @@ export default function SlimesPage() {
 
         <section className="mt-6 grid grid-cols-2 gap-3">
           <SummaryCard label="已收藏" value={`${ownedCount} / ${SLIMES.length}`} />
-          <SummaryCard
-            label="專屬飾品"
-            value={`${accessoryCount} / ${SLIMES.length}`}
-          />
+          <SummaryCard label="目前陪伴" value={companionName} />
         </section>
 
         <section className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -174,26 +168,12 @@ function SlimeCard({
   const player = game.slimes[slime.id];
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState("");
-  const [accessoryAnimating, setAccessoryAnimating] = useState(false);
 
   const owned = player?.owned ?? false;
   const companion = game.companionId === slime.id;
-  const fragments = player?.fragments ?? 0;
-  const accessoryUnlocked = player?.accessoryUnlocked ?? false;
-  const accessoryEquipped = player?.accessoryEquipped ?? false;
-  const canUnlockAccessory =
-    owned && !accessoryUnlocked && fragments >= ACCESSORY_COST;
   const hiddenSSR = slime.rarity === "SSR" && !owned;
   const currentName = player?.nickname?.trim() || slime.defaultName;
-
-  const cardImage = hiddenSSR
-    ? LOCKED_SSR_PLACEHOLDER
-    : owned && accessoryUnlocked && accessoryEquipped
-      ? slime.accessoryImage
-      : slime.image;
-
-  // 以較小的未穿戴版本為基準；飾品版縮小配合。
-  const visualScale = accessoryEquipped ? 0.9 : 1;
+  const cardImage = hiddenSSR ? LOCKED_SSR_PLACEHOLDER : slime.image;
 
   const beginNicknameEdit = () => {
     setNicknameDraft("");
@@ -212,13 +192,6 @@ function SlimeCard({
     setEditingNickname(false);
   };
 
-  const toggleAccessory = () => {
-    if (accessoryAnimating) return;
-    setAccessoryAnimating(true);
-    game.setAccessoryEquipped(slime.id, !accessoryEquipped);
-    window.setTimeout(() => setAccessoryAnimating(false), 650);
-  };
-
   const chooseCompanion = () => {
     game.setCompanion(slime.id);
     window.setTimeout(() => {
@@ -233,8 +206,8 @@ function SlimeCard({
       id={`slime-card-${slime.id}`}
       className={[
         "scroll-mt-4 overflow-hidden rounded-[24px] border bg-white p-4 shadow-[0_8px_22px_rgba(32,85,54,0.05)] transition-all duration-300 sm:p-5",
-        canUnlockAccessory
-          ? "border-[#efc66c] ring-2 ring-[#f8e8bc]/70"
+        companion
+          ? "border-[#9eddb9] ring-2 ring-[#dff4e8]/70"
           : "border-[#dbe9e1]",
         expanded ? "shadow-[0_16px_36px_rgba(32,85,54,0.11)]" : "",
       ].join(" ")}
@@ -252,16 +225,8 @@ function SlimeCard({
                 : owned
                   ? "opacity-100"
                   : "grayscale opacity-35",
-              accessoryAnimating
-                ? "drop-shadow-[0_0_18px_rgba(49,201,120,0.35)]"
-                : "",
             ].join(" ")}
-            style={{ transform: `scale(${visualScale})` }}
           />
-
-          {accessoryAnimating && (
-            <div className="pointer-events-none absolute inset-1 animate-ping rounded-full border-2 border-[#65d795]/60" />
-          )}
 
           {!owned && (
             <div className="absolute right-0 top-0 rounded-full bg-white p-2 shadow-sm">
@@ -334,12 +299,6 @@ function SlimeCard({
             </span>
           )}
 
-          {canUnlockAccessory && (
-            <div className="mt-3 rounded-xl border border-[#f1d28a] bg-[#fff8df] px-3 py-2 text-xs font-black text-[#8a6814]">
-              ✨ 碎片已滿，可以解鎖專屬飾品
-            </div>
-          )}
-
           <button
             type="button"
             onClick={onToggle}
@@ -366,81 +325,20 @@ function SlimeCard({
                   {slime.description}
                 </p>
 
-                {!accessoryUnlocked && (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-sm font-bold text-[#557768]">
-                      <span>專屬碎片</span>
-                      <span>
-                        {fragments} / {ACCESSORY_COST}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e7efe9]">
-                      <div
-                        className="h-full rounded-full bg-[#55b97b]"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            (fragments / ACCESSORY_COST) * 100,
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <AccessoryPreview slime={slime} hiddenSSR={false} />
-
-                {accessoryUnlocked ? (
-                  <button
-                    type="button"
-                    disabled={accessoryAnimating}
-                    onClick={toggleAccessory}
-                    className={[
-                      "mt-3 w-full rounded-xl py-3 font-black transition",
-                      accessoryAnimating
-                        ? "cursor-wait bg-[#dff4e8] text-[#237849]"
-                        : accessoryEquipped
-                          ? "border border-[#d7e7de] bg-white text-[#466a58] hover:bg-[#f5faf7]"
-                          : "bg-[#31c978] text-white hover:bg-[#2dbc70]",
-                    ].join(" ")}
-                  >
-                    {accessoryAnimating
-                      ? "✨ 切換造型中..."
-                      : accessoryEquipped
-                        ? "取下專屬飾品"
-                        : "戴上專屬飾品"}
-                  </button>
-                ) : canUnlockAccessory ? (
-                  <button
-                    type="button"
-                    onClick={() => game.unlockAccessory(slime.id)}
-                    className="mt-3 w-full rounded-xl bg-[#f3a93b] py-3 font-black text-white transition hover:bg-[#e99c2f]"
-                  >
-                    ✨ 使用 30 碎片解鎖
-                  </button>
-                ) : (
-                  <div className="mt-3 text-center text-xs font-bold text-[#789083]">
-                    還差 {ACCESSORY_COST - fragments} 碎片解鎖
-                  </div>
-                )}
-
                 {!companion && (
                   <button
                     type="button"
                     onClick={chooseCompanion}
-                    className="mt-3 w-full rounded-xl bg-[#31c978] py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                    className="mt-4 w-full rounded-xl bg-[#31c978] py-3 font-black text-white transition hover:bg-[#2dbc70]"
                   >
                     設為陪伴
                   </button>
                 )}
               </>
             ) : (
-              <>
-                <p className="text-sm font-bold leading-6 text-[#6f887b]">
-                  抽到這隻史萊姆後，就會立即加入你的圖鑑。
-                </p>
-                <AccessoryPreview slime={slime} hiddenSSR={hiddenSSR} />
-              </>
+              <p className="text-sm font-bold leading-6 text-[#6f887b]">
+                抽到這隻史萊姆後，就會立即加入你的圖鑑。
+              </p>
             )}
           </div>
         </div>
@@ -449,30 +347,11 @@ function SlimeCard({
   );
 }
 
-function AccessoryPreview({
-  slime,
-  hiddenSSR,
-}: {
-  slime: SlimeDefinition;
-  hiddenSSR: boolean;
-}) {
-  return (
-    <div className="mt-4 rounded-xl border border-[#e0e9e3] bg-[#f7faf8] px-3 py-3">
-      <div className="text-xs font-black tracking-[0.05em] text-[#789083]">
-        專屬飾品
-      </div>
-      <div className="mt-1 text-sm font-black text-[#315b45]">
-        ✨ {hiddenSSR ? "???" : slime.accessory}
-      </div>
-    </div>
-  );
-}
-
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
       <div className="text-xs font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-lg font-black">{value}</div>
+      <div className="mt-1 truncate text-lg font-black">{value}</div>
     </div>
   );
 }
