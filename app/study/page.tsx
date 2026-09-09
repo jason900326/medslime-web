@@ -20,8 +20,8 @@ const primaryItems = [
     icon: "📝",
     eyebrow: "複習",
     title: "錯題複習",
-    copy: "直接回到尚未熟悉的題目，不必再從作答紀錄裡找。",
-    href: "/study/records?tab=mistakes",
+    copy: "集中整理答錯與不確定題目，直接開始複習。",
+    href: "/study/mistakes",
   },
   {
     icon: "📊",
