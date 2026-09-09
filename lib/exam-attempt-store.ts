@@ -126,7 +126,7 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   if (!user) return [];
 
   const safeLimit = Math.max(1, Math.min(300, limit));
-  let result = await supabase
+  const result = await supabase
     .from("exam_attempts")
     .select(ATTEMPT_SELECT)
     .eq("user_id", user.id)
@@ -134,12 +134,20 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
     .limit(safeLimit);
 
   if (result.error && missingReviewItemsColumn(result.error.message)) {
-    result = await supabase
+    const legacyResult = await supabase
       .from("exam_attempts")
       .select(ATTEMPT_SELECT_BASE)
       .eq("user_id", user.id)
       .order("completed_at", { ascending: false })
       .limit(safeLimit);
+
+    if (legacyResult.error) {
+      if (legacyResult.error.message.includes("exam_attempts")) return [];
+      console.error("讀取國考作答紀錄失敗：", legacyResult.error);
+      throw new Error("作答紀錄讀取失敗，請稍後再試。");
+    }
+
+    return ((legacyResult.data ?? []) as AttemptRow[]).map(mapRow);
   }
 
   if (result.error) {
@@ -159,7 +167,7 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
 
   if (!user || !id) return null;
 
-  let result = await supabase
+  const result = await supabase
     .from("exam_attempts")
     .select(ATTEMPT_SELECT)
     .eq("user_id", user.id)
@@ -167,12 +175,20 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
     .maybeSingle();
 
   if (result.error && missingReviewItemsColumn(result.error.message)) {
-    result = await supabase
+    const legacyResult = await supabase
       .from("exam_attempts")
       .select(ATTEMPT_SELECT_BASE)
       .eq("user_id", user.id)
       .eq("id", id)
       .maybeSingle();
+
+    if (legacyResult.error) {
+      if (legacyResult.error.message.includes("exam_attempts")) return null;
+      console.error("讀取單次作答紀錄失敗：", legacyResult.error);
+      throw new Error("作答紀錄讀取失敗，請稍後再試。");
+    }
+
+    return legacyResult.data ? mapRow(legacyResult.data as AttemptRow) : null;
   }
 
   if (result.error) {
