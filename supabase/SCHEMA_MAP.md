@@ -12,7 +12,7 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `player_mistakes` | User mistake library | Current mistake read/write store |
 | `player_entitlements` | Service entitlements | Daily free detailed-explanation usage + fixed Pro expiry (`pro_expires_at`) |
 | `exam_explanation_entitlements` | Permanent paid content access | One row per user + purchased national-exam explanation set |
-| `exam_attempts` | National-exam attempt history | Score history, duration, review counts, subject trends and Pro analysis |
+| `exam_attempts` | Exam/free-quiz attempt history | Score history, review snapshots, all-question outcomes, subject trends and Pro analysis |
 | `payment_orders` | Payment ledger | ECPay ledger; new orders store direct `entitlement_type` / `entitlement_key`, never wallet or credit grants |
 | `national_exam_questions` | National-exam question bank + shared topic taxonomy | Current national-exam/free-quiz APIs; Phase C adds canonical `topic`, `subtopic`, `concepts` metadata |
 | `shared_ai_explanations` | Shared national-exam explanation cache | Internal cost optimization for reusable national-exam explanations |
@@ -170,7 +170,27 @@ completed quiz
       └─> player_mistakes -> wrong/uncertain questions
 ```
 
-The Study area intentionally exposes these as separate learner flows now: `/study/records` is作答歷史與 Pro 分析；`/study/mistakes` is the standalone錯題複習 experience.
+Phase C adds `exam_attempts.question_outcomes` through `supabase/exam_attempt_question_outcomes.sql`.
+
+`review_items` and `question_outcomes` have deliberately different jobs:
+
+```text
+review_items
+    -> only wrong / uncertain questions
+    -> drives learner review UI
+
+question_outcomes
+    -> every question in that completed attempt
+    -> canonical national_exam_questions id + question key
+    -> answered / correct / uncertain outcome
+    -> drives topic-level Pro analytics
+```
+
+A correct answer must therefore remain available to analytics even though it never enters the mistake library. Unanswered questions are retained with `answered=false` and `correct=null`, so future topic accuracy can distinguish skipped items from attempted wrong answers.
+
+Old attempts created before this migration legitimately have an empty `question_outcomes` array. Do not fabricate topic history for those rows. New national-exam and free-quiz attempts populate the snapshot at submission time.
+
+The Study area intentionally exposes learner flows separately: `/study/records` is 作答歷史與 Pro 分析；`/study/mistakes` is the standalone 錯題複習 experience.
 
 ## Payment rule
 
