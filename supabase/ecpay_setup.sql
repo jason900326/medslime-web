@@ -1,4 +1,5 @@
 -- Run once in Supabase SQL Editor before enabling ECPay checkout.
+-- MedSlime coins are intentionally NOT purchasable with real money.
 
 create table if not exists public.payment_orders (
   id uuid primary key default gen_random_uuid(),
@@ -6,7 +7,7 @@ create table if not exists public.payment_orders (
   merchant_trade_no text not null unique,
   product_id text not null,
   total_amount integer not null check (total_amount > 0),
-  grant_type text not null check (grant_type in ('coins', 'ai_detail')),
+  grant_type text not null check (grant_type = 'ai_detail'),
   grant_amount integer not null check (grant_amount > 0),
   status text not null default 'pending' check (status in ('pending', 'paid', 'cancelled', 'refunded')),
   provider text not null default 'ecpay',
@@ -38,7 +39,6 @@ set search_path = public
 as $$
 declare
   v_order public.payment_orders%rowtype;
-  v_updated integer;
 begin
   select * into v_order
   from public.payment_orders
@@ -57,30 +57,15 @@ begin
     raise exception 'payment order is not pending';
   end if;
 
-  if v_order.grant_type = 'coins' then
-    update public.player_account_state
-    set state = jsonb_set(
-      state,
-      '{coins}',
-      to_jsonb(coalesce((state->>'coins')::integer, 0) + v_order.grant_amount),
-      true
-    ),
-    updated_at = now()
-    where user_id = v_order.user_id;
-
-    get diagnostics v_updated = row_count;
-    if v_updated <> 1 then
-      raise exception 'player account state not found';
-    end if;
-  elsif v_order.grant_type = 'ai_detail' then
-    insert into public.player_entitlements (user_id, ai_detail_credits, updated_at)
-    values (v_order.user_id, v_order.grant_amount, now())
-    on conflict (user_id) do update
-      set ai_detail_credits = public.player_entitlements.ai_detail_credits + excluded.ai_detail_credits,
-          updated_at = now();
-  else
+  if v_order.grant_type <> 'ai_detail' then
     raise exception 'unsupported grant type';
   end if;
+
+  insert into public.player_entitlements (user_id, ai_detail_credits, updated_at)
+  values (v_order.user_id, v_order.grant_amount, now())
+  on conflict (user_id) do update
+    set ai_detail_credits = public.player_entitlements.ai_detail_credits + excluded.ai_detail_credits,
+        updated_at = now();
 
   update public.payment_orders
   set status = 'paid',
