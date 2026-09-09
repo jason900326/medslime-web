@@ -27,12 +27,14 @@ const focusMinutes = (game: Game) =>
 const ownedCount = (game: Game) =>
   SLIMES.filter((slime) => game.slimes[slime.id]?.owned).length;
 
-const accessoryCount = (game: Game) =>
-  SLIMES.filter((slime) => game.slimes[slime.id]?.accessoryUnlocked).length;
-
 const ownedByRarity = (game: Game, rarity: "N" | "R" | "SR" | "SSR") =>
   SLIMES.filter(
     (slime) => slime.rarity === rarity && game.slimes[slime.id]?.owned,
+  ).length;
+
+const rarityKindsOwned = (game: Game) =>
+  (["N", "R", "SR", "SSR"] as const).filter(
+    (rarity) => ownedByRarity(game, rarity) > 0,
   ).length;
 
 const achievementDefinitions: AchievementDefinition[] = [
@@ -50,11 +52,11 @@ const achievementDefinitions: AchievementDefinition[] = [
 
   // 收藏 6
   { id: "collection-5", category: "收藏", name: "開始有點擠了", description: "收集 5 隻不同史萊姆", target: 5, unit: "隻", reward: { type: "coins", amount: 150 }, getProgress: ownedCount },
+  { id: "collection-10", category: "收藏", name: "史萊姆宿舍", description: "收集 10 隻不同史萊姆", target: 10, unit: "隻", reward: { type: "coins", amount: 300 }, getProgress: ownedCount },
   { id: "collection-all-n", category: "收藏", name: "普通但完整", description: "收集全部 N 史萊姆", target: SLIMES.filter((s) => s.rarity === "N").length, unit: "隻", reward: { type: "tickets", amount: 2 }, getProgress: (game) => ownedByRarity(game, "N") },
   { id: "collection-all-r", category: "收藏", name: "稀有居民區", description: "收集全部 R 史萊姆", target: SLIMES.filter((s) => s.rarity === "R").length, unit: "隻", reward: { type: "tickets", amount: 3 }, getProgress: (game) => ownedByRarity(game, "R") },
   { id: "collection-all-sr", category: "收藏", name: "金光閃閃", description: "收集全部 SR 史萊姆", target: SLIMES.filter((s) => s.rarity === "SR").length, unit: "隻", reward: { type: "tickets", amount: 5 }, getProgress: (game) => ownedByRarity(game, "SR") },
-  { id: "accessory-first", category: "收藏", name: "今天有打扮", description: "解鎖第一件史萊姆專屬飾品", target: 1, unit: "件", reward: { type: "coins", amount: 150 }, getProgress: accessoryCount },
-  { id: "collection-complete", category: "收藏", name: "圖鑑完成", description: "收集全部史萊姆並解鎖全部專屬飾品", target: SLIMES.length, unit: "隻", reward: { type: "tickets", amount: 10 }, getProgress: (game) => SLIMES.filter((slime) => game.slimes[slime.id]?.owned && game.slimes[slime.id]?.accessoryUnlocked).length },
+  { id: "collection-complete", category: "收藏", name: "圖鑑完成", description: "收集目前圖鑑中的全部史萊姆", target: SLIMES.length, unit: "隻", reward: { type: "tickets", amount: 10 }, getProgress: ownedCount },
 
   // 抽卡 4：全部都落在第一輪完整圖鑑的 100 抽目標內
   { id: "pull-10", category: "抽卡", name: "手癢了", description: "累積抽卡 10 次", target: 10, unit: "抽", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalPulls },
@@ -64,7 +66,7 @@ const achievementDefinitions: AchievementDefinition[] = [
 
   // 特殊 4
   { id: "special-ssr", category: "特殊", name: "SSR！", description: "第一次抽到 SSR 史萊姆", target: 1, unit: "次", reward: { type: "tickets", amount: 3 }, getProgress: (game) => ownedByRarity(game, "SSR") > 0 ? 1 : 0 },
-  { id: "special-ssr-accessory", category: "特殊", name: "錯誤也要有造型", description: "解鎖 SSR 史萊姆的專屬飾品", target: 1, unit: "件", reward: { type: "tickets", amount: 5 }, getProgress: (game) => SLIMES.some((slime) => slime.rarity === "SSR" && game.slimes[slime.id]?.accessoryUnlocked) ? 1 : 0 },
+  { id: "special-rarity-set", category: "特殊", name: "四色到齊", description: "N、R、SR、SSR 四種稀有度都至少收藏 1 隻", target: 4, unit: "種", reward: { type: "tickets", amount: 5 }, getProgress: rarityKindsOwned },
   { id: "special-nickname", category: "特殊", name: "你有名字了", description: "第一次替史萊姆取名字", target: 1, unit: "隻", reward: { type: "coins", amount: 100 }, getProgress: (game) => Object.values(game.slimes).some((slime) => Boolean(slime.nickname?.trim())) ? 1 : 0 },
   { id: "special-streak-7", category: "特殊", name: "一週沒逃跑", description: "連續學習 7 天", target: 7, unit: "天", reward: { type: "tickets", amount: 3 }, getProgress: (game) => game.streak },
 ];
@@ -121,7 +123,7 @@ export default function AchievementsPage() {
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">ACHIEVEMENTS</div>
           <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">成就</h1>
           <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
-            第一版共 24 個成就，依登入帳號的真實學習、收藏與抽卡進度計算。
+            共 24 個成就，依登入帳號的真實學習、收藏與抽卡進度計算。
           </p>
         </section>
 
