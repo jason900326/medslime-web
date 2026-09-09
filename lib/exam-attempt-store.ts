@@ -2,6 +2,17 @@
 
 import { createClient } from "@/lib/supabase/client";
 
+export type ExamAttemptReviewItem = {
+  id: string;
+  questionNumber: number | null;
+  stem: string;
+  options: string[];
+  correctIndex: number | null;
+  userAnswer: number | null;
+  uncertain: boolean;
+  officialPdfUrl: string | null;
+};
+
 export type ExamAttempt = {
   id: string;
   year: string;
@@ -15,6 +26,7 @@ export type ExamAttempt = {
   uncertainCount: number;
   durationSeconds: number;
   completedAt: string;
+  reviewItems: ExamAttemptReviewItem[];
 };
 
 type AttemptRow = {
@@ -30,16 +42,55 @@ type AttemptRow = {
   uncertain_count: number;
   duration_seconds: number;
   completed_at: string;
+  review_items?: unknown;
 };
 
 type ReviewLike = {
+  id?: string;
+  questionNumber?: number;
+  stem?: string;
+  options?: string[];
   correctIndex: number | null;
   userAnswer: number | null;
   uncertain: boolean;
+  officialPdfUrl?: string | null;
 };
 
 const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
 const CAPTURE_LOCK_KEY = "medslime_exam_attempt_capture";
+
+function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as Partial<ExamAttemptReviewItem>;
+      if (typeof raw.stem !== "string" || !Array.isArray(raw.options)) return null;
+
+      return {
+        id: typeof raw.id === "string" ? raw.id : `review-${index}`,
+        questionNumber:
+          typeof raw.questionNumber === "number" && Number.isFinite(raw.questionNumber)
+            ? raw.questionNumber
+            : null,
+        stem: raw.stem,
+        options: raw.options.filter((option): option is string => typeof option === "string"),
+        correctIndex:
+          typeof raw.correctIndex === "number" && Number.isFinite(raw.correctIndex)
+            ? raw.correctIndex
+            : null,
+        userAnswer:
+          typeof raw.userAnswer === "number" && Number.isFinite(raw.userAnswer)
+            ? raw.userAnswer
+            : null,
+        uncertain: raw.uncertain === true,
+        officialPdfUrl:
+          typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
+      } satisfies ExamAttemptReviewItem;
+    })
+    .filter((item): item is ExamAttemptReviewItem => Boolean(item));
+}
 
 function mapRow(row: AttemptRow): ExamAttempt {
   return {
@@ -55,8 +106,12 @@ function mapRow(row: AttemptRow): ExamAttempt {
     uncertainCount: Math.max(0, Number(row.uncertain_count ?? 0)),
     durationSeconds: Math.max(0, Number(row.duration_seconds ?? 0)),
     completedAt: row.completed_at,
+    reviewItems: normalizeReviewItems(row.review_items),
   };
 }
+
+const ATTEMPT_SELECT =
+  "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at,review_items";
 
 export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   const supabase = createClient();
@@ -68,9 +123,7 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
 
   const { data, error } = await supabase
     .from("exam_attempts")
-    .select(
-      "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at",
-    )
+    .select(ATTEMPT_SELECT)
     .eq("user_id", user.id)
     .order("completed_at", { ascending: false })
     .limit(Math.max(1, Math.min(300, limit)));
@@ -82,6 +135,30 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   }
 
   return ((data ?? []) as AttemptRow[]).map(mapRow);
+}
+
+export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !id) return null;
+
+  const { data, error } = await supabase
+    .from("exam_attempts")
+    .select(ATTEMPT_SELECT)
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    if (error.message.includes("exam_attempts")) return null;
+    console.error("讀取單次作答紀錄失敗：", error);
+    throw new Error("作答紀錄讀取失敗，請稍後再試。");
+  }
+
+  return data ? mapRow(data as AttemptRow) : null;
 }
 
 function getExamIdentityFromLocation() {
@@ -145,6 +222,17 @@ export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
   const reviewCount = records.length;
   const uncertainCount = records.filter((item) => item.uncertain).length;
   const durationSeconds = getDurationSeconds();
+  const reviewItems: ExamAttemptReviewItem[] = records.map((item, index) => ({
+    id: item.id ?? `${identity.examKey}:${item.questionNumber ?? index + 1}`,
+    questionNumber:
+      typeof item.questionNumber === "number" ? item.questionNumber : null,
+    stem: item.stem ?? "",
+    options: Array.isArray(item.options) ? item.options : [],
+    correctIndex: item.correctIndex,
+    userAnswer: item.userAnswer,
+    uncertain: item.uncertain,
+    officialPdfUrl: item.officialPdfUrl ?? null,
+  }));
 
   void (async () => {
     const waits = [450, 900, 1600, 2800, 4500];
@@ -180,6 +268,7 @@ export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
       review_count: reviewCount,
       uncertain_count: uncertainCount,
       duration_seconds: durationSeconds,
+      review_items: reviewItems,
       completed_at: new Date().toISOString(),
     });
 
