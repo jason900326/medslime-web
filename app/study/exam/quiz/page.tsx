@@ -13,6 +13,7 @@ import {
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
 import AIExplanationButton from "@/components/ai-explanation-button";
+import ExamExplanationOffer from "@/components/exam-explanation-offer";
 import { useGameState } from "@/components/game-state-provider";
 import { upsertMistakes } from "@/lib/mistake-store";
 
@@ -327,6 +328,13 @@ function ExamQuizContent() {
                 再選一份考卷
               </button>
             </div>
+
+            <ExamExplanationOffer
+              year={year}
+              session={session}
+              subject={subject}
+              reviewCount={reviewQuestions.length}
+            />
 
             {reviewQuestions.length > 0 ? (
               <section className="mx-auto mt-7 max-w-3xl space-y-4 text-left sm:mt-8">
