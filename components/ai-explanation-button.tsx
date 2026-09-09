@@ -30,7 +30,15 @@ type ExplanationResult = {
 type GenerateResponse = {
   cached: boolean;
   explanation?: ExplanationResult;
+  accessSource?: "exam_entitlement" | "daily_limit";
+  aiDetailRemaining?: number | null;
   code?: string;
+  error?: string;
+};
+
+type AvailabilityResponse = {
+  available?: boolean;
+  purchasedExamAccess?: boolean;
   error?: string;
 };
 
@@ -58,6 +66,7 @@ export default function AIExplanationButton({
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDailyLimitReached, setShowDailyLimitReached] = useState(false);
   const [usage, setUsage] = useState<DailyUsage | null>(null);
+  const [purchasedExamAccess, setPurchasedExamAccess] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [feedback, setFeedback] = useState<FeedbackValue | null>(null);
@@ -88,6 +97,21 @@ export default function AIExplanationButton({
     return nextUsage;
   };
 
+  const loadPurchasedAccess = async () => {
+    const params = new URLSearchParams({
+      questionKey: payload.questionKey,
+      source: payload.source,
+    });
+    const response = await fetch(`/api/ai-explanation?${params.toString()}`, {
+      cache: "no-store",
+    });
+    const data = (await response.json()) as AvailabilityResponse;
+    if (!response.ok) {
+      throw new Error(data.error ?? "無法確認完整詳解存取權限。");
+    }
+    return Boolean(data.purchasedExamAccess);
+  };
+
   const requestDetailedExplanation = async () => {
     if (detailLoading) return;
 
@@ -102,6 +126,14 @@ export default function AIExplanationButton({
     setShowDailyLimitReached(false);
 
     try {
+      const hasPurchasedAccess = await loadPurchasedAccess();
+      setPurchasedExamAccess(hasPurchasedAccess);
+
+      if (hasPurchasedAccess) {
+        setShowConfirm(true);
+        return;
+      }
+
       const current = await loadUsage();
       if (current.remaining <= 0) {
         setShowDailyLimitReached(true);
@@ -147,12 +179,18 @@ export default function AIExplanationButton({
         throw new Error(data.error ?? "完整詳解產生失敗，請稍後再試。");
       }
 
-      const current = await loadUsage();
       setDetailResult(data.explanation);
       setDetailOpen(true);
-      setNoticeMessage(
-        `今日完整詳解還可使用 ${current.remaining} / ${current.limit} 次。`,
-      );
+
+      if (data.accessSource === "exam_entitlement") {
+        setPurchasedExamAccess(true);
+        setNoticeMessage("這份考卷已解鎖，本題不計入每日 5 次使用上限。");
+      } else {
+        const current = await loadUsage();
+        setNoticeMessage(
+          `今日完整詳解還可使用 ${current.remaining} / ${current.limit} 次。`,
+        );
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "完整詳解發生未知錯誤。",
@@ -309,7 +347,7 @@ export default function AIExplanationButton({
         </div>
       )}
 
-      {showConfirm && usage && (
+      {showConfirm && (usage || purchasedExamAccess) && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 px-5">
           <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
             <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
@@ -319,11 +357,19 @@ export default function AIExplanationButton({
               查看這題的完整詳解？
             </div>
             <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-              系統會直接整理並顯示這題的完整解析。這次會計入今天的完整詳解使用次數。
+              {purchasedExamAccess
+                ? "你已永久解鎖這份考卷的完整詳解，本題不會計入每日免費使用上限。"
+                : "系統會直接整理並顯示這題的完整解析。這次會計入今天的完整詳解使用次數。"}
             </p>
-            <div className="mt-4 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black leading-6 text-[#315b45]">
-              今日目前還可使用 {usage.remaining} / {usage.limit} 次
-            </div>
+            {purchasedExamAccess ? (
+              <div className="mt-4 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black leading-6 text-[#315b45]">
+                ✓ 這份考卷已解鎖
+              </div>
+            ) : usage ? (
+              <div className="mt-4 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black leading-6 text-[#315b45]">
+                今日目前還可使用 {usage.remaining} / {usage.limit} 次
+              </div>
+            ) : null}
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
                 type="button"
