@@ -167,7 +167,7 @@ export default function GachaPage() {
             <InfoDialogButton title="抽卡說明">
               <p>抽卡機率：N 45% · R 37% · SR 17.7% · SSR 0.3%。</p>
               <p>SSR 最晚第 80 抽保底；10 連抽保證至少會出現 1 隻 SR 以上。</p>
-              <p>收集進度會優先補齊尚未取得，或尚未解鎖飾品的史萊姆。</p>
+              <p>同稀有度會優先補齊尚未取得的史萊姆；抽到重複角色時會直接獲得金幣回饋。</p>
               <p>100 金幣可抽 1 次，1,000 金幣可抽 10 次；抽卡券則是 1 張 1 抽。</p>
             </InfoDialogButton>
           </div>
