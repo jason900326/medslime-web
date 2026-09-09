@@ -14,32 +14,50 @@ import { useEffect } from "react";
  */
 export default function LegacyEraLabelNormalizer() {
   useEffect(() => {
-    const normalize = () => {
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-      );
+    const normalizeTextNode = (node: Node) => {
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      const parent = node.parentElement;
+      if (
+        !parent ||
+        parent.closest("script, style, textarea, [data-preserve-era-label]")
+      ) {
+        return;
+      }
 
+      const current = node.nodeValue ?? "";
+      const next = current.replace(
+        /^(\s*)民國\s*(?=\d{2,3}\s*年(?:\s*[·・]|\s*$))/,
+        "$1",
+      );
+      if (next !== current) node.nodeValue = next;
+    };
+
+    const normalizeTree = (root: Node) => {
+      if (root.nodeType === Node.TEXT_NODE) {
+        normalizeTextNode(root);
+        return;
+      }
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let node = walker.nextNode();
       while (node) {
-        const parent = node.parentElement;
-        if (
-          parent &&
-          !parent.closest("script, style, textarea, [data-preserve-era-label]")
-        ) {
-          const current = node.nodeValue ?? "";
-          const next = current.replace(
-            /^(\s*)民國\s*(?=\d{2,3}\s*年(?:\s*[·・]|\s*$))/,
-            "$1",
-          );
-          if (next !== current) node.nodeValue = next;
-        }
+        normalizeTextNode(node);
         node = walker.nextNode();
       }
     };
 
-    normalize();
-    const observer = new MutationObserver(normalize);
+    normalizeTree(document.body);
+
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "characterData") {
+          normalizeTextNode(record.target);
+          continue;
+        }
+        record.addedNodes.forEach(normalizeTree);
+      }
+    });
+
     observer.observe(document.body, {
       childList: true,
       subtree: true,
