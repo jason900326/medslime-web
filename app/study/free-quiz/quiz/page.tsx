@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
@@ -57,6 +57,7 @@ function FreeQuizRunner() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
+  const [struckOptions, setStruckOptions] = useState<Record<string, number[]>>({});
   const [finished, setFinished] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
@@ -71,6 +72,7 @@ function FreeQuizRunner() {
       setIndex(0);
       setAnswers({});
       setUncertain({});
+      setStruckOptions({});
       setFinished(false);
       setRecorded(false);
       setElapsedAtFinish(0);
@@ -145,7 +147,29 @@ function FreeQuizRunner() {
   const sourceId = (item: FreeQuestion) =>
     `national-exam:${item.sourceYear}:${item.sourceSession}:${subject}:${item.sourceQuestionNumber}`;
   const sourceLabel = (item: FreeQuestion) =>
-    `民國 ${item.sourceYear} 年 · 第 ${item.sourceSession} 次 · ${subject}`;
+    `${item.sourceYear} 年 · 第 ${item.sourceSession} 次 · ${subject}`;
+
+  const toggleStrike = (questionId: string, optionIndex: number) => {
+    setStruckOptions((current) => {
+      const list = current[questionId] ?? [];
+      const exists = list.includes(optionIndex);
+      return {
+        ...current,
+        [questionId]: exists
+          ? list.filter((item) => item !== optionIndex)
+          : [...list, optionIndex],
+      };
+    });
+  };
+
+  const getQuestionStatus = (questionId: string) => {
+    const hasAnswer = answers[questionId] !== undefined;
+    const isUncertain = uncertain[questionId] ?? false;
+    if (hasAnswer && isUncertain) return "yellow" as const;
+    if (hasAnswer) return "green" as const;
+    if (isUncertain) return "red" as const;
+    return "gray" as const;
+  };
 
   const finish = async () => {
     const startedAt = Number(sessionStorage.getItem(STARTED_AT_KEY));
@@ -223,7 +247,7 @@ function FreeQuizRunner() {
           <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
             <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">FREE QUIZ RESULT</div>
             <h1 className="mt-2 text-3xl font-black">自由測驗完成</h1>
-            <div className="mt-2 text-sm font-bold text-[#789083]">民國 {from}–{to} 年 · {subject}</div>
+            <div className="mt-2 text-sm font-bold text-[#789083]">{from}–{to} 年 · {subject}</div>
 
             <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3">
               <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
@@ -262,7 +286,7 @@ function FreeQuizRunner() {
                   return (
                     <article key={item.id} className="rounded-[20px] border border-[#e0ebe4] bg-[#fbfefc] p-4">
                       <div className="text-xs font-black text-[#2ba962]">
-                        民國 {item.sourceYear} 年・第 {item.sourceSession} 次・第 {item.sourceQuestionNumber} 題
+                        {item.sourceYear} 年・第 {item.sourceSession} 次・第 {item.sourceQuestionNumber} 題
                       </div>
                       <div className="ms-question-stem mt-2">{item.stem}</div>
                       <div className="mt-3 space-y-2">
@@ -311,111 +335,166 @@ function FreeQuizRunner() {
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+      <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
         <TopBar showBack backHref="/study/free-quiz" backLabel="返回設定" />
 
-        <section className="mt-6 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">自由測驗 · 民國 {from}–{to} 年</div>
-            <h1 className="mt-1 text-2xl font-black">{subject}</h1>
+        <section className="mt-8">
+          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
+            自由測驗 · {from}–{to} 年
           </div>
-          <div className="text-sm font-black text-[#789083]">{index + 1} / {questions.length}</div>
+          <h1 className="mt-2 text-2xl font-black">{subject}</h1>
         </section>
 
-        <ProgressGrid
+        <QuestionProgress
           questions={questions}
-          index={index}
-          answers={answers}
-          uncertain={uncertain}
+          currentIndex={index}
+          getStatus={getQuestionStatus}
           onJump={setIndex}
         />
 
-        <section className="mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_12px_28px_rgba(30,78,50,0.05)] sm:p-7">
-          <div className="flex items-start justify-between gap-4">
-            <div className="text-xs font-black text-[#2ba962]">
-              民國 {question.sourceYear} 年・第 {question.sourceSession} 次・官方第 {question.sourceQuestionNumber} 題
+        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-sm font-black text-[#789083]">
+              Q{index + 1} / {questions.length}
             </div>
             <button
               type="button"
               onClick={() => setShowSubmit(true)}
-              className="shrink-0 text-xs font-black text-[#9b5050]"
+              className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
               結束測驗
             </button>
           </div>
 
-          <div className="ms-question-stem mt-4">{question.stem}</div>
+          <div className="mt-4 text-xs font-black text-[#2ba962]">
+            {question.sourceYear} 年・第 {question.sourceSession} 次・官方第 {question.sourceQuestionNumber} 題
+          </div>
 
-          {(question.hasImageHint || question.sourceOnlyMode) && (
-            <div className="mt-4 rounded-xl bg-[#fff9e8] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
-              {question.hasImageHint ? "本題包含圖表／影像，建議查看官方原題。" : "本題文字解析可能不完整，建議查看官方原題。"}
+          <div className="ms-question-stem mt-5">{question.stem}</div>
+
+          {question.hasImageHint && (
+            <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-black leading-6 text-[#80651e]">
+              🖼️ 本題包含圖表／影像，建議點開官方原題確認。
+            </div>
+          )}
+
+          {question.sourceOnlyMode && !question.hasImageHint && (
+            <div className="mt-4 rounded-2xl border border-[#e1e7e3] bg-[#f7faf8] px-4 py-3 text-sm font-black leading-6 text-[#60786c]">
+              📄 本題文字解析可能不完整，建議點開官方原題確認。
             </div>
           )}
 
           {question.questionPdfUrl && (
-            <button
-              type="button"
-              onClick={() => setShowOfficial(true)}
-              className="mt-4 rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45]"
-            >
-              📄 官方原題
-            </button>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setShowOfficial(true)}
+                className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#315b45] transition hover:bg-[#f5faf7]"
+              >
+                📄 官方原題
+              </button>
+            </div>
           )}
 
-          <div className="mt-5 space-y-2">
+          <div className="mt-6 space-y-3">
             {question.options.map((option, optionIndex) => {
               const selected = answers[question.id] === optionIndex;
+              const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
+
               return (
-                <button
+                <div
                   key={`${question.id}-${optionIndex}`}
-                  type="button"
-                  onClick={() => setAnswers((current) => ({ ...current, [question.id]: optionIndex }))}
                   className={[
-                    "ms-question-option flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition",
+                    "flex items-stretch rounded-2xl border transition",
                     selected
-                      ? "border-[#65d795] bg-[#eaf9f0] text-[#315b45]"
-                      : "border-[#dfe8e2] bg-white text-[#466a58] hover:bg-[#f7faf8]",
+                      ? "border-[#65d795] bg-[#eaf9f0]"
+                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
                   ].join(" ")}
                 >
-                  <span className={[
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-black",
-                    selected ? "border-[#31c978] bg-[#31c978] text-white" : "border-[#cad8d0] bg-white text-[#789083]",
-                  ].join(" ")}>
-                    {String.fromCharCode(65 + optionIndex)}
-                  </span>
-                  <span>{option}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAnswers((current) => ({
+                        ...current,
+                        [question.id]: optionIndex,
+                      }))
+                    }
+                    className="flex w-14 shrink-0 items-center justify-center"
+                    aria-label={`選擇 ${String.fromCharCode(65 + optionIndex)}`}
+                  >
+                    <span
+                      className={[
+                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
+                        selected
+                          ? "border-[#31c978] bg-[#31c978]"
+                          : "border-[#b8c9bf] bg-white",
+                      ].join(" ")}
+                    >
+                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleStrike(question.id, optionIndex)}
+                    className={[
+                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
+                      struck ? "line-through opacity-45" : "",
+                    ].join(" ")}
+                    aria-label={`${struck ? "取消刪除線" : "劃掉"} ${String.fromCharCode(65 + optionIndex)} 選項`}
+                  >
+                    {String.fromCharCode(65 + optionIndex)}. {option}
+                  </button>
+                </div>
               );
             })}
           </div>
 
           <button
             type="button"
-            onClick={() => setUncertain((current) => ({ ...current, [question.id]: !current[question.id] }))}
+            onClick={() =>
+              setUncertain((current) => ({
+                ...current,
+                [question.id]: !current[question.id],
+              }))
+            }
             className={[
-              "mt-4 w-full rounded-2xl border px-4 py-3 text-left text-sm font-black",
+              "mt-4 flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left font-black transition",
               uncertain[question.id]
-                ? "border-[#e2b94f] bg-[#fff8df] text-[#80651e]"
-                : "border-[#dfe8e2] bg-white text-[#557768]",
+                ? "border-[#e2b94f] bg-[#fff8df] text-[#8a6814]"
+                : "border-[#dfe8e2] bg-white text-[#557768] hover:bg-[#f7faf8]",
             ].join(" ")}
           >
+            <span
+              className={[
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
+                uncertain[question.id]
+                  ? "border-[#e2b94f] bg-[#e2b94f]"
+                  : "border-[#b8c9bf] bg-white",
+              ].join(" ")}
+            >
+              {uncertain[question.id] && (
+                <span className="h-2.5 w-2.5 rounded-full bg-white" />
+              )}
+            </span>
             ❓ 我不確定
           </button>
 
-          <div className="mt-7 flex items-center justify-between gap-3">
+          <div className="mt-8 flex items-center justify-between gap-3">
             <button
               type="button"
               disabled={index === 0}
               onClick={() => setIndex((current) => Math.max(0, current - 1))}
-              className="rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45] disabled:opacity-35"
+              className="rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45] disabled:cursor-not-allowed disabled:opacity-40"
             >
               ← 上一題
             </button>
+
             {index < questions.length - 1 ? (
               <button
                 type="button"
                 onClick={() => setIndex((current) => Math.min(questions.length - 1, current + 1))}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
                 下一題 →
               </button>
@@ -423,7 +502,7 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={() => setShowSubmit(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
               >
                 完成測驗
               </button>
@@ -434,12 +513,19 @@ function FreeQuizRunner() {
 
       {showSubmit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/35 px-4">
-          <div className="w-full max-w-md rounded-[26px] bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
             <div className="text-2xl font-black">是否要交卷？</div>
-            <div className="mt-3 text-sm font-bold leading-6 text-[#70877a]">
-              已作答 {answeredCount} / {questions.length} 題
-              {unanswered.length > 0 ? `，還有 ${unanswered.length} 題未作答。` : "，已完成全部題目。"}
-            </div>
+            {unanswered.length > 0 ? (
+              <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
+                尚有 {unanswered.length} 題未作答。
+                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
+                  未作答題號：{unanswered.map((item) => item.questionNumber).join("、")}
+                </div>
+                <div className="mt-3">確定仍要交卷嗎？</div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm font-bold text-[#70877a]">已完成所有題目。</p>
+            )}
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -462,11 +548,13 @@ function FreeQuizRunner() {
 
       {showOfficial && question.questionPdfUrl && (
         <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/35 px-3 py-5">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[26px] bg-white p-5 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">OFFICIAL QUESTION</div>
-                <div className="mt-1 text-xl font-black">民國 {question.sourceYear} 年・第 {question.sourceSession} 次・第 {question.sourceQuestionNumber} 題</div>
+                <div className="mt-1 text-xl font-black">
+                  {question.sourceYear} 年・第 {question.sourceSession} 次・第 {question.sourceQuestionNumber} 題
+                </div>
               </div>
               <button
                 type="button"
@@ -490,49 +578,200 @@ function FreeQuizRunner() {
   );
 }
 
-function ProgressGrid({
+function QuestionProgress({
   questions,
-  index,
-  answers,
-  uncertain,
+  currentIndex,
+  getStatus,
   onJump,
 }: {
   questions: FreeQuestion[];
-  index: number;
-  answers: Record<string, number>;
-  uncertain: Record<string, boolean>;
+  currentIndex: number;
+  getStatus: (questionId: string) => "green" | "yellow" | "red" | "gray";
   onJump: (index: number) => void;
 }) {
+  const segmentSize = 10;
+  const segmentCount = Math.ceil(questions.length / segmentSize);
+  const currentSegment = Math.floor(currentIndex / segmentSize);
+  const segmentStart = currentSegment * segmentSize;
+  const segmentEnd = Math.min(segmentStart + segmentSize, questions.length);
+  const visibleQuestions = questions.slice(segmentStart, segmentEnd);
+
+  const getSegmentStatus = (segmentIndex: number) => {
+    const start = segmentIndex * segmentSize;
+    const end = Math.min(start + segmentSize, questions.length);
+    const segmentQuestions = questions.slice(start, end);
+    const statuses = segmentQuestions.map((item) => getStatus(item.id));
+
+    if (statuses.every((status) => status === "green")) return "green";
+    if (
+      statuses.every((status) => status !== "gray") &&
+      statuses.some((status) => status === "yellow")
+    ) {
+      return "yellow";
+    }
+    if (statuses.some((status) => status === "red")) return "red";
+    return "gray";
+  };
+
   return (
-    <section className="mt-4 rounded-[20px] border border-[#dce9e1] bg-white px-3 py-3">
-      <div className="grid grid-cols-10 gap-1.5">
-        {questions.map((item, questionIndex) => {
-          const answered = answers[item.id] !== undefined;
-          const unsure = Boolean(uncertain[item.id]);
-          const active = index === questionIndex;
+    <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white px-3 py-4 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:px-4">
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 text-[11px] font-black text-[#70877a] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <span className="flex shrink-0 items-center gap-1.5">
+          <LegendDot color="green" />已作答
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <LegendDot color="yellow" />作答＋不確定
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <LegendDot color="red" />只有不確定
+        </span>
+      </div>
+
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {Array.from({ length: segmentCount }, (_, segmentIndex) => {
+          const active = segmentIndex === currentSegment;
+          const status = getSegmentStatus(segmentIndex);
+          const firstQuestionIndex = segmentIndex * segmentSize;
+          const lastQuestionNumber = Math.min(firstQuestionIndex + segmentSize, questions.length);
+
+          return (
+            <button
+              key={segmentIndex}
+              type="button"
+              onClick={() => onJump(firstQuestionIndex)}
+              className={[
+                "flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 transition",
+                active
+                  ? "border-[#8fd9aa] bg-[#eefaf2]"
+                  : "border-[#e0e9e3] bg-white",
+              ].join(" ")}
+              title={`第 ${firstQuestionIndex + 1}–${lastQuestionNumber} 題`}
+            >
+              <SimpleSlime status={status} size="segment" active={active} />
+              <span
+                className={[
+                  "text-[11px] font-black",
+                  active ? "text-[#237849]" : "text-[#789083]",
+                ].join(" ")}
+              >
+                {firstQuestionIndex + 1}–{lastQuestionNumber}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 grid grid-cols-10 gap-1">
+        {visibleQuestions.map((item, offset) => {
+          const questionIndex = segmentStart + offset;
+          const current = questionIndex === currentIndex;
+
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onJump(questionIndex)}
               className={[
-                "aspect-square rounded-lg text-[10px] font-black transition",
-                active
-                  ? "bg-[#17372a] text-white"
-                  : unsure
-                    ? "bg-[#fff1c9] text-[#80651e]"
-                    : answered
-                      ? "bg-[#eaf9f0] text-[#237849]"
-                      : "bg-[#f4f7f5] text-[#8a9c92]",
+                "flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1 transition",
+                current ? "bg-[#f0faf4]" : "",
               ].join(" ")}
+              aria-label={`跳到第 ${item.questionNumber} 題`}
             >
-              {questionIndex + 1}
+              <SimpleSlime
+                status={getStatus(item.id)}
+                size="question"
+                active={current}
+              />
+              <span
+                className={[
+                  "text-[10px] font-black leading-none",
+                  current ? "text-[#17372a]" : "text-[#8a9c92]",
+                ].join(" ")}
+              >
+                {item.questionNumber}
+              </span>
             </button>
           );
         })}
       </div>
     </section>
   );
+}
+
+function SimpleSlime({
+  status,
+  size,
+  active,
+}: {
+  status: "green" | "yellow" | "red" | "gray";
+  size: "segment" | "question";
+  active: boolean;
+}) {
+  const colors = {
+    green: { body: "#b9efd1", border: "#55b97b", face: "#315b45" },
+    yellow: { body: "#ffe8a3", border: "#e2b94f", face: "#6f5a1d" },
+    red: { body: "#ffc9cf", border: "#de7777", face: "#7c3d46" },
+    gray: { body: "#eef6f1", border: "#d6e5dc", face: "#759184" },
+  }[status];
+
+  const segment = size === "segment";
+  const width = segment ? 26 : 20;
+  const height = segment ? 19 : 15;
+
+  return (
+    <div
+      className="relative shrink-0 transition"
+      style={{
+        width,
+        height,
+        borderRadius: "48% 48% 42% 42% / 56% 56% 42% 42%",
+        background: colors.body,
+        border: `1.5px solid ${colors.border}`,
+        boxShadow: active ? "0 0 0 3px rgba(49,201,120,0.12)" : "none",
+      }}
+    >
+      <span
+        className="absolute rounded-full"
+        style={{
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          left: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
+        }}
+      />
+      <span
+        className="absolute rounded-full"
+        style={{
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          right: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
+        }}
+      />
+      <span
+        className="absolute rounded-b-full border-b"
+        style={{
+          width: segment ? 5.5 : 4.5,
+          height: segment ? 3 : 2.5,
+          borderColor: colors.face,
+          left: "50%",
+          bottom: segment ? 3.5 : 2.5,
+          transform: "translateX(-50%)",
+        }}
+      />
+    </div>
+  );
+}
+
+function LegendDot({ color }: { color: "green" | "yellow" | "red" }) {
+  const className = {
+    green: "bg-[#55b97b]",
+    yellow: "bg-[#e2b94f]",
+    red: "bg-[#de7777]",
+  }[color];
+  return <span className={`h-2 w-2 rounded-full ${className}`} />;
 }
 
 function ResultCard({ label, value }: { label: string; value: string }) {
@@ -547,8 +786,14 @@ function ResultCard({ label, value }: { label: string; value: string }) {
 function LoadingQuiz() {
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-4xl px-4 py-10 text-center text-sm font-black text-[#789083]">
-        正在替你組卷…
+      <div className="flex min-h-[72vh] flex-col items-center justify-center px-4 text-center">
+        <img
+          src="/slimes/n-green.png"
+          alt="正在組卷的綠色史萊姆"
+          className="h-28 w-28 animate-bounce object-contain sm:h-32 sm:w-32"
+        />
+        <div className="mt-3 text-base font-black text-[#557768]">正在替你組卷…</div>
+        <div className="mt-1 text-xs font-bold text-[#8a9c92]">從你選的年份與科目中抽題</div>
       </div>
     </main>
   );
