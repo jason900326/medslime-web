@@ -94,7 +94,7 @@ function ExamPicker() {
               >
                 {rocYears.map((item) => (
                   <option key={item} value={item}>
-                    民國 {item} 年
+                    {item} 年
                   </option>
                 ))}
               </select>
@@ -126,7 +126,7 @@ function ExamPicker() {
         <section className="mt-5">
           <div>
             <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
-              民國 {rocYear} 年 · 第 {session} 次
+              {rocYear} 年 · 第 {session} 次
             </div>
             <h2 className="mt-1 text-xl font-black">選擇科目考卷</h2>
           </div>

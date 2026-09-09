@@ -77,7 +77,7 @@ function FreeQuizConfigurator() {
                 className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
               >
                 {[...rocYears].reverse().map((year) => (
-                  <option key={year} value={year}>民國 {year} 年</option>
+                  <option key={year} value={year}>{year} 年</option>
                 ))}
               </select>
             </div>
@@ -94,7 +94,7 @@ function FreeQuizConfigurator() {
                 className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
               >
                 {[...rocYears].reverse().map((year) => (
-                  <option key={year} value={year}>民國 {year} 年</option>
+                  <option key={year} value={year}>{year} 年</option>
                 ))}
               </select>
             </div>
@@ -137,7 +137,7 @@ function FreeQuizConfigurator() {
           <div className="mt-6 rounded-2xl bg-[#f6faf7] px-4 py-4">
             <div className="text-xs font-black text-[#2ba962]">本次設定</div>
             <div className="mt-1 text-sm font-black leading-6 text-[#315b45]">
-              民國 {fromYear}–{toYear} 年 · {rangeYears} 個年度 · {count} 題
+              {fromYear}–{toYear} 年 · {rangeYears} 個年度 · {count} 題
             </div>
             <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">{subject}</div>
           </div>
@@ -152,7 +152,7 @@ function FreeQuizConfigurator() {
         </section>
 
         <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/70 px-5 py-4 text-sm font-bold leading-6 text-[#789083]">
-          自由測驗目前採隨機抽題；同一份題目不會因為題數不同而改變原題內容。交卷後會保存作答紀錄與當次錯題快照。
+          自由測驗目前採隨機抽題；交卷後會保存作答紀錄與當次錯題快照。
         </section>
       </div>
     </main>

@@ -13,6 +13,10 @@ import {
 
 type MistakeFilter = "全部" | "國考" | "教材" | "已複習";
 
+function displaySourceLabel(value: string) {
+  return value.replace(/^民國\s*/, "");
+}
+
 export default function MistakeRecordsTab({
   mistakes,
   setMistakes,
@@ -98,7 +102,7 @@ export default function MistakeRecordsTab({
           <div className="min-w-0">
             <div className="text-xs font-black text-[#2ba962]">目前只看這次考卷</div>
             <div className="mt-1 truncate text-sm font-black text-[#315b45]">
-              民國 {filterYear} 年・第 {filterSession} 次・{filterSubject}
+              {filterYear} 年・第 {filterSession} 次・{filterSubject}
             </div>
           </div>
           <Link
@@ -191,6 +195,7 @@ function MistakeRecordCard({
     item.source === "national-exam" &&
     Boolean(item.officialPdfUrl) &&
     Boolean(item.questionNumber);
+  const cleanSourceLabel = displaySourceLabel(item.sourceLabel);
 
   const updateReviewed = async () => {
     if (busy) return;
@@ -233,10 +238,10 @@ function MistakeRecordCard({
             {item.source === "national-exam" ? (
               <>
                 <div className="text-xs font-black text-[#2ba962]">
-                  民國 {item.year ?? "—"} 年・第 {item.session ?? "—"} 次
+                  {item.year ?? "—"} 年・第 {item.session ?? "—"} 次
                 </div>
                 <h3 className="mt-1 text-base font-black leading-7 text-[#17372a]">
-                  {item.subject ?? item.sourceLabel}
+                  {item.subject ?? cleanSourceLabel}
                 </h3>
               </>
             ) : (
@@ -244,7 +249,7 @@ function MistakeRecordCard({
                 <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
                   MATERIAL
                 </div>
-                <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+                <div className="mt-1 text-sm font-bold text-[#789083]">{cleanSourceLabel}</div>
               </>
             )}
           </div>
@@ -343,7 +348,7 @@ function MistakeRecordCard({
             payload={{
               questionKey: item.id,
               source: item.source,
-              sourceLabel: item.sourceLabel,
+              sourceLabel: cleanSourceLabel,
               stem: item.stem,
               options: item.options,
               correctIndex: item.correctIndex,
@@ -362,7 +367,7 @@ function MistakeRecordCard({
               <div>
                 <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">OFFICIAL QUESTION</div>
                 <div className="mt-1 text-xl font-black">官方原題 · 第 {item.questionNumber} 題</div>
-                <div className="mt-1 text-sm font-bold text-[#789083]">{item.sourceLabel}</div>
+                <div className="mt-1 text-sm font-bold text-[#789083]">{cleanSourceLabel}</div>
               </div>
               <button
                 type="button"
