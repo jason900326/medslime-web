@@ -14,7 +14,7 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `exam_explanation_entitlements` | Permanent paid content access | One row per user + purchased national-exam explanation set |
 | `exam_attempts` | National-exam attempt history | Score history, duration, review counts, subject trends and Pro analysis |
 | `payment_orders` | Payment ledger | ECPay ledger; new orders store direct `entitlement_type` / `entitlement_key`, never wallet or credit grants |
-| `national_exam_questions` | National-exam question bank | Current national-exam API |
+| `national_exam_questions` | National-exam question bank + shared topic taxonomy | Current national-exam/free-quiz APIs; Phase C adds canonical `topic`, `subtopic`, `concepts` metadata |
 | `shared_ai_explanations` | Shared national-exam explanation cache | Internal cost optimization for reusable national-exam explanations |
 | `ai_question_explanations` | Per-user material AI cache | Material explanations generated from user-uploaded content |
 | `ai_explanation_events` | AI explanation analytics | Existing-content view / generated events |
@@ -91,6 +91,41 @@ Fragments and accessories are retired gameplay systems. Gacha selection may prio
 
 Current duplicate-refund amounts remain temporary balancing values until the MedSlime 2.0 economy pass is complete.
 
+## Question-taxonomy rule
+
+Phase C classifies every canonical national-exam question once and stores the shared result on `national_exam_questions`.
+
+```text
+national exam question
+       ↓
+subject
+       ↓
+topic
+       ↓
+subtopic
+       ↓
+concepts[]
+```
+
+The active migration is `supabase/question_topic_taxonomy.sql`. It adds:
+
+- `topic`
+- `subtopic`
+- `concepts`
+- `taxonomy_status` (`pending`, `classified`, `needs_review`)
+- `taxonomy_confidence`
+- `taxonomy_version`
+- `taxonomy_model`
+- `taxonomy_updated_at`
+
+Taxonomy is question metadata, not learner data. A question is classified once and the result is reused for every user, every attempt, free quiz, Pro analysis and later weak-topic quiz generation.
+
+Top-level `topic` values must come from the canonical subject catalog in `lib/topic-taxonomy-catalog.ts`; this avoids AI-created synonyms splitting one medical topic into several analytics buckets. `subtopic` may be more specific, and `concepts` should contain only a small set of genuine tested concepts.
+
+`app/api/internal/taxonomy/backfill` is an internal batch classifier. It requires `TAXONOMY_ADMIN_SECRET`, processes only `pending` rows, stores the prompt/catalog version, and sends uncertain/catalog-mismatched results to `needs_review` instead of silently treating them as valid analytics data.
+
+Do not classify the same question again for each user attempt. Do not expose the internal backfill endpoint as a learner feature.
+
 ## Detailed-explanation rule
 
 Free detailed explanations are a daily service limit, not a stored balance.
@@ -127,15 +162,15 @@ Do not advertise a Pro capability until the corresponding code path exists in pr
 
 ## Exam-attempt rule
 
-`exam_attempts` stores one row for each completed national-exam attempt. It is separate from `player_mistakes`: attempt history is exam-centric, while mistakes remain question-centric.
+`exam_attempts` stores one row for each completed national-exam or free-quiz attempt. It is separate from `player_mistakes`: attempt history is exam-centric, while mistakes remain question-centric.
 
 ```text
-completed national exam
-      ├─> exam_attempts  -> score/history/trends
+completed quiz
+      ├─> exam_attempts   -> score/history/trends
       └─> player_mistakes -> wrong/uncertain questions
 ```
 
-The Study area exposes these together under `學習紀錄`, with separate `作答紀錄` and `錯題整理` views.
+The Study area intentionally exposes these as separate learner flows now: `/study/records` is作答歷史與 Pro 分析；`/study/mistakes` is the standalone錯題複習 experience.
 
 ## Payment rule
 
