@@ -99,6 +99,53 @@ function normalizeSource(value: unknown): "national-exam" | "material" {
   return value === "material" ? "material" : "national-exam";
 }
 
+function nationalExamKeyFromQuestionKey(questionKey: string) {
+  const parts = questionKey.split(":");
+  if (parts.length < 5 || parts[0] !== "national-exam") return null;
+
+  const year = parts[1]?.trim();
+  const session = parts[2]?.trim();
+  const subject = parts.slice(3, -1).join(":").trim();
+  if (!year || !session || !subject) return null;
+  return `${year}-${session}-${subject}`;
+}
+
+function isMissingRpc(message: string) {
+  return /could not find|does not exist|schema cache/i.test(message);
+}
+
+async function hasPurchasedExamExplanation(input: {
+  userId: string;
+  source: "national-exam" | "material";
+  questionKey: string;
+}) {
+  const { userId, source, questionKey } = input;
+  if (source !== "national-exam") return false;
+
+  const examKey = nationalExamKeyFromQuestionKey(questionKey);
+  if (!examKey) return false;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("exam_explanation_entitlements")
+    .select("exam_key")
+    .eq("user_id", userId)
+    .eq("exam_key", examKey)
+    .maybeSingle();
+
+  // During a rolling deployment the table may not exist until the SQL migration
+  // is applied. Checkout stays disabled until then, so treating that state as
+  // "not purchased" keeps the existing free daily limit working safely.
+  if (error) {
+    if (/exam_explanation_entitlements|does not exist|schema cache/i.test(error.message)) {
+      return false;
+    }
+    throw new Error(`完整詳解權限讀取失敗：${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
 async function readCachedExplanation(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -210,29 +257,49 @@ function normalizeRpcPayload(data: unknown): Record<string, unknown> {
 
 async function consumeDailyDetailUse(userId: string): Promise<DailyUseResult> {
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("consume_ai_detail_credit", {
+  let { data, error } = await admin.rpc("consume_ai_detail_daily_use", {
     p_user_id: userId,
   });
 
+  // Compatibility while payment_entitlement_v2.sql is being rolled out.
+  if (error && isMissingRpc(error.message)) {
+    const legacy = await admin.rpc("consume_ai_detail_credit", {
+      p_user_id: userId,
+    });
+    data = legacy.data;
+    error = legacy.error;
+  }
+
   if (error) {
-    if (error.message.includes("AI_DETAIL_CREDIT_REQUIRED")) {
+    if (
+      error.message.includes("AI_DETAIL_DAILY_LIMIT_REACHED") ||
+      error.message.includes("AI_DETAIL_CREDIT_REQUIRED")
+    ) {
       return { ok: false, remaining: 0 };
     }
     throw new Error(`完整詳解每日使用次數更新失敗：${error.message}`);
   }
 
   const payload = normalizeRpcPayload(data);
-  const remaining = Math.max(0, Number(payload.remaining ?? 0));
+  const remaining = Math.max(0, Number(payload.remaining ?? payload.freeRemaining ?? 0));
   return { ok: true, remaining };
 }
 
 async function refundDailyDetailUse(userId: string) {
   try {
     const admin = createAdminClient();
-    const { error } = await admin.rpc("refund_ai_detail_credit", {
+    let { error } = await admin.rpc("refund_ai_detail_daily_use", {
       p_user_id: userId,
-      p_source: "free",
     });
+
+    if (error && isMissingRpc(error.message)) {
+      const legacy = await admin.rpc("refund_ai_detail_credit", {
+        p_user_id: userId,
+        p_source: "free",
+      });
+      error = legacy.error;
+    }
+
     if (error) console.error("完整詳解每日使用次數退回失敗：", error);
   } catch (error) {
     console.error("完整詳解每日使用次數退回失敗：", error);
@@ -265,11 +332,18 @@ export async function GET(request: NextRequest) {
       source,
       questionKey,
     });
+    const purchasedExamAccess = await hasPurchasedExamExplanation({
+      userId: user.id,
+      source,
+      questionKey,
+    });
 
-    // Do not return the explanation through GET. Access must go through POST so
-    // the daily service limit (or future purchased-exam entitlement) is checked
-    // before content is revealed.
-    return NextResponse.json({ available: Boolean(cached) });
+    // Do not return the explanation through GET. POST performs the entitlement
+    // or daily-service-limit check before revealing content.
+    return NextResponse.json({
+      available: Boolean(cached),
+      purchasedExamAccess,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "完整詳解讀取失敗。" },
@@ -321,17 +395,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const dailyUse = await consumeDailyDetailUse(user.id);
-    if (!dailyUse.ok) {
-      return NextResponse.json(
-        {
-          error: "今日完整詳解使用次數已達上限。",
-          code: "AI_DETAIL_DAILY_LIMIT_REACHED",
-        },
-        { status: 402 },
-      );
+    const purchasedExamAccess = await hasPurchasedExamExplanation({
+      userId: user.id,
+      source,
+      questionKey,
+    });
+
+    let dailyRemaining: number | null = null;
+    if (!purchasedExamAccess) {
+      const dailyUse = await consumeDailyDetailUse(user.id);
+      if (!dailyUse.ok) {
+        return NextResponse.json(
+          {
+            error: "今日完整詳解使用次數已達上限。",
+            code: "AI_DETAIL_DAILY_LIMIT_REACHED",
+          },
+          { status: 402 },
+        );
+      }
+      dailyRemaining = dailyUse.remaining;
+      reservedDailyUse = { userId: user.id };
     }
-    reservedDailyUse = { userId: user.id };
 
     const cached = await readCachedExplanation({
       supabase,
@@ -352,13 +436,14 @@ export async function POST(request: Request) {
       return NextResponse.json({
         cached: true,
         explanation: cached,
-        aiDetailRemaining: dailyUse.remaining,
+        accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
+        aiDetailRemaining: dailyRemaining,
       });
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      await refundDailyDetailUse(user.id);
+      if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
       return NextResponse.json(
         { error: "伺服器尚未設定 OPENAI_API_KEY。" },
@@ -469,7 +554,7 @@ export async function POST(request: Request) {
 
     if (!openAIResponse.ok) {
       console.error("OpenAI explanation failed:", openAIPayload);
-      await refundDailyDetailUse(user.id);
+      if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
       return NextResponse.json(
         {
@@ -483,7 +568,7 @@ export async function POST(request: Request) {
 
     const outputText = getOutputText(openAIPayload);
     if (!outputText) {
-      await refundDailyDetailUse(user.id);
+      if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
       return NextResponse.json(
         { error: "OpenAI 已回應，但沒有取得可解析的詳解。" },
@@ -495,7 +580,7 @@ export async function POST(request: Request) {
     try {
       explanation = JSON.parse(outputText) as ExplanationResult;
     } catch {
-      await refundDailyDetailUse(user.id);
+      if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
       return NextResponse.json(
         { error: "AI 詳解格式異常，請再試一次。" },
@@ -524,7 +609,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       cached: false,
       explanation,
-      aiDetailRemaining: dailyUse.remaining,
+      accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
+      aiDetailRemaining: dailyRemaining,
     });
   } catch (error) {
     if (reservedDailyUse) {
