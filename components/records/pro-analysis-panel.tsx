@@ -116,12 +116,14 @@ export default function ProAnalysisPanel() {
 
   useEffect(() => {
     if (pro.loading) return;
-    if (!pro.isLoggedIn || !pro.isPro || !pro.userId) {
+
+    const userId = pro.userId;
+    if (!pro.isLoggedIn || !pro.isPro || !userId) {
       setState({ status: "locked" });
       return;
     }
 
-    const cached = readCachedAnalysis(pro.userId);
+    const cached = readCachedAnalysis(userId);
     if (cached) {
       setState({ status: "ready", data: cached });
       return;
@@ -146,7 +148,7 @@ export default function ProAnalysisPanel() {
           throw new Error(payload.error ?? "Pro 分析讀取失敗。");
         }
 
-        writeCachedAnalysis(pro.userId, payload);
+        writeCachedAnalysis(userId, payload);
         setState({ status: "ready", data: payload });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
