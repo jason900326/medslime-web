@@ -232,7 +232,7 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  return ((result.data ?? []) as AttemptRow[]).map(mapRow);
+  return ((result.data ?? []) as unknown as AttemptRow[]).map(mapRow);
 }
 
 export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
@@ -250,7 +250,7 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  const row = ((result.data ?? []) as AttemptRow[])[0];
+  const row = ((result.data ?? []) as unknown as AttemptRow[])[0];
   return row ? mapRow(row) : null;
 }
 
