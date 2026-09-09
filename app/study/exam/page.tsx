@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import {
+  formatAttemptDate,
+  latestAttemptMap,
+  readExamAttempts,
+  type ExamAttempt,
+} from "@/lib/exam-attempt-store";
 
 const rocYears = Array.from({ length: 10 }, (_, index) => 115 - index);
 
@@ -28,7 +34,24 @@ function ExamPicker() {
   const searchParams = useSearchParams();
   const [rocYear, setRocYear] = useState(115);
   const [session, setSession] = useState<1 | 2>(1);
+  const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const explanationMode = searchParams.get("mode") === "explanation";
+
+  useEffect(() => {
+    let cancelled = false;
+    void readExamAttempts()
+      .then((items) => {
+        if (!cancelled) setAttempts(items);
+      })
+      .catch(() => {
+        if (!cancelled) setAttempts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const latestMap = useMemo(() => latestAttemptMap(attempts), [attempts]);
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -45,7 +68,7 @@ function ExamPicker() {
           </h1>
 
           <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            選年度與梯次，再從下面直接挑一份考卷開始作答。
+            選年度與梯次，再挑一份考卷開始作答；寫過的考卷會留下成績紀錄。
           </p>
         </section>
 
@@ -55,7 +78,7 @@ function ExamPicker() {
               想解鎖 NT$59 單份完整詳解？
             </div>
             <p className="mt-1 text-sm font-bold leading-6 text-[#668276]">
-              先選一份考卷並完成作答；交卷後會依這一份考卷顯示完整詳解的解鎖入口。
+              先完成指定考卷；交卷後會在成績頁顯示該份完整詳解的解鎖入口。
             </p>
           </section>
         )}
@@ -101,26 +124,27 @@ function ExamPicker() {
         </section>
 
         <section className="mt-5">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
-                民國 {rocYear} 年 · 第 {session} 次
-              </div>
-              <h2 className="mt-1 text-xl font-black">選擇科目考卷</h2>
+          <div>
+            <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
+              民國 {rocYear} 年 · 第 {session} 次
             </div>
-            <div className="text-xs font-bold text-[#8a9c92]">每份約 80 題</div>
+            <h2 className="mt-1 text-xl font-black">選擇科目考卷</h2>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {subjects.map((subject, index) => (
-              <ExamCard
-                key={subject}
-                index={index}
-                year={rocYear}
-                session={session}
-                subject={subject}
-              />
-            ))}
+            {subjects.map((subject, index) => {
+              const examKey = `${rocYear}-${session}-${subject}`;
+              return (
+                <ExamCard
+                  key={subject}
+                  index={index}
+                  year={rocYear}
+                  session={session}
+                  subject={subject}
+                  latestAttempt={latestMap.get(examKey) ?? null}
+                />
+              );
+            })}
           </div>
         </section>
       </div>
@@ -133,11 +157,13 @@ function ExamCard({
   year,
   session,
   subject,
+  latestAttempt,
 }: {
   index: number;
   year: number;
   session: 1 | 2;
   subject: string;
+  latestAttempt: ExamAttempt | null;
 }) {
   const quizHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -148,28 +174,56 @@ function ExamCard({
     return `/study/exam/quiz?${params.toString()}`;
   }, [year, session, subject]);
 
+  const historyHref = useMemo(() => {
+    const params = new URLSearchParams({
+      tab: "attempts",
+      year: String(year),
+      session: String(session),
+      subject,
+    });
+    return `/study/records?${params.toString()}`;
+  }, [year, session, subject]);
+
   return (
-    <article className="flex min-h-[190px] flex-col rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
-      <div className="flex items-start justify-between gap-3">
+    <article className="flex min-h-[180px] flex-col rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+      <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eefaf2] text-sm font-black text-[#237849]">
           {index + 1}
         </div>
-        <span className="rounded-full bg-[#f7faf8] px-3 py-1 text-[11px] font-black text-[#789083]">
-          完整詳解 NT$59／份
-        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-black leading-7 text-[#17372a]">{subject}</h3>
+          {latestAttempt ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-[#789083]">
+              <span className="font-black text-[#237849]">
+                最近 {latestAttempt.score.toFixed(2)} 分
+              </span>
+              <span>{formatAttemptDate(latestAttempt.completedAt)}</span>
+              <span>{latestAttempt.reviewCount} 題需複習</span>
+            </div>
+          ) : (
+            <div className="mt-2 text-xs font-bold text-[#9aa9a1]">尚無作答紀錄</div>
+          )}
+        </div>
       </div>
 
-      <h3 className="mt-4 text-base font-black leading-7 text-[#17372a]">{subject}</h3>
-      <p className="mt-1 text-xs font-bold leading-5 text-[#789083]">
-        先免費作答；交卷後可選擇是否永久解鎖這份考卷的完整詳解。
-      </p>
-
-      <Link
-        href={quizHref}
-        className="mt-auto block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
-      >
-        ✏️ 開始作答
-      </Link>
+      <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
+        <Link
+          href={quizHref}
+          className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+        >
+          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+        </Link>
+        {latestAttempt ? (
+          <Link
+            href={historyHref}
+            className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+          >
+            歷史作答
+          </Link>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+      </div>
     </article>
   );
 }
