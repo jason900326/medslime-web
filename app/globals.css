@@ -89,6 +89,37 @@
   }
 }
 
+@layer components {
+  /*
+   * Shared type scale. New screens should use these classes instead of choosing
+   * ad-hoc text sizes. Question stems/options are especially important because
+   * users move between quiz, result, attempt-history and mistake-review screens.
+   */
+  .ms-page-title {
+    @apply text-3xl font-black tracking-[-0.04em] md:text-4xl;
+  }
+
+  .ms-section-title {
+    @apply text-xl font-black tracking-[-0.02em];
+  }
+
+  .ms-body-text {
+    @apply text-sm font-bold leading-6;
+  }
+
+  .ms-meta-text {
+    @apply text-xs font-bold leading-5;
+  }
+
+  .ms-question-stem {
+    @apply text-base font-black leading-7 sm:text-lg sm:leading-8;
+  }
+
+  .ms-question-option {
+    @apply text-sm font-bold leading-6 sm:text-base;
+  }
+}
+
 html {
   background: var(--brand-bg);
 }
