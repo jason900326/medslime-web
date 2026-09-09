@@ -45,8 +45,8 @@ export default function AttemptCard({
         <div className="min-w-0 flex-1">
           <div className="text-xs font-black tracking-[0.02em] text-[#2ba962]">
             {freeQuiz
-              ? `自由測驗 · 民國 ${attempt.year.replace("-", "–")} 年`
-              : `民國 ${attempt.year} 年・第 ${attempt.session} 次`}
+              ? `自由測驗 · ${attempt.year.replace("-", "–")} 年`
+              : `${attempt.year} 年・第 ${attempt.session} 次`}
           </div>
           <h3 className="mt-1 text-lg font-black leading-7 text-[#17372a]">
             {attempt.subject}
@@ -73,9 +73,7 @@ export default function AttemptCard({
           需複習 <strong className="font-black text-[#315b45]">{attempt.reviewCount} 題</strong>
         </span>
         <span className="text-[#c9d4ce]">•</span>
-        <span>
-          {formatAttemptDuration(attempt.durationSeconds)}
-        </span>
+        <span>{formatAttemptDuration(attempt.durationSeconds)}</span>
         {delta !== null && (
           <>
             <span className="text-[#c9d4ce]">•</span>
