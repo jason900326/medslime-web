@@ -70,7 +70,24 @@ The `state` JSON currently owns the gameplay fields, including:
 - `focusHistory`
 - `hasSeenOnboarding`
 
+Each `slimes[slimeId]` entry should contain only collection state needed by the current app, currently `owned` and optional `nickname`. The retired fields `fragments`, `accessoryUnlocked`, and `accessoryEquipped` must not be created by new code.
+
+`supabase/remove_slime_accessories.sql` backs up the current account-state table and removes those retired fields from every player's slime JSON. It also removes the retired accessory achievement ids `accessory-first` and `special-ssr-accessory` from `claimedAchievementIds`.
+
 If MedSlime 2.0 later normalizes parts of this JSON into relational tables, do it as an explicit migration and update this document at the same time.
+
+## Gacha rule
+
+The MedSlime 2.0 collection loop is intentionally simple:
+
+```text
+new slime      -> add to collection
+duplicate slime -> refund gameplay coins
+```
+
+Fragments and accessories are retired gameplay systems. Gacha selection may prioritize unowned slimes within the rolled rarity, but it must not route duplicates into fragment or accessory progression.
+
+Current duplicate-refund amounts remain temporary balancing values until the MedSlime 2.0 economy pass is complete.
 
 ## Cleanup policy
 
