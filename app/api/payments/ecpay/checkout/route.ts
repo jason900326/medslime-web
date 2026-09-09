@@ -29,20 +29,36 @@ export async function POST(request: NextRequest) {
     }
 
     if (product.kind === "exam_explanation") {
+      const year = String(form.get("year") ?? "").trim();
+      const session = String(form.get("session") ?? "").trim();
+      const subject = String(form.get("subject") ?? "").trim();
+
+      if (!year || !session || !subject) {
+        return NextResponse.json(
+          { error: "單份國考完整詳解必須先指定年度、梯次與科目。" },
+          { status: 400 },
+        );
+      }
+
+      // The public CTA can carry the exact exam identity, but payment stays
+      // closed until permanent exam-access fulfillment is deployed. Never fall
+      // back to the retired AI-credit model.
       return NextResponse.json(
-        { error: "單份國考完整詳解請先從國考題庫選擇指定考卷。" },
-        { status: 400 },
+        {
+          error:
+            "單份國考完整詳解付款後端尚未完成永久存取權開通，目前暫不開放付款。",
+        },
+        { status: 503 },
       );
     }
 
-    // Legacy checkout used to grant purchasable AI-detail credits. That flow is
-    // intentionally retired. Keep checkout closed until the Pro subscription
-    // fulfillment schema is deployed so a payment can never fall back to the
-    // old stored-credit model.
+    // Pro is a fixed 30-day learning-service entitlement, not an auto-renewing
+    // subscription and not a stored-value balance. Keep checkout closed until
+    // the matching expiry-based entitlement / fulfillment schema is deployed.
     return NextResponse.json(
       {
         error:
-          "MedSlime Pro 新版會員付款後端正在更新中，目前暫不開放付款。",
+          "MedSlime Pro 30 天方案付款後端正在更新中，目前暫不開放付款。",
       },
       { status: 503 },
     );
