@@ -2,8 +2,10 @@
 -- Run once in Supabase SQL Editor after deploying the matching app changes.
 --
 -- Policy:
---   * Free accounts may generate 5 NEW AI detailed explanations per Taiwan calendar day.
---   * Cached explanations consume nothing.
+--   * Free accounts may VIEW up to 5 detailed explanations per Taiwan calendar day.
+--   * The daily service limit applies whether the explanation is newly generated
+--     or already exists in the shared cache. Cache status is an internal cost
+--     optimization and must not change what the user is entitled to view.
 --   * Unused daily uses do not carry over.
 --   * AI uses cannot be purchased, topped up, transferred, or stored as a paid balance.
 --
