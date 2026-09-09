@@ -39,7 +39,7 @@ export default function PaymentResultClient() {
         setStatus(nextStatus);
 
         if (nextStatus === "paid") {
-          setMessage("付款已確認，資源已入帳。");
+          setMessage("付款已確認，購買的學習服務已開通。");
           return;
         }
 
