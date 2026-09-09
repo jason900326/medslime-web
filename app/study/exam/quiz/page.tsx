@@ -272,6 +272,23 @@ function ExamQuizContent() {
             uncertain: uncertain[item.id] ?? false,
             officialPdfUrl: item.questionPdfUrl,
           })),
+          questionOutcomes: questions.map((item) => {
+            const answer = answers[item.id];
+            const answered = answer !== undefined;
+            return {
+              questionId: item.id,
+              questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+              questionNumber: item.questionNumber,
+              userAnswer: answered ? answer : null,
+              correctIndex: item.correctIndex,
+              answered,
+              correct:
+                answered && item.correctIndex !== null
+                  ? answer === item.correctIndex
+                  : null,
+              uncertain: uncertain[item.id] ?? false,
+            };
+          }),
         });
       } catch (error) {
         console.error("國考作答紀錄儲存失敗：", error);
