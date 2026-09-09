@@ -6,7 +6,6 @@ type AchievementSnapshot = {
     string,
     {
       owned?: boolean;
-      accessoryUnlocked?: boolean;
       nickname?: string;
     }
   >;
@@ -25,13 +24,13 @@ export function getCompletedAchievementIds(game: AchievementSnapshot) {
     game.focusHistory.reduce((sum, session) => sum + session.actualSeconds, 0) / 60,
   );
   const ownedCount = SLIMES.filter((slime) => game.slimes[slime.id]?.owned).length;
-  const accessoryCount = SLIMES.filter(
-    (slime) => game.slimes[slime.id]?.accessoryUnlocked,
-  ).length;
   const ownedByRarity = (rarity: "N" | "R" | "SR" | "SSR") =>
     SLIMES.filter(
       (slime) => slime.rarity === rarity && game.slimes[slime.id]?.owned,
     ).length;
+  const rarityKindsOwned = (["N", "R", "SR", "SSR"] as const).filter(
+    (rarity) => ownedByRarity(rarity) > 0,
+  ).length;
 
   const checks: Array<[string, boolean]> = [
     ["focus-1", focusMinutes >= 60],
@@ -45,23 +44,17 @@ export function getCompletedAchievementIds(game: AchievementSnapshot) {
     ["questions-1000", game.totalQuestionsAnswered >= 1000],
     ["mistakes-50", game.totalMistakesReviewed >= 50],
     ["collection-5", ownedCount >= 5],
+    ["collection-10", ownedCount >= 10],
     ["collection-all-n", ownedByRarity("N") >= SLIMES.filter((s) => s.rarity === "N").length],
     ["collection-all-r", ownedByRarity("R") >= SLIMES.filter((s) => s.rarity === "R").length],
     ["collection-all-sr", ownedByRarity("SR") >= SLIMES.filter((s) => s.rarity === "SR").length],
-    ["accessory-first", accessoryCount >= 1],
-    ["collection-complete", accessoryCount >= SLIMES.length && ownedCount >= SLIMES.length],
+    ["collection-complete", ownedCount >= SLIMES.length],
     ["pull-10", game.totalPulls >= 10],
     ["pull-25", game.totalPulls >= 25],
     ["pull-50", game.totalPulls >= 50],
     ["pull-100", game.totalPulls >= 100],
     ["special-ssr", ownedByRarity("SSR") > 0],
-    [
-      "special-ssr-accessory",
-      SLIMES.some(
-        (slime) =>
-          slime.rarity === "SSR" && game.slimes[slime.id]?.accessoryUnlocked,
-      ),
-    ],
+    ["special-rarity-set", rarityKindsOwned >= 4],
     [
       "special-nickname",
       Object.values(game.slimes).some((slime) => Boolean(slime.nickname?.trim())),
