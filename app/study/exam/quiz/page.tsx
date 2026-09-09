@@ -15,6 +15,7 @@ import OfficialQuestionCrop from "@/components/official-question-crop";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import ExamExplanationOffer from "@/components/exam-explanation-offer";
 import { useGameState } from "@/components/game-state-provider";
+import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 
 type Question = {
@@ -180,6 +181,16 @@ function ExamQuizContent() {
   const uncertainCount = Object.values(uncertain).filter(Boolean).length;
   const score = correctCount * 1.25;
 
+  const reviewQuestions = questions.filter((item) => {
+    const userAnswer = answers[item.id];
+    const isWrong =
+      item.correctIndex !== null &&
+      userAnswer !== undefined &&
+      userAnswer !== item.correctIndex;
+    const isUncertain = uncertain[item.id] ?? false;
+    return isWrong || isUncertain;
+  });
+
   const toggleStrike = (questionId: string, optionIndex: number) => {
     setStruckOptions((current) => {
       const list = current[questionId] ?? [];
@@ -205,33 +216,23 @@ function ExamQuizContent() {
 
   const saveMistakes = async () => {
     const now = new Date().toISOString();
-    const records = questions
-      .filter((item) => {
-        const userAnswer = answers[item.id];
-        const isWrong =
-          item.correctIndex !== null &&
-          userAnswer !== undefined &&
-          userAnswer !== item.correctIndex;
-        const isUncertain = uncertain[item.id] ?? false;
-        return isWrong || isUncertain;
-      })
-      .map((item) => ({
-        id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
-        source: "national-exam" as const,
-        sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
-        subject,
-        year,
-        session,
-        questionNumber: item.questionNumber,
-        stem: item.stem,
-        options: item.options,
-        correctIndex: item.correctIndex,
-        userAnswer: answers[item.id] ?? null,
-        uncertain: uncertain[item.id] ?? false,
-        officialPdfUrl: item.questionPdfUrl,
-        createdAt: now,
-        reviewed: false,
-      }));
+    const records = reviewQuestions.map((item) => ({
+      id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+      source: "national-exam" as const,
+      sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
+      subject,
+      year,
+      session,
+      questionNumber: item.questionNumber,
+      stem: item.stem,
+      options: item.options,
+      correctIndex: item.correctIndex,
+      userAnswer: answers[item.id] ?? null,
+      uncertain: uncertain[item.id] ?? false,
+      officialPdfUrl: item.questionPdfUrl,
+      createdAt: now,
+      reviewed: false,
+    }));
 
     await upsertMistakes(records);
   };
@@ -242,19 +243,47 @@ function ExamQuizContent() {
       Number.isFinite(startedAt) && startedAt > 0
         ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
         : 0;
+    const answeredCount = Object.keys(answers).length;
 
     setElapsedAtFinish(elapsed);
     window.dispatchEvent(new Event(EXAM_FINISHED_EVENT));
+
+    if (!recorded) {
+      setRecorded(true);
+
+      try {
+        await saveNationalExamAttempt({
+          year,
+          session,
+          subject,
+          answeredCount,
+          correctCount,
+          score,
+          reviewCount: reviewQuestions.length,
+          uncertainCount,
+          durationSeconds: elapsed,
+          reviewItems: reviewQuestions.map((item) => ({
+            id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+            questionNumber: item.questionNumber,
+            stem: item.stem,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            userAnswer: answers[item.id] ?? null,
+            uncertain: uncertain[item.id] ?? false,
+            officialPdfUrl: item.questionPdfUrl,
+          })),
+        });
+      } catch (error) {
+        console.error("國考作答紀錄儲存失敗：", error);
+      }
+
+      game.recordQuestionsAnswered(answeredCount);
+    }
 
     try {
       await saveMistakes();
     } catch (error) {
       console.error("國考錯題儲存失敗：", error);
-    }
-
-    if (!recorded) {
-      game.recordQuestionsAnswered(Object.keys(answers).length);
-      setRecorded(true);
     }
 
     setShowSubmitDialog(false);
@@ -265,16 +294,6 @@ function ExamQuizContent() {
     localStorage.setItem(TUTORIAL_STORAGE_KEY, "1");
     setShowTutorial(false);
   };
-
-  const reviewQuestions = questions.filter((item) => {
-    const userAnswer = answers[item.id];
-    const isWrong =
-      item.correctIndex !== null &&
-      userAnswer !== undefined &&
-      userAnswer !== item.correctIndex;
-    const isUncertain = uncertain[item.id] ?? false;
-    return isWrong || isUncertain;
-  });
 
   if (finished) {
     const previewReviewQuestions = reviewQuestions.slice(0, 3);

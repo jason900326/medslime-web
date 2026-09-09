@@ -1,7 +1,6 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { stageNationalExamAttemptCapture } from "@/lib/exam-attempt-store";
 
 export type MistakeSource = "national-exam" | "material";
 
@@ -96,7 +95,6 @@ export async function readMistakes(): Promise<MistakeRecord[]> {
       .filter(Boolean);
   }
 
-  // 一次性搬移目前瀏覽器裡舊的帳號專屬 localStorage 錯題。
   const legacy = readLegacyMistakes(userId);
 
   if (legacy.length > 0) {
@@ -111,10 +109,6 @@ export async function readMistakes(): Promise<MistakeRecord[]> {
 export async function upsertMistakes(
   records: MistakeRecord[],
 ): Promise<void> {
-  // 國考交卷時這個函式會在 recordQuestionsAnswered() 前被 await。
-  // 先確定 baseline，回傳後再由既有流程更新總作答數，歷史成績才能準確計算。
-  await stageNationalExamAttemptCapture(records);
-
   if (records.length === 0) return;
 
   const { supabase, userId } = await getCurrentUserId();
