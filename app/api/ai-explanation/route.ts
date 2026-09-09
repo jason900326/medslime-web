@@ -110,10 +110,6 @@ function nationalExamKeyFromQuestionKey(questionKey: string) {
   return `${year}-${session}-${subject}`;
 }
 
-function isMissingRpc(message: string) {
-  return /could not find|does not exist|schema cache/i.test(message);
-}
-
 async function hasPurchasedExamExplanation(input: {
   userId: string;
   source: "national-exam" | "material";
@@ -133,9 +129,6 @@ async function hasPurchasedExamExplanation(input: {
     .eq("exam_key", examKey)
     .maybeSingle();
 
-  // During a rolling deployment the table may not exist until the SQL migration
-  // is applied. Checkout stays disabled until then, so treating that state as
-  // "not purchased" keeps the existing free daily limit working safely.
   if (error) {
     if (/exam_explanation_entitlements|does not exist|schema cache/i.test(error.message)) {
       return false;
@@ -257,48 +250,28 @@ function normalizeRpcPayload(data: unknown): Record<string, unknown> {
 
 async function consumeDailyDetailUse(userId: string): Promise<DailyUseResult> {
   const admin = createAdminClient();
-  let { data, error } = await admin.rpc("consume_ai_detail_daily_use", {
+  const { data, error } = await admin.rpc("consume_ai_detail_daily_use", {
     p_user_id: userId,
   });
 
-  // Compatibility while payment_entitlement_v2.sql is being rolled out.
-  if (error && isMissingRpc(error.message)) {
-    const legacy = await admin.rpc("consume_ai_detail_credit", {
-      p_user_id: userId,
-    });
-    data = legacy.data;
-    error = legacy.error;
-  }
-
   if (error) {
-    if (
-      error.message.includes("AI_DETAIL_DAILY_LIMIT_REACHED") ||
-      error.message.includes("AI_DETAIL_CREDIT_REQUIRED")
-    ) {
+    if (error.message.includes("AI_DETAIL_DAILY_LIMIT_REACHED")) {
       return { ok: false, remaining: 0 };
     }
     throw new Error(`完整詳解每日使用次數更新失敗：${error.message}`);
   }
 
   const payload = normalizeRpcPayload(data);
-  const remaining = Math.max(0, Number(payload.remaining ?? payload.freeRemaining ?? 0));
+  const remaining = Math.max(0, Number(payload.remaining ?? 0));
   return { ok: true, remaining };
 }
 
 async function refundDailyDetailUse(userId: string) {
   try {
     const admin = createAdminClient();
-    let { error } = await admin.rpc("refund_ai_detail_daily_use", {
+    const { error } = await admin.rpc("refund_ai_detail_daily_use", {
       p_user_id: userId,
     });
-
-    if (error && isMissingRpc(error.message)) {
-      const legacy = await admin.rpc("refund_ai_detail_credit", {
-        p_user_id: userId,
-        p_source: "free",
-      });
-      error = legacy.error;
-    }
 
     if (error) console.error("完整詳解每日使用次數退回失敗：", error);
   } catch (error) {
@@ -326,20 +299,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "缺少 questionKey。" }, { status: 400 });
     }
 
-    const cached = await readCachedExplanation({
-      supabase,
-      userId: user.id,
-      source,
-      questionKey,
-    });
-    const purchasedExamAccess = await hasPurchasedExamExplanation({
-      userId: user.id,
-      source,
-      questionKey,
-    });
+    const [cached, purchasedExamAccess] = await Promise.all([
+      readCachedExplanation({
+        supabase,
+        userId: user.id,
+        source,
+        questionKey,
+      }),
+      hasPurchasedExamExplanation({
+        userId: user.id,
+        source,
+        questionKey,
+      }),
+    ]);
 
-    // Do not return the explanation through GET. POST performs the entitlement
-    // or daily-service-limit check before revealing content.
     return NextResponse.json({
       available: Boolean(cached),
       purchasedExamAccess,
