@@ -202,6 +202,23 @@ function FreeQuizRunner() {
             uncertain: Boolean(uncertain[item.id]),
             officialPdfUrl: item.questionPdfUrl,
           })),
+          questionOutcomes: questions.map((item) => {
+            const answer = answers[item.id];
+            const answered = answer !== undefined;
+            return {
+              questionId: item.id,
+              questionKey: sourceId(item),
+              questionNumber: item.sourceQuestionNumber,
+              userAnswer: answered ? answer : null,
+              correctIndex: item.correctIndex,
+              answered,
+              correct:
+                answered && item.correctIndex !== null
+                  ? answer === item.correctIndex
+                  : null,
+              uncertain: Boolean(uncertain[item.id]),
+            };
+          }),
         });
         game.recordQuestionsAnswered(answeredCount);
       } catch (error) {
