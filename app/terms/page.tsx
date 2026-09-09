@@ -13,7 +13,7 @@ export default function TermsPage() {
           <div className="text-xs font-black tracking-[0.12em] text-[#2ba962]">TERMS</div>
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">服務條款與著作權</h1>
           <p className="mt-3 text-sm font-bold leading-7 text-[#70877a] sm:text-base">
-            最後更新：2026 年 9 月 6 日
+            最後更新：2026 年 9 月 9 日
           </p>
         </section>
 
@@ -49,18 +49,21 @@ export default function TermsPage() {
           </p>
         </PolicySection>
 
-        <PolicySection title="虛擬商品、付款與交易異常">
+        <PolicySection title="付費學習服務、付款與交易異常">
           <p>
-            商城商品包含金幣與 AI 詳解額度等虛擬資源。實際商品內容、數量與價格以購買當下商城頁面顯示為準。付款由綠界科技處理，付款完成後由 MedSlime 驗證交易結果並發放對應資源。
+            MedSlime 的付費內容為線上學習服務，包括 MedSlime Pro 會員方案與指定國考考卷的完整數位詳解。實際服務內容與價格以購買當下商城或題庫頁面顯示為準。付款由合作金流服務處理，付款完成後由 MedSlime 驗證交易結果並開通對應會員服務或指定數位內容。
           </p>
           <p className="mt-3">
-            若發生付款成功但未入帳、重複扣款或其他交易異常，請盡快聯絡 MedSlime。退款、取消及其他消費者權利依適用法令與付款服務規則處理；依法不得排除的權利不因本條款而受影響。
+            MedSlime 不提供以現金購買金幣、抽卡券、AI 次數、點數、錢包餘額或其他可儲值資產。站內金幣僅能透過學習、任務、專注與成就取得，且無法兌現、交易或轉讓。免費 AI 即時詳解的每日使用次數為服務使用上限，每日重新計算、未使用次數不累積，也不提供額外次數購買。
+          </p>
+          <p className="mt-3">
+            若發生付款成功但服務未開通、重複扣款或其他交易異常，請盡快聯絡 MedSlime。退款、取消及其他消費者權利依適用法令與付款服務規則處理；依法不得排除的權利不因本條款而受影響。
           </p>
         </PolicySection>
 
         <PolicySection title="帳號與服務變更">
           <p>
-            請勿利用 MedSlime 從事未授權存取、破壞服務、濫用 API、欺詐付款或其他違法行為。為維持服務品質與安全，MedSlime 可能調整功能、額度、價格或活動內容；重大變更會盡可能在網站上說明。
+            請勿利用 MedSlime 從事未授權存取、破壞服務、濫用 API、欺詐付款或其他違法行為。為維持服務品質與安全，MedSlime 可能調整功能、每日使用上限、價格或活動內容；重大變更會盡可能在網站上說明。
           </p>
         </PolicySection>
 
