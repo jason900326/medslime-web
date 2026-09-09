@@ -14,6 +14,50 @@ set local lock_timeout = '5s';
 set local statement_timeout = '60s';
 
 -- -----------------------------------------------------------------------------
+-- 0. Ensure the two core tables exist. The legacy ai_detail_credits column is
+--    retained only because older deployed databases may still have it; active
+--    code never treats it as purchasable value.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.payment_orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  merchant_trade_no text not null unique,
+  product_id text not null,
+  total_amount integer not null check (total_amount > 0),
+  status text not null default 'pending' check (status in ('pending', 'paid', 'cancelled', 'refunded')),
+  provider text not null default 'ecpay',
+  provider_trade_no text,
+  provider_message text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  entitlement_type text,
+  entitlement_key text,
+  entitlement_metadata jsonb not null default '{}'::jsonb
+);
+
+alter table public.payment_orders enable row level security;
+
+create table if not exists public.player_entitlements (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  ai_detail_credits integer not null default 0,
+  ai_detail_free_period text,
+  ai_detail_free_used integer not null default 0,
+  pro_expires_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.player_entitlements
+  add column if not exists ai_detail_credits integer not null default 0,
+  add column if not exists ai_detail_free_period text,
+  add column if not exists ai_detail_free_used integer not null default 0,
+  add column if not exists pro_expires_at timestamptz,
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.player_entitlements enable row level security;
+
+-- -----------------------------------------------------------------------------
 -- 1. Payment ledger: preserve historical rows, but move all new orders to direct
 --    entitlement fields.
 -- -----------------------------------------------------------------------------
@@ -23,10 +67,31 @@ alter table public.payment_orders
   add column if not exists entitlement_key text,
   add column if not exists entitlement_metadata jsonb not null default '{}'::jsonb;
 
--- Legacy stored-value columns remain readable for historical audit only.
-alter table public.payment_orders
-  alter column grant_type drop not null,
-  alter column grant_amount drop not null;
+-- Legacy stored-value columns remain readable for historical audit only if an
+-- older database still has them. Their NOT NULL/check restrictions must not
+-- constrain new direct-entitlement orders.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'payment_orders'
+      and column_name = 'grant_type'
+  ) then
+    execute 'alter table public.payment_orders alter column grant_type drop not null';
+  end if;
+
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'payment_orders'
+      and column_name = 'grant_amount'
+  ) then
+    execute 'alter table public.payment_orders alter column grant_amount drop not null';
+  end if;
+end $$;
 
 alter table public.payment_orders
   drop constraint if exists payment_orders_ai_detail_only_check,
