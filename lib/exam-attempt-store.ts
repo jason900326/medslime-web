@@ -29,6 +29,19 @@ export type ExamAttempt = {
   reviewItems: ExamAttemptReviewItem[];
 };
 
+export type SaveExamAttemptInput = {
+  year: string;
+  session: string;
+  subject: string;
+  answeredCount: number;
+  correctCount: number;
+  score: number;
+  reviewCount: number;
+  uncertainCount: number;
+  durationSeconds: number;
+  reviewItems: ExamAttemptReviewItem[];
+};
+
 type AttemptRow = {
   id: string;
   year: string;
@@ -45,19 +58,6 @@ type AttemptRow = {
   review_items?: unknown;
 };
 
-type ReviewLike = {
-  id?: string;
-  questionNumber?: number;
-  stem?: string;
-  options?: string[];
-  correctIndex: number | null;
-  userAnswer: number | null;
-  uncertain: boolean;
-  officialPdfUrl?: string | null;
-};
-
-const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
-const CAPTURE_LOCK_KEY = "medslime_exam_attempt_capture";
 const ATTEMPT_SELECT_BASE =
   "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
 const ATTEMPT_SELECT = `${ATTEMPT_SELECT_BASE},review_items`;
@@ -200,133 +200,50 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
   return result.data ? mapRow(result.data as AttemptRow) : null;
 }
 
-function getExamIdentityFromLocation() {
-  if (typeof window === "undefined") return null;
-  if (!window.location.pathname.includes("/study/exam/quiz")) return null;
-
-  const params = new URLSearchParams(window.location.search);
-  const year = params.get("year")?.trim() ?? "";
-  const session = params.get("session")?.trim() ?? "";
-  const subject = params.get("subject")?.trim() ?? "";
-  if (!year || !session || !subject) return null;
-
-  return {
-    year,
-    session,
-    subject,
-    examKey: `${year}-${session}-${subject}`,
-  };
-}
-
-function getDurationSeconds() {
-  if (typeof window === "undefined") return 0;
-  const startedAt = Number(window.sessionStorage.getItem(EXAM_STARTED_AT_KEY));
-  if (!Number.isFinite(startedAt) || startedAt <= 0) return 0;
-  return Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-}
-
-/**
- * Capture the total-question baseline before the quiz records this attempt, then
- * poll briefly for the existing game-state counter update. This keeps the new
- * history feature isolated while the quiz page is being migrated.
- */
-export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
-  if (typeof window === "undefined") return;
-  const identity = getExamIdentityFromLocation();
-  if (!identity) return;
-
+export async function saveNationalExamAttempt(
+  input: SaveExamAttemptInput,
+): Promise<void> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) return;
 
-  const { data: beforeRow } = await supabase
-    .from("player_account_state")
-    .select("state")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const beforeState = (beforeRow?.state ?? {}) as { totalQuestionsAnswered?: unknown };
-  const baseline = Math.max(0, Number(beforeState.totalQuestionsAnswered ?? 0));
+  const examKey = `${input.year}-${input.session}-${input.subject}`;
+  const baseInsert = {
+    user_id: user.id,
+    year: input.year,
+    session: input.session,
+    subject: input.subject,
+    exam_key: examKey,
+    answered_count: Math.max(0, Math.floor(input.answeredCount)),
+    correct_count: Math.max(0, Math.floor(input.correctCount)),
+    score: Math.max(0, Number(input.score)),
+    review_count: Math.max(0, Math.floor(input.reviewCount)),
+    uncertain_count: Math.max(0, Math.floor(input.uncertainCount)),
+    duration_seconds: Math.max(0, Math.floor(input.durationSeconds)),
+    completed_at: new Date().toISOString(),
+  };
 
-  const captureKey = `${identity.examKey}:${Date.now()}`;
-  window.sessionStorage.setItem(CAPTURE_LOCK_KEY, captureKey);
+  const result = await supabase.from("exam_attempts").insert({
+    ...baseInsert,
+    review_items: input.reviewItems,
+  });
 
-  const wrongCount = records.filter(
-    (item) =>
-      item.correctIndex !== null &&
-      item.userAnswer !== null &&
-      item.userAnswer !== item.correctIndex,
-  ).length;
-  const reviewCount = records.length;
-  const uncertainCount = records.filter((item) => item.uncertain).length;
-  const durationSeconds = getDurationSeconds();
-  const reviewItems: ExamAttemptReviewItem[] = records.map((item, index) => ({
-    id: item.id ?? `${identity.examKey}:${item.questionNumber ?? index + 1}`,
-    questionNumber:
-      typeof item.questionNumber === "number" ? item.questionNumber : null,
-    stem: item.stem ?? "",
-    options: Array.isArray(item.options) ? item.options : [],
-    correctIndex: item.correctIndex,
-    userAnswer: item.userAnswer,
-    uncertain: item.uncertain,
-    officialPdfUrl: item.officialPdfUrl ?? null,
-  }));
-
-  void (async () => {
-    const waits = [450, 900, 1600, 2800, 4500];
-    let answeredCount = 0;
-
-    for (const wait of waits) {
-      await new Promise((resolve) => window.setTimeout(resolve, wait));
-      if (window.sessionStorage.getItem(CAPTURE_LOCK_KEY) !== captureKey) return;
-
-      const { data: afterRow } = await supabase
-        .from("player_account_state")
-        .select("state")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      const afterState = (afterRow?.state ?? {}) as { totalQuestionsAnswered?: unknown };
-      const current = Math.max(0, Number(afterState.totalQuestionsAnswered ?? baseline));
-      answeredCount = Math.max(0, current - baseline);
-      if (answeredCount > 0) break;
+  if (result.error && missingReviewItemsColumn(result.error.message)) {
+    const legacyResult = await supabase.from("exam_attempts").insert(baseInsert);
+    if (legacyResult.error) {
+      console.error("儲存國考作答紀錄失敗：", legacyResult.error);
+      throw new Error("作答紀錄儲存失敗，請稍後再試。");
     }
+    return;
+  }
 
-    const correctCount = Math.max(0, answeredCount - wrongCount);
-    const score = Math.round(correctCount * 1.25 * 100) / 100;
-    const baseInsert = {
-      user_id: user.id,
-      year: identity.year,
-      session: identity.session,
-      subject: identity.subject,
-      exam_key: identity.examKey,
-      answered_count: answeredCount,
-      correct_count: correctCount,
-      score,
-      review_count: reviewCount,
-      uncertain_count: uncertainCount,
-      duration_seconds: durationSeconds,
-      completed_at: new Date().toISOString(),
-    };
-
-    let { error } = await supabase.from("exam_attempts").insert({
-      ...baseInsert,
-      review_items: reviewItems,
-    });
-
-    if (error && missingReviewItemsColumn(error.message)) {
-      const retry = await supabase.from("exam_attempts").insert(baseInsert);
-      error = retry.error;
-    }
-
-    if (error && !error.message.includes("exam_attempts")) {
-      console.error("儲存國考作答紀錄失敗：", error);
-    }
-
-    if (window.sessionStorage.getItem(CAPTURE_LOCK_KEY) === captureKey) {
-      window.sessionStorage.removeItem(CAPTURE_LOCK_KEY);
-    }
-  })();
+  if (result.error) {
+    console.error("儲存國考作答紀錄失敗：", result.error);
+    throw new Error("作答紀錄儲存失敗，請稍後再試。");
+  }
 }
 
 export function latestAttemptMap(attempts: ExamAttempt[]) {
