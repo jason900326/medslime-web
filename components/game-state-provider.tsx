@@ -18,10 +18,11 @@ import {
 
 type PlayerSlimeState = {
   owned: boolean;
-  fragments: number;
-  accessoryUnlocked: boolean;
-  accessoryEquipped: boolean;
   nickname?: string;
+  // Legacy accessory fields are kept read-only until the DB cleanup migration runs.
+  fragments?: number;
+  accessoryUnlocked?: boolean;
+  accessoryEquipped?: boolean;
 };
 
 export type FocusSession = {
@@ -63,11 +64,7 @@ type GameState = {
 type PullOutcome = {
   slimeId: string;
   isNew: boolean;
-  duplicateReward:
-    | { type: "fragments"; amount: number }
-    | { type: "coins"; amount: number }
-    | { type: "fragments_full"; amount: 0 }
-    | null;
+  duplicateReward: { type: "coins"; amount: number } | null;
 };
 
 type Reward = {
@@ -88,8 +85,6 @@ type GameStateContextValue = GameState & {
   canUseFreePull: boolean;
   useFreePull: () => boolean;
   pullOne: (options?: PullOptions) => PullOutcome;
-  unlockAccessory: (slimeId: string) => boolean;
-  setAccessoryEquipped: (slimeId: string, equipped: boolean) => boolean;
   setCompanion: (slimeId: string) => void;
   setNickname: (slimeId: string, nickname: string) => void;
   claimAchievementReward: (achievementId: string, reward: Reward) => boolean;
@@ -111,7 +106,6 @@ type GameStateContextValue = GameState & {
 };
 
 const FOCUS_COIN_CAP = 60;
-const ACCESSORY_FRAGMENT_COST = 30;
 const SSR_PITY_PULLS = 80;
 
 const starterState: GameState = {
@@ -132,9 +126,6 @@ const starterState: GameState = {
   slimes: {
     "n-green": {
       owned: true,
-      fragments: 0,
-      accessoryUnlocked: false,
-      accessoryEquipped: false,
     },
   },
 };
@@ -217,14 +208,16 @@ function normalizeState(raw: unknown): GameState {
           slimeId,
           {
             owned: item.owned === true,
-            fragments:
-              typeof item.fragments === "number" && Number.isFinite(item.fragments)
-                ? Math.max(0, item.fragments)
-                : 0,
-            accessoryUnlocked: item.accessoryUnlocked === true,
-            accessoryEquipped:
-              item.accessoryUnlocked === true && item.accessoryEquipped === true,
             ...(typeof item.nickname === "string" ? { nickname: item.nickname } : {}),
+            ...(typeof item.fragments === "number" && Number.isFinite(item.fragments)
+              ? { fragments: Math.max(0, item.fragments) }
+              : {}),
+            ...(typeof item.accessoryUnlocked === "boolean"
+              ? { accessoryUnlocked: item.accessoryUnlocked }
+              : {}),
+            ...(typeof item.accessoryEquipped === "boolean"
+              ? { accessoryEquipped: item.accessoryEquipped }
+              : {}),
           },
         ];
       },
@@ -296,12 +289,6 @@ function duplicateCoinRefund(rarity: SlimeRarity) {
   return 150;
 }
 
-function duplicateFragmentReward(rarity: SlimeRarity) {
-  if (rarity === "N") return 10;
-  if (rarity === "R") return 15;
-  return 30;
-}
-
 function rollRarity(forceSSR: boolean, forceSR: boolean): SlimeRarity {
   if (forceSSR) return "SSR";
   if (forceSR) return "SR";
@@ -320,23 +307,10 @@ function pickWeightedSlime(
   const rarity = rollRarity(forceSSR, forceSR);
   const pool = SLIMES.filter((slime) => slime.rarity === rarity);
 
-  // 收集保護：先補同稀有度尚未擁有的角色，再優先補尚未解鎖飾品、碎片最少的角色。
+  // 收集保護：同稀有度先補尚未擁有的角色；若已收齊則在該稀有度隨機抽取。
   const unowned = pool.filter((slime) => !state.slimes[slime.id]?.owned);
   if (unowned.length > 0) {
     return unowned[Math.floor(Math.random() * unowned.length)];
-  }
-
-  const incomplete = pool.filter(
-    (slime) => !state.slimes[slime.id]?.accessoryUnlocked,
-  );
-  if (incomplete.length > 0) {
-    const minimumFragments = Math.min(
-      ...incomplete.map((slime) => state.slimes[slime.id]?.fragments ?? 0),
-    );
-    const candidates = incomplete.filter(
-      (slime) => (state.slimes[slime.id]?.fragments ?? 0) === minimumFragments,
-    );
-    return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
   return pool[Math.floor(Math.random() * pool.length)];
@@ -498,8 +472,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       current,
       options?.forceSR === true,
     );
-    const playerSlime = current.slimes[slime.id];
-    const owned = playerSlime?.owned ?? false;
+    const owned = current.slimes[slime.id]?.owned ?? false;
     const nextPity = slime.rarity === "SSR" ? 0 : current.pity + 1;
 
     if (!owned) {
@@ -511,106 +484,24 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           ...current.slimes,
           [slime.id]: {
             owned: true,
-            fragments: 0,
-            accessoryUnlocked: false,
-            accessoryEquipped: false,
           },
         },
       });
       return { slimeId: slime.id, isNew: true, duplicateReward: null };
     }
 
-    if (playerSlime.accessoryUnlocked) {
-      const refund = duplicateCoinRefund(slime.rarity);
-      replaceState({
-        ...current,
-        pity: nextPity,
-        totalPulls: current.totalPulls + 1,
-        coins: current.coins + refund,
-      });
-      return {
-        slimeId: slime.id,
-        isNew: false,
-        duplicateReward: { type: "coins", amount: refund },
-      };
-    }
-
-    if (playerSlime.fragments >= ACCESSORY_FRAGMENT_COST) {
-      replaceState({
-        ...current,
-        pity: nextPity,
-        totalPulls: current.totalPulls + 1,
-      });
-      return {
-        slimeId: slime.id,
-        isNew: false,
-        duplicateReward: { type: "fragments_full", amount: 0 },
-      };
-    }
-
-    const fragmentReward = duplicateFragmentReward(slime.rarity);
-    const nextFragments = Math.min(
-      ACCESSORY_FRAGMENT_COST,
-      playerSlime.fragments + fragmentReward,
-    );
-    const added = nextFragments - playerSlime.fragments;
+    const refund = duplicateCoinRefund(slime.rarity);
     replaceState({
       ...current,
       pity: nextPity,
       totalPulls: current.totalPulls + 1,
-      slimes: {
-        ...current.slimes,
-        [slime.id]: { ...playerSlime, fragments: nextFragments },
-      },
+      coins: current.coins + refund,
     });
     return {
       slimeId: slime.id,
       isNew: false,
-      duplicateReward: { type: "fragments", amount: added },
+      duplicateReward: { type: "coins", amount: refund },
     };
-  };
-
-  const unlockAccessory = (slimeId: string) => {
-    if (!userId) return false;
-    const playerSlime = stateRef.current.slimes[slimeId];
-    if (
-      !playerSlime?.owned ||
-      playerSlime.accessoryUnlocked ||
-      playerSlime.fragments < ACCESSORY_FRAGMENT_COST
-    ) return false;
-    updateState((current) => {
-      const latest = current.slimes[slimeId];
-      if (!latest?.owned || latest.accessoryUnlocked || latest.fragments < ACCESSORY_FRAGMENT_COST) {
-        return current;
-      }
-      return {
-        ...current,
-        slimes: {
-          ...current.slimes,
-          [slimeId]: {
-            ...latest,
-            fragments: latest.fragments - ACCESSORY_FRAGMENT_COST,
-            accessoryUnlocked: true,
-            accessoryEquipped: false,
-          },
-        },
-      };
-    });
-    return true;
-  };
-
-  const setAccessoryEquipped = (slimeId: string, equipped: boolean) => {
-    if (!userId) return false;
-    const playerSlime = stateRef.current.slimes[slimeId];
-    if (!playerSlime?.owned || !playerSlime.accessoryUnlocked) return false;
-    updateState((current) => ({
-      ...current,
-      slimes: {
-        ...current.slimes,
-        [slimeId]: { ...current.slimes[slimeId], accessoryEquipped: equipped },
-      },
-    }));
-    return true;
   };
 
   const setCompanion = (slimeId: string) => {
@@ -785,8 +676,6 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       canUseFreePull,
       useFreePull,
       pullOne,
-      unlockAccessory,
-      setAccessoryEquipped,
       setCompanion,
       setNickname,
       claimAchievementReward,
