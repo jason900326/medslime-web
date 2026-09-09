@@ -58,6 +58,9 @@ type ReviewLike = {
 
 const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
 const CAPTURE_LOCK_KEY = "medslime_exam_attempt_capture";
+const ATTEMPT_SELECT_BASE =
+  "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
+const ATTEMPT_SELECT = `${ATTEMPT_SELECT_BASE},review_items`;
 
 function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
   if (!Array.isArray(value)) return [];
@@ -110,8 +113,9 @@ function mapRow(row: AttemptRow): ExamAttempt {
   };
 }
 
-const ATTEMPT_SELECT =
-  "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at,review_items";
+function missingReviewItemsColumn(message: string) {
+  return message.toLowerCase().includes("review_items");
+}
 
 export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   const supabase = createClient();
@@ -121,20 +125,30 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
 
   if (!user) return [];
 
-  const { data, error } = await supabase
+  const safeLimit = Math.max(1, Math.min(300, limit));
+  let result = await supabase
     .from("exam_attempts")
     .select(ATTEMPT_SELECT)
     .eq("user_id", user.id)
     .order("completed_at", { ascending: false })
-    .limit(Math.max(1, Math.min(300, limit)));
+    .limit(safeLimit);
 
-  if (error) {
-    if (error.message.includes("exam_attempts")) return [];
-    console.error("讀取國考作答紀錄失敗：", error);
+  if (result.error && missingReviewItemsColumn(result.error.message)) {
+    result = await supabase
+      .from("exam_attempts")
+      .select(ATTEMPT_SELECT_BASE)
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false })
+      .limit(safeLimit);
+  }
+
+  if (result.error) {
+    if (result.error.message.includes("exam_attempts")) return [];
+    console.error("讀取國考作答紀錄失敗：", result.error);
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  return ((data ?? []) as AttemptRow[]).map(mapRow);
+  return ((result.data ?? []) as AttemptRow[]).map(mapRow);
 }
 
 export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
@@ -145,20 +159,29 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
 
   if (!user || !id) return null;
 
-  const { data, error } = await supabase
+  let result = await supabase
     .from("exam_attempts")
     .select(ATTEMPT_SELECT)
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle();
 
-  if (error) {
-    if (error.message.includes("exam_attempts")) return null;
-    console.error("讀取單次作答紀錄失敗：", error);
+  if (result.error && missingReviewItemsColumn(result.error.message)) {
+    result = await supabase
+      .from("exam_attempts")
+      .select(ATTEMPT_SELECT_BASE)
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .maybeSingle();
+  }
+
+  if (result.error) {
+    if (result.error.message.includes("exam_attempts")) return null;
+    console.error("讀取單次作答紀錄失敗：", result.error);
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
 
-  return data ? mapRow(data as AttemptRow) : null;
+  return result.data ? mapRow(result.data as AttemptRow) : null;
 }
 
 function getExamIdentityFromLocation() {
@@ -255,8 +278,7 @@ export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
 
     const correctCount = Math.max(0, answeredCount - wrongCount);
     const score = Math.round(correctCount * 1.25 * 100) / 100;
-
-    const { error } = await supabase.from("exam_attempts").insert({
+    const baseInsert = {
       user_id: user.id,
       year: identity.year,
       session: identity.session,
@@ -268,9 +290,18 @@ export async function stageNationalExamAttemptCapture(records: ReviewLike[]) {
       review_count: reviewCount,
       uncertain_count: uncertainCount,
       duration_seconds: durationSeconds,
-      review_items: reviewItems,
       completed_at: new Date().toISOString(),
+    };
+
+    let { error } = await supabase.from("exam_attempts").insert({
+      ...baseInsert,
+      review_items: reviewItems,
     });
+
+    if (error && missingReviewItemsColumn(error.message)) {
+      const retry = await supabase.from("exam_attempts").insert(baseInsert);
+      error = retry.error;
+    }
 
     if (error && !error.message.includes("exam_attempts")) {
       console.error("儲存國考作答紀錄失敗：", error);
