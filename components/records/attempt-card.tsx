@@ -8,6 +8,15 @@ import {
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
 
+function isFreeQuizAttempt(attempt: ExamAttempt) {
+  return attempt.session === "自由測驗";
+}
+
+function splitYearRange(value: string) {
+  const match = value.match(/^(\d{2,3})-(\d{2,3})$/);
+  return match ? { from: match[1], to: match[2] } : null;
+}
+
 export default function AttemptCard({
   attempt,
   previous,
@@ -15,85 +24,101 @@ export default function AttemptCard({
   attempt: ExamAttempt;
   previous: ExamAttempt | null;
 }) {
+  const freeQuiz = isFreeQuizAttempt(attempt);
+  const yearRange = freeQuiz ? splitYearRange(attempt.year) : null;
   const quizParams = new URLSearchParams({
     year: attempt.year,
     session: attempt.session,
+    subject: attempt.subject,
+  });
+  const freeQuizParams = new URLSearchParams({
+    from: yearRange?.from ?? "110",
+    to: yearRange?.to ?? "115",
     subject: attempt.subject,
   });
   const sameExamPrevious = previous?.examKey === attempt.examKey ? previous : null;
   const delta = sameExamPrevious ? attempt.score - sameExamPrevious.score : null;
 
   return (
-    <article className="rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-xs font-black text-[#2ba962]">
-            民國 {attempt.year} 年・第 {attempt.session} 次
+    <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
+      <div className="flex items-start justify-between gap-5">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-black tracking-[0.02em] text-[#2ba962]">
+            {freeQuiz
+              ? `自由測驗 · 民國 ${attempt.year.replace("-", "–")} 年`
+              : `民國 ${attempt.year} 年・第 ${attempt.session} 次`}
           </div>
-          <h3 className="mt-1 text-base font-black leading-7">{attempt.subject}</h3>
+          <h3 className="mt-1 text-lg font-black leading-7 text-[#17372a]">
+            {attempt.subject}
+          </h3>
           <div className="mt-1 text-xs font-bold text-[#8a9c92]">
             {formatAttemptDate(attempt.completedAt)}
           </div>
         </div>
+
         <div className="shrink-0 text-right">
-          <div className="text-3xl font-black tracking-[-0.04em] text-[#17372a]">
+          <div className="text-4xl font-black tracking-[-0.05em] text-[#17372a]">
             {attempt.score.toFixed(2)}
           </div>
-          <div className="text-[11px] font-bold text-[#8a9c92]">分</div>
+          <div className="mt-0.5 text-[11px] font-bold text-[#8a9c92]">分</div>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <SmallStat label="答對" value={`${attempt.correctCount} 題`} />
-        <SmallStat label="需複習" value={`${attempt.reviewCount} 題`} />
-        <SmallStat label="時間" value={formatAttemptDuration(attempt.durationSeconds)} />
+      <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#edf2ef] py-3 text-xs font-bold text-[#6f8679]">
+        <span>
+          答對 <strong className="font-black text-[#315b45]">{attempt.correctCount} 題</strong>
+        </span>
+        <span className="text-[#c9d4ce]">•</span>
+        <span>
+          需複習 <strong className="font-black text-[#315b45]">{attempt.reviewCount} 題</strong>
+        </span>
+        <span className="text-[#c9d4ce]">•</span>
+        <span>
+          {formatAttemptDuration(attempt.durationSeconds)}
+        </span>
+        {delta !== null && (
+          <>
+            <span className="text-[#c9d4ce]">•</span>
+            <span className={delta >= 0 ? "font-black text-[#237849]" : "font-black text-[#a15a5a]"}>
+              前次 {delta >= 0 ? "+" : ""}{delta.toFixed(2)}
+            </span>
+          </>
+        )}
       </div>
 
-      {delta !== null && (
-        <div className="mt-3 text-xs font-black text-[#557768]">
-          相較這份考卷前一次：
-          <span className={delta >= 0 ? "text-[#237849]" : "text-[#a15a5a]"}>
-            {delta >= 0 ? "+" : ""}
-            {delta.toFixed(2)} 分
-          </span>
-        </div>
-      )}
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <Link
           href={`/study/records/attempt/${attempt.id}`}
-          className="rounded-xl bg-[#31c978] px-4 py-2.5 text-center text-sm font-black text-white"
+          className="text-sm font-black text-[#237849]"
         >
-          查看這次作答{attempt.reviewCount > 0 ? ` · ${attempt.reviewCount} 題需複習` : ""}
+          查看這次作答 →
         </Link>
+
         <Link
-          href={`/study/exam/quiz?${quizParams.toString()}`}
-          className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2.5 text-center text-sm font-black text-[#315b45]"
+          href={
+            freeQuiz
+              ? `/study/free-quiz?${freeQuizParams.toString()}`
+              : `/study/exam/quiz?${quizParams.toString()}`
+          }
+          className="text-xs font-black text-[#6d8578] underline decoration-[#d8e7de] underline-offset-4"
         >
-          再次作答
+          {freeQuiz ? "再組一份" : "再次作答"}
         </Link>
       </div>
 
-      <div className="mt-3 border-t border-[#edf2ef] pt-3">
-        <div className="mb-2 text-xs font-bold text-[#789083]">
-          想完整檢討這份考卷？可永久解鎖全部題目詳解。
+      {!freeQuiz && (
+        <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-[#f8fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs font-bold text-[#789083]">
+            想完整檢討這份考卷？永久解鎖全部題目詳解。
+          </div>
+          <ExamExplanationPurchaseButton
+            year={attempt.year}
+            session={attempt.session}
+            subject={attempt.subject}
+            compact
+          />
         </div>
-        <ExamExplanationPurchaseButton
-          year={attempt.year}
-          session={attempt.session}
-          subject={attempt.subject}
-          compact
-        />
-      </div>
+      )}
     </article>
-  );
-}
-
-function SmallStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-[#f7faf8] px-3 py-2.5 text-center">
-      <div className="text-[10px] font-bold text-[#8a9c92]">{label}</div>
-      <div className="mt-1 text-xs font-black text-[#315b45]">{value}</div>
-    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
@@ -38,7 +38,11 @@ export default function AttemptDetailPage() {
         if (!attempt) throw new Error("找不到這筆作答紀錄，或這筆紀錄不屬於目前帳號。");
 
         let fallbackItems: ExamAttemptReviewItem[] = [];
-        if (attempt.reviewCount > 0 && attempt.reviewItems.length === 0) {
+        if (
+          attempt.session !== "自由測驗" &&
+          attempt.reviewCount > 0 &&
+          attempt.reviewItems.length === 0
+        ) {
           const mistakes = await readMistakes();
           fallbackItems = mistakes
             .filter(
@@ -60,9 +64,7 @@ export default function AttemptDetailPage() {
             }));
         }
 
-        if (!cancelled) {
-          setState({ status: "ready", attempt, fallbackItems });
-        }
+        if (!cancelled) setState({ status: "ready", attempt, fallbackItems });
       } catch (error) {
         if (!cancelled) {
           setState({
@@ -103,11 +105,18 @@ export default function AttemptDetailPage() {
   }
 
   const { attempt, fallbackItems } = state;
+  const freeQuiz = attempt.session === "自由測驗";
   const items = attempt.reviewItems.length > 0 ? attempt.reviewItems : fallbackItems;
   const usingFallback = attempt.reviewItems.length === 0 && fallbackItems.length > 0;
   const quizParams = new URLSearchParams({
     year: attempt.year,
     session: attempt.session,
+    subject: attempt.subject,
+  });
+  const range = parseYearRange(attempt.year);
+  const freeQuizParams = new URLSearchParams({
+    from: range?.from ?? "110",
+    to: range?.to ?? "115",
     subject: attempt.subject,
   });
 
@@ -120,7 +129,9 @@ export default function AttemptDetailPage() {
           <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">ATTEMPT DETAIL</div>
           <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            民國 {attempt.year} 年・第 {attempt.session} 次・{attempt.subject}
+            {freeQuiz
+              ? `自由測驗 · 民國 ${attempt.year.replace("-", "–")} 年 · ${attempt.subject}`
+              : `民國 ${attempt.year} 年・第 ${attempt.session} 次・${attempt.subject}`}
           </div>
           <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(attempt.completedAt)}</div>
         </section>
@@ -132,20 +143,22 @@ export default function AttemptDetailPage() {
           <Stat label="作答時間" value={formatAttemptDuration(attempt.durationSeconds)} />
         </section>
 
-        <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-black text-[#315b45]">這份考卷的完整詳解</div>
-              <div className="mt-1 text-xs font-bold text-[#789083]">單次 NT$59，購買後永久存取這份考卷完整解析。</div>
+        {!freeQuiz && (
+          <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-black text-[#315b45]">這份考卷的完整詳解</div>
+                <div className="mt-1 text-xs font-bold text-[#789083]">單次 NT$59，購買後永久存取這份考卷完整解析。</div>
+              </div>
+              <ExamExplanationPurchaseButton
+                year={attempt.year}
+                session={attempt.session}
+                subject={attempt.subject}
+                compact
+              />
             </div>
-            <ExamExplanationPurchaseButton
-              year={attempt.year}
-              session={attempt.session}
-              subject={attempt.subject}
-              compact
-            />
-          </div>
-        </section>
+          </section>
+        )}
 
         <section className="mt-7">
           <div className="flex items-end justify-between gap-3">
@@ -168,12 +181,12 @@ export default function AttemptDetailPage() {
             </div>
           ) : items.length === 0 ? (
             <div className="mt-4 rounded-[22px] border border-[#dce9e1] bg-white p-5 text-sm font-bold leading-6 text-[#70877a]">
-              這筆舊紀錄當時只保存了成績摘要，沒有逐題快照。重新作答這份考卷後，下一筆紀錄就能直接查看當次錯題。
+              這筆紀錄當時只保存了成績摘要，沒有逐題快照。重新作答後，下一筆紀錄就能直接查看當次錯題。
             </div>
           ) : (
             <div className="mt-4 space-y-4">
               {items.map((item) => (
-                <ReviewCard key={item.id} item={item} />
+                <ReviewCard key={item.id} item={item} freeQuiz={freeQuiz} />
               ))}
             </div>
           )}
@@ -181,10 +194,14 @@ export default function AttemptDetailPage() {
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
           <Link
-            href={`/study/exam/quiz?${quizParams.toString()}`}
+            href={
+              freeQuiz
+                ? `/study/free-quiz?${freeQuizParams.toString()}`
+                : `/study/exam/quiz?${quizParams.toString()}`
+            }
             className="rounded-xl bg-[#31c978] px-5 py-3 text-center text-sm font-black text-white"
           >
-            再次作答這份考卷
+            {freeQuiz ? "再組一份自由測驗" : "再次作答這份考卷"}
           </Link>
           <Link
             href="/study/records?tab=attempts"
@@ -198,17 +215,22 @@ export default function AttemptDetailPage() {
   );
 }
 
-function ReviewCard({ item }: { item: ExamAttemptReviewItem }) {
+function ReviewCard({ item, freeQuiz }: { item: ExamAttemptReviewItem; freeQuiz: boolean }) {
   const isWrong =
     item.correctIndex !== null &&
     item.userAnswer !== null &&
     item.userAnswer !== item.correctIndex;
+  const source = freeQuiz ? parseSourceId(item.id) : null;
 
   return (
     <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
       <div className="flex flex-wrap items-center gap-2">
         <div className="text-sm font-black text-[#2ba962]">
-          {item.questionNumber ? `第 ${item.questionNumber} 題` : "題目"}
+          {source
+            ? `民國 ${source.year} 年・第 ${source.session} 次・第 ${source.questionNumber} 題`
+            : item.questionNumber
+              ? `第 ${item.questionNumber} 題`
+              : "題目"}
         </div>
         {isWrong && (
           <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">答錯</span>
@@ -260,4 +282,21 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
     </div>
   );
+}
+
+function parseYearRange(value: string) {
+  const match = value.match(/^(\d{2,3})-(\d{2,3})$/);
+  return match ? { from: match[1], to: match[2] } : null;
+}
+
+function parseSourceId(value: string) {
+  const parts = value.split(":");
+  if (parts.length < 5 || parts[0] !== "national-exam") return null;
+  const questionNumber = Number(parts[parts.length - 1]);
+  if (!Number.isFinite(questionNumber)) return null;
+  return {
+    year: parts[1],
+    session: parts[2],
+    questionNumber,
+  };
 }
