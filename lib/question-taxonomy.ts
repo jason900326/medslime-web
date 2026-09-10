@@ -1,16 +1,21 @@
-export const QUESTION_TAXONOMY_VERSION = "topic-taxonomy-v1.2";
+export const QUESTION_TAXONOMY_VERSION = "topic-taxonomy-v1.3";
 
-// v1.2 only expands the fixed catalog and improves visual-reference detection.
-// Existing v1.1 classified rows remain semantically valid and must not be
-// re-sent to the model during the full backfill.
+// v1.3 only extends the stable catalog after the 500-question checkpoint.
+// Existing v1.1/v1.2 classified rows remain semantically usable and are not
+// globally re-sent to the model during the remaining full-bank backfill.
 export const QUESTION_TAXONOMY_COMPATIBLE_VERSIONS = [
   QUESTION_TAXONOMY_VERSION,
+  "topic-taxonomy-v1.2",
   "topic-taxonomy-v1.1",
 ] as const;
 
-// v1.1 needs_review rows are the targeted source set for the one-time v1.2
-// repair pass. Rows upgraded by that pass are written as v1.2.
+// Kept for the historical one-time v1.2 repair endpoint/script.
 export const QUESTION_TAXONOMY_REPAIR_SOURCE_VERSION = "topic-taxonomy-v1.1";
+
+// v1.3 targeted repair candidates must come from the v1.2 500-question
+// checkpoint. The validation runner additionally supplies the exact IDs from
+// that local checkpoint report, so unrelated needs_review rows are untouched.
+export const QUESTION_TAXONOMY_V13_REPAIR_SOURCE_VERSION = "topic-taxonomy-v1.2";
 
 // Versions old enough that they should still be reclassified if encountered.
 export const QUESTION_TAXONOMY_REPROCESS_VERSIONS = ["topic-taxonomy-v1"] as const;
