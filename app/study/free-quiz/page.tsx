@@ -29,11 +29,18 @@ function FreeQuizConfigurator() {
   const initialFrom = clampYear(Number(searchParams.get("from") ?? 110));
   const initialTo = clampYear(Number(searchParams.get("to") ?? 115));
   const initialSubject = searchParams.get("subject") ?? subjects[1];
+  const targetTopic = searchParams.get("topic")?.trim() ?? "";
+  const targetSubtopic = targetTopic ? searchParams.get("subtopic")?.trim() ?? "" : "";
+  const targeted = Boolean(targetTopic);
+  const requestedCount = Number(searchParams.get("count") ?? 20);
+  const initialCount = questionCounts.includes(requestedCount as (typeof questionCounts)[number])
+    ? (requestedCount as (typeof questionCounts)[number])
+    : 20;
 
   const [fromYear, setFromYear] = useState(Math.min(initialFrom, initialTo));
   const [toYear, setToYear] = useState(Math.max(initialFrom, initialTo));
   const [subject, setSubject] = useState(subjects.includes(initialSubject) ? initialSubject : subjects[1]);
-  const [count, setCount] = useState<(typeof questionCounts)[number]>(20);
+  const [count, setCount] = useState<(typeof questionCounts)[number]>(initialCount);
 
   const rangeYears = useMemo(
     () => rocYears.filter((year) => year >= fromYear && year <= toYear).length,
@@ -47,7 +54,19 @@ function FreeQuizConfigurator() {
       subject,
       count: String(count),
     });
+    if (targetTopic) params.set("topic", targetTopic);
+    if (targetSubtopic) params.set("subtopic", targetSubtopic);
     router.push(`/study/free-quiz/quiz?${params.toString()}`);
+  };
+
+  const clearTarget = () => {
+    const params = new URLSearchParams({
+      from: String(fromYear),
+      to: String(toYear),
+      subject,
+      count: String(count),
+    });
+    router.replace(`/study/free-quiz?${params.toString()}`);
   };
 
   return (
@@ -56,12 +75,37 @@ function FreeQuizConfigurator() {
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">FREE QUIZ</div>
-          <h1 className="ms-page-title mt-2">自由測驗</h1>
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
+            {targeted ? "WEAK TOPIC PRACTICE" : "FREE QUIZ"}
+          </div>
+          <h1 className="ms-page-title mt-2">{targeted ? "弱主題練習" : "自由測驗"}</h1>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
-            自己決定年份範圍、科目與題數。系統會從歷屆國考中隨機組一份練習，答錯或標記不確定的題目一樣會進錯題紀錄。
+            {targeted
+              ? "這份練習會鎖定 Pro 分析找到的弱主題，從歷屆國考中抽出同 Topic／Subtopic 題目，完成後的新作答也會回到弱點分析。"
+              : "自己決定年份範圍、科目與題數。系統會從歷屆國考中隨機組一份練習，答錯或標記不確定的題目一樣會進錯題紀錄。"}
           </p>
         </section>
+
+        {targeted && (
+          <section className="mt-5 rounded-[22px] border border-[#bfe1cb] bg-[#eefaf2] px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-xs font-black text-[#2ba962]">本次鎖定弱點</div>
+                <div className="mt-1 text-lg font-black text-[#237849]">{targetSubtopic || targetTopic}</div>
+                {targetSubtopic && (
+                  <div className="mt-1 text-xs font-bold text-[#668276]">上層主題：{targetTopic}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={clearTarget}
+                className="shrink-0 rounded-xl border border-[#cfe7d8] bg-white px-3 py-2 text-xs font-black text-[#557768]"
+              >
+                改回隨機
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 shadow-[0_12px_30px_rgba(30,78,50,0.05)] sm:p-7">
           <div className="grid gap-6 sm:grid-cols-2">
@@ -105,12 +149,18 @@ function FreeQuizConfigurator() {
             <select
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
-              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold leading-6 outline-none focus:border-[#65d795]"
+              disabled={targeted}
+              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold leading-6 outline-none focus:border-[#65d795] disabled:cursor-not-allowed disabled:bg-[#f4f8f5] disabled:text-[#789083]"
             >
               {subjects.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            {targeted && (
+              <div className="mt-2 text-xs font-bold leading-5 text-[#8a9c92]">
+                弱主題隸屬這個科目，因此此模式下不切換科目；要換科請先改回隨機模式。
+              </div>
+            )}
           </div>
 
           <div className="mt-6">
@@ -140,6 +190,11 @@ function FreeQuizConfigurator() {
               {fromYear}–{toYear} 年 · {rangeYears} 個年度 · {count} 題
             </div>
             <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">{subject}</div>
+            {targeted && (
+              <div className="mt-2 text-xs font-black leading-5 text-[#237849]">
+                {targetSubtopic ? `${targetTopic} · ${targetSubtopic}` : targetTopic}
+              </div>
+            )}
           </div>
 
           <button
@@ -147,12 +202,14 @@ function FreeQuizConfigurator() {
             onClick={startQuiz}
             className="mt-6 w-full rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70]"
           >
-            開始自由測驗 →
+            {targeted ? "開始弱主題練習 →" : "開始自由測驗 →"}
           </button>
         </section>
 
         <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/70 px-5 py-4 text-sm font-bold leading-6 text-[#789083]">
-          自由測驗目前採隨機抽題；交卷後會保存作答紀錄與當次錯題快照。
+          {targeted
+            ? "弱主題模式只會使用已確認 taxonomy 的題目；若細分主題題量不足，實際題數可能少於你設定的題數。"
+            : "自由測驗目前採隨機抽題；交卷後會保存作答紀錄與當次錯題快照。"}
         </section>
       </div>
     </main>

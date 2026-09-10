@@ -10,6 +10,7 @@
     "validate:taxonomy-v1.3": "node scripts/validate-taxonomy-v1-3.mjs",
     "backfill:taxonomy": "node scripts/backfill-taxonomy.mjs",
     "validate:topic-analytics": "node scripts/validate-topic-analytics.mjs",
+    "validate:weak-topic-quiz": "node scripts/validate-weak-topic-quiz.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {

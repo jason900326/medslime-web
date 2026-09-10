@@ -30,6 +30,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
       "依逐題作答統計 Topic / Subtopic 弱點",
       "最近作答成績與主題改善趨勢",
       "依弱主題、弱科與錯題整理複習優先順序",
+      "從 Pro 弱點分析直接建立弱主題練習",
       "30 天內持續使用 Pro 進階分析功能",
     ],
     badge: "備考推薦",

@@ -51,7 +51,18 @@ function FreeQuizRunner() {
   const to = searchParams.get("to") ?? "115";
   const subject = searchParams.get("subject") ?? "生物化學與臨床生化學";
   const count = searchParams.get("count") ?? "20";
-  const configKey = `${from}-${to}-${subject}-${count}`;
+  const topic = searchParams.get("topic")?.trim() ?? "";
+  const subtopic = topic ? searchParams.get("subtopic")?.trim() ?? "" : "";
+  const targeted = Boolean(topic);
+  const targetLabel = subtopic || topic;
+  const configKey = `${from}-${to}-${subject}-${count}-${topic}-${subtopic}`;
+
+  const buildConfiguratorHref = () => {
+    const params = new URLSearchParams({ from, to, subject, count });
+    if (topic) params.set("topic", topic);
+    if (subtopic) params.set("subtopic", subtopic);
+    return `/study/free-quiz?${params.toString()}`;
+  };
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [index, setIndex] = useState(0);
@@ -80,6 +91,8 @@ function FreeQuizRunner() {
 
       try {
         const params = new URLSearchParams({ from, to, subject, count });
+        if (topic) params.set("topic", topic);
+        if (subtopic) params.set("subtopic", subtopic);
         const response = await fetch(`/api/free-quiz?${params.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
@@ -100,7 +113,7 @@ function FreeQuizRunner() {
 
     void load();
     return () => controller.abort();
-  }, [configKey, from, to, subject, count]);
+  }, [configKey, from, to, subject, count, topic, subtopic]);
 
   if (loadState.status === "loading") return <LoadingQuiz />;
 
@@ -108,13 +121,13 @@ function FreeQuizRunner() {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref="/study/free-quiz" backLabel="返回自由測驗" />
+          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
           <section className="mt-8 rounded-[24px] border border-[#f0dddd] bg-white p-6">
             <div className="text-xl font-black text-[#9b5050]">無法建立自由測驗</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">{loadState.message}</div>
             <button
               type="button"
-              onClick={() => router.push("/study/free-quiz")}
+              onClick={() => router.push(buildConfiguratorHref())}
               className="mt-5 rounded-xl bg-[#31c978] px-5 py-3 text-sm font-black text-white"
             >
               重新設定
@@ -259,12 +272,19 @@ function FreeQuizRunner() {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref="/study/free-quiz" backLabel="返回自由測驗" />
+          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
 
           <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">FREE QUIZ RESULT</div>
-            <h1 className="mt-2 text-3xl font-black">自由測驗完成</h1>
+            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
+              {targeted ? "WEAK TOPIC RESULT" : "FREE QUIZ RESULT"}
+            </div>
+            <h1 className="mt-2 text-3xl font-black">{targeted ? "弱主題練習完成" : "自由測驗完成"}</h1>
             <div className="mt-2 text-sm font-bold text-[#789083]">{from}–{to} 年 · {subject}</div>
+            {targeted && (
+              <div className="mx-auto mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">
+                {subtopic ? `${topic} · ${subtopic}` : topic}
+              </div>
+            )}
 
             <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3">
               <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
@@ -285,7 +305,7 @@ function FreeQuizRunner() {
               )}
               <button
                 type="button"
-                onClick={() => router.push(`/study/free-quiz?from=${from}&to=${to}&subject=${encodeURIComponent(subject)}`)}
+                onClick={() => router.push(buildConfiguratorHref())}
                 className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
               >
                 再組一份
@@ -353,13 +373,18 @@ function FreeQuizRunner() {
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
-        <TopBar showBack backHref="/study/free-quiz" backLabel="返回設定" />
+        <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回設定" />
 
         <section className="mt-8">
           <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-            自由測驗 · {from}–{to} 年
+            {targeted ? "弱主題練習" : "自由測驗"} · {from}–{to} 年
           </div>
           <h1 className="mt-2 text-2xl font-black">{subject}</h1>
+          {targeted && (
+            <div className="mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1.5 text-xs font-black text-[#237849]">
+              {targetLabel}
+            </div>
+          )}
         </section>
 
         <QuestionProgress

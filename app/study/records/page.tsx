@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import AttemptCard from "@/components/records/attempt-card";
 import ProAnalysisPanel from "@/components/records/pro-analysis-panel";
+import WeakTopicPracticeCard from "@/components/records/weak-topic-practice-card";
 import {
   readExamAttempts,
   type ExamAttempt,
@@ -120,6 +121,7 @@ function RecordsContent() {
             </div>
 
             <ProAnalysisPanel />
+            <WeakTopicPracticeCard />
 
             {hasExamFilter && (
               <section className="mt-5 flex items-center justify-between gap-3 rounded-[20px] border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3">
