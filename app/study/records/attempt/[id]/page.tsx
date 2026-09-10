@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
+import AIExplanationButton from "@/components/ai-explanation-button";
 import {
   formatAttemptDate,
   formatAttemptDuration,
@@ -27,6 +28,7 @@ export default function AttemptDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [purchased, setPurchased] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +82,38 @@ export default function AttemptDetailPage() {
     };
   }, [id]);
 
+  const attempt = state.status === "ready" ? state.attempt : null;
+
+  useEffect(() => {
+    if (!attempt || attempt.session === "自由測驗") {
+      setPurchased(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const params = new URLSearchParams({
+          year: attempt.year,
+          session: attempt.session,
+          subject: attempt.subject,
+        });
+        const response = await fetch(`/api/exam-explanation-access?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? "讀取詳解權限失敗。");
+        setPurchased(Boolean(payload?.purchased));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setPurchased(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [attempt]);
+
   if (state.status === "loading") {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -104,21 +138,31 @@ export default function AttemptDetailPage() {
     );
   }
 
-  const { attempt, fallbackItems } = state;
-  const freeQuiz = attempt.session === "自由測驗";
-  const items = attempt.reviewItems.length > 0 ? attempt.reviewItems : fallbackItems;
-  const usingFallback = attempt.reviewItems.length === 0 && fallbackItems.length > 0;
+  const { attempt: readyAttempt, fallbackItems } = state;
+  const freeQuiz = readyAttempt.session === "自由測驗";
+  const items = readyAttempt.reviewItems.length > 0 ? readyAttempt.reviewItems : fallbackItems;
+  const usingFallback = readyAttempt.reviewItems.length === 0 && fallbackItems.length > 0;
   const quizParams = new URLSearchParams({
-    year: attempt.year,
-    session: attempt.session,
-    subject: attempt.subject,
+    year: readyAttempt.year,
+    session: readyAttempt.session,
+    subject: readyAttempt.subject,
   });
-  const range = parseYearRange(attempt.year);
+  const range = parseYearRange(readyAttempt.year);
   const freeQuizParams = new URLSearchParams({
     from: range?.from ?? "110",
     to: range?.to ?? "115",
-    subject: attempt.subject,
+    subject: readyAttempt.subject,
   });
+  const wrongItems = items.filter(
+    (item) =>
+      item.correctIndex !== null &&
+      item.userAnswer !== null &&
+      item.userAnswer !== item.correctIndex,
+  );
+  const uncertainItems = items.filter((item) => item.uncertain);
+  const wrongNumbers = wrongItems
+    .map((item) => item.questionNumber)
+    .filter((value): value is number => typeof value === "number");
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -130,44 +174,75 @@ export default function AttemptDetailPage() {
           <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
             {freeQuiz
-              ? `自由測驗 · ${attempt.year.replace("-", "–")} 年 · ${attempt.subject}`
-              : `${attempt.year} 年・第 ${attempt.session} 次・${attempt.subject}`}
+              ? `自由測驗 · ${readyAttempt.year.replace("-", "–")} 年 · ${readyAttempt.subject}`
+              : `${readyAttempt.year} 年・第 ${readyAttempt.session} 次・${readyAttempt.subject}`}
           </div>
-          <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(attempt.completedAt)}</div>
+          <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(readyAttempt.completedAt)}</div>
         </section>
 
         <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="分數" value={`${attempt.score.toFixed(2)}`} />
-          <Stat label="答對" value={`${attempt.correctCount} 題`} />
-          <Stat label="需要複習" value={`${attempt.reviewCount} 題`} />
-          <Stat label="作答時間" value={formatAttemptDuration(attempt.durationSeconds)} />
+          <Stat label="分數" value={`${readyAttempt.score.toFixed(2)}`} />
+          <Stat label="答對" value={`${readyAttempt.correctCount} 題`} />
+          <Stat label="答錯" value={`${wrongItems.length} 題`} />
+          <Stat label="作答時間" value={formatAttemptDuration(readyAttempt.durationSeconds)} />
         </section>
 
         {!freeQuiz && (
           <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-black text-[#315b45]">這份考卷的完整詳解</div>
-                <div className="mt-1 text-xs font-bold text-[#789083]">單次 NT$59，購買後永久存取這份考卷完整解析。</div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-black text-[#315b45]">錯題詳解權限</div>
+                  {purchased && (
+                    <span className="rounded-full bg-[#eaf9f0] px-2.5 py-1 text-[11px] font-black text-[#237849]">
+                      ✓ 整份考卷已解鎖
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">
+                  {purchased
+                    ? "下面只列這次需要複習的題目；按你需要的題目展開詳解，只有真的打開時才會載入解析。"
+                    : "單次 NT$59 解鎖這份考卷的詳解權限。購買後仍只需要針對自己的錯題按需查看，不會自動產生整份解析。"}
+                </div>
               </div>
-              <ExamExplanationPurchaseButton
-                year={attempt.year}
-                session={attempt.session}
-                subject={attempt.subject}
-                compact
-              />
+              {!purchased && (
+                <ExamExplanationPurchaseButton
+                  year={readyAttempt.year}
+                  session={readyAttempt.session}
+                  subject={readyAttempt.subject}
+                  compact
+                />
+              )}
             </div>
           </section>
         )}
 
         <section className="mt-7">
-          <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">REVIEW</div>
               <h2 className="mt-1 text-2xl font-black">這次需要複習的題目</h2>
             </div>
-            <span className="shrink-0 text-sm font-black text-[#789083]">{attempt.reviewCount} 題</span>
+            <span className="shrink-0 text-sm font-black text-[#789083]">
+              {wrongItems.length} 題答錯{uncertainItems.length > 0 ? ` · ${uncertainItems.length} 題不確定` : ""}
+            </span>
           </div>
+
+          {wrongNumbers.length > 0 && (
+            <div className="mt-4 rounded-[20px] border border-[#dce9e1] bg-white p-4">
+              <div className="text-xs font-black text-[#789083]">錯題題號</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {wrongNumbers.map((number) => (
+                  <span
+                    key={number}
+                    className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-[#f0cccc] bg-[#fff6f6] px-2 text-sm font-black text-[#9b5050]"
+                  >
+                    {number}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {usingFallback && (
             <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
@@ -175,7 +250,7 @@ export default function AttemptDetailPage() {
             </div>
           )}
 
-          {attempt.reviewCount === 0 ? (
+          {readyAttempt.reviewCount === 0 ? (
             <div className="mt-4 rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
               ✓ 這次沒有答錯或標記不確定的題目。
             </div>
@@ -186,7 +261,15 @@ export default function AttemptDetailPage() {
           ) : (
             <div className="mt-4 space-y-4">
               {items.map((item) => (
-                <ReviewCard key={item.id} item={item} freeQuiz={freeQuiz} />
+                <ReviewCard
+                  key={item.id}
+                  item={item}
+                  freeQuiz={freeQuiz}
+                  year={readyAttempt.year}
+                  session={readyAttempt.session}
+                  subject={readyAttempt.subject}
+                  purchased={purchased}
+                />
               ))}
             </div>
           )}
@@ -215,12 +298,32 @@ export default function AttemptDetailPage() {
   );
 }
 
-function ReviewCard({ item, freeQuiz }: { item: ExamAttemptReviewItem; freeQuiz: boolean }) {
+function ReviewCard({
+  item,
+  freeQuiz,
+  year,
+  session,
+  subject,
+  purchased,
+}: {
+  item: ExamAttemptReviewItem;
+  freeQuiz: boolean;
+  year: string;
+  session: string;
+  subject: string;
+  purchased: boolean;
+}) {
   const isWrong =
     item.correctIndex !== null &&
     item.userAnswer !== null &&
     item.userAnswer !== item.correctIndex;
   const source = freeQuiz ? parseSourceId(item.id) : null;
+  const sourceYear = source?.year ?? year;
+  const sourceSession = source?.session ?? session;
+  const sourceQuestionNumber = source?.questionNumber ?? item.questionNumber;
+  const questionKey = sourceQuestionNumber
+    ? `national-exam:${sourceYear}:${sourceSession}:${subject}:${sourceQuestionNumber}`
+    : item.id;
 
   return (
     <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
@@ -270,6 +373,23 @@ function ReviewCard({ item, freeQuiz }: { item: ExamAttemptReviewItem; freeQuiz:
         <div className="mt-4 rounded-xl bg-[#fff8df] px-4 py-3 text-sm font-bold text-[#80651e]">
           這題沒有正式作答，但你標記了「我不確定」。
         </div>
+      )}
+
+      {item.correctIndex !== null && (
+        <AIExplanationButton
+          directPurchasedAccess={!freeQuiz && purchased}
+          buttonLabel={purchased && !freeQuiz ? "查看這題詳解" : "查看完整詳解"}
+          payload={{
+            questionKey,
+            source: "national-exam",
+            sourceLabel: `${sourceYear} 年 · 第 ${sourceSession} 次 · ${subject}`,
+            stem: item.stem,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            userAnswer: item.userAnswer,
+            uncertain: item.uncertain,
+          }}
+        />
       )}
     </article>
   );

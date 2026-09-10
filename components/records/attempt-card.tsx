@@ -89,7 +89,7 @@ export default function AttemptCard({
           href={`/study/records/attempt/${attempt.id}`}
           className="text-sm font-black text-[#237849]"
         >
-          查看這次作答 →
+          查看錯題與這次作答 →
         </Link>
 
         <Link
@@ -106,8 +106,8 @@ export default function AttemptCard({
 
       {!freeQuiz && (
         <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-[#f8fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs font-bold text-[#789083]">
-            想完整檢討這份考卷？永久解鎖全部題目詳解。
+          <div className="text-xs font-bold leading-5 text-[#789083]">
+            整份考卷詳解權限：進入作答紀錄後，只在需要的錯題上展開解析。
           </div>
           <ExamExplanationPurchaseButton
             year={attempt.year}
