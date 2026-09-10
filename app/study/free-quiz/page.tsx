@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 
@@ -41,11 +41,6 @@ function FreeQuizConfigurator() {
   const [toYear, setToYear] = useState(Math.max(initialFrom, initialTo));
   const [subject, setSubject] = useState(subjects.includes(initialSubject) ? initialSubject : subjects[1]);
   const [count, setCount] = useState<(typeof questionCounts)[number]>(initialCount);
-
-  const rangeYears = useMemo(
-    () => rocYears.filter((year) => year >= fromYear && year <= toYear).length,
-    [fromYear, toYear],
-  );
 
   const startQuiz = () => {
     const params = new URLSearchParams({
@@ -182,19 +177,6 @@ function FreeQuizConfigurator() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl bg-[#f6faf7] px-4 py-4">
-            <div className="text-xs font-black text-[#2ba962]">本次設定</div>
-            <div className="mt-1 text-sm font-black leading-6 text-[#315b45]">
-              {fromYear}–{toYear} 年 · {rangeYears} 個年度 · {count} 題
-            </div>
-            <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">{subject}</div>
-            {targeted && (
-              <div className="mt-2 text-xs font-black leading-5 text-[#237849]">
-                {targetSubtopic ? `${targetTopic} · ${targetSubtopic}` : targetTopic}
-              </div>
-            )}
           </div>
 
           <button
