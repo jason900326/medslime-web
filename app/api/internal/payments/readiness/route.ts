@@ -10,9 +10,37 @@ function isAuthorized(request: NextRequest) {
   return Boolean(received && expected && received === expected);
 }
 
+function supabaseEnvSnapshot() {
+  return {
+    publicUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
+    publishableKey: Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim(),
+    ),
+    serviceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()),
+  };
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabaseEnv = supabaseEnvSnapshot();
+  const missingSupabaseEnv = [
+    !supabaseEnv.publicUrl ? "NEXT_PUBLIC_SUPABASE_URL" : null,
+    !supabaseEnv.serviceRoleKey ? "SUPABASE_SERVICE_ROLE_KEY" : null,
+  ].filter(Boolean);
+
+  if (missingSupabaseEnv.length > 0) {
+    return NextResponse.json(
+      {
+        ...getPaymentReadinessSnapshot(),
+        supabaseEnv,
+        missingSupabaseEnv,
+        error: `Preview deployment is missing: ${missingSupabaseEnv.join(", ")}`,
+      },
+      { status: 500 },
+    );
   }
 
   try {
@@ -27,6 +55,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...getPaymentReadinessSnapshot(),
+      supabaseEnv,
       schema: {
         paymentOrders: !orders.error,
         playerEntitlements: !entitlements.error,
@@ -38,7 +67,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Readiness check failed." },
+      {
+        ...getPaymentReadinessSnapshot(),
+        supabaseEnv,
+        error: error instanceof Error ? error.message : "Readiness check failed.",
+      },
       { status: 500 },
     );
   }
