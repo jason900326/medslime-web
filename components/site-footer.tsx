@@ -29,7 +29,15 @@ export default function SiteFooter() {
         </div>
 
         <div className="mt-4 border-t border-[#edf2ef] pt-4">
-          <div className="text-xs font-bold text-[#789083]">聯絡信箱：{CONTACT_EMAIL}</div>
+          <div className="text-xs font-bold text-[#789083]">
+            客服／聯絡信箱：{" "}
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="font-black text-[#315b45] underline decoration-[#cfe7d8] underline-offset-4"
+            >
+              {CONTACT_EMAIL}
+            </a>
+          </div>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-black text-[#557768]">
             <Link href="/about" className="hover:text-[#2a9d5e]">資料來源與 AI 說明</Link>
             <Link href="/privacy" className="hover:text-[#2a9d5e]">隱私權政策</Link>
