@@ -39,29 +39,46 @@ export async function GET(request: NextRequest) {
       .order("taxonomy_updated_at", { ascending: false, nullsFirst: false })
       .limit(limit);
 
+    if (status !== "pending") {
+      sampleQuery = sampleQuery.eq("taxonomy_version", QUESTION_TAXONOMY_VERSION);
+    }
     if (subject) sampleQuery = sampleQuery.eq("subject", subject);
 
-    const [sampleResult, classifiedResult, needsReviewResult, pendingResult] =
-      await Promise.all([
-        sampleQuery,
-        admin
-          .from("national_exam_questions")
-          .select("subject,topic,taxonomy_confidence")
-          .eq("taxonomy_status", "classified"),
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .eq("taxonomy_status", "needs_review"),
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .eq("taxonomy_status", "pending"),
-      ]);
+    const [
+      sampleResult,
+      classifiedResult,
+      needsReviewResult,
+      pendingResult,
+      outdatedResult,
+    ] = await Promise.all([
+      sampleQuery,
+      admin
+        .from("national_exam_questions")
+        .select("subject,topic,taxonomy_confidence")
+        .eq("taxonomy_status", "classified")
+        .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "needs_review")
+        .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "pending"),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .neq("taxonomy_status", "pending")
+        .not("taxonomy_version", "is", null)
+        .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+    ]);
 
     if (sampleResult.error) throw new Error(sampleResult.error.message);
     if (classifiedResult.error) throw new Error(classifiedResult.error.message);
     if (needsReviewResult.error) throw new Error(needsReviewResult.error.message);
     if (pendingResult.error) throw new Error(pendingResult.error.message);
+    if (outdatedResult.error) throw new Error(outdatedResult.error.message);
 
     const groups = new Map<
       string,
@@ -107,6 +124,7 @@ export async function GET(request: NextRequest) {
         classified: classifiedResult.data?.length ?? 0,
         needsReview: needsReviewResult.count ?? 0,
         pending: pendingResult.count ?? 0,
+        outdated: outdatedResult.count ?? 0,
       },
       topicDistribution,
       sample: sampleResult.data ?? [],
