@@ -18,13 +18,22 @@ type ProAnalysisPayload = {
 };
 
 const ANALYSIS_CACHE_PREFIX = "medslime_pro_analysis_v2";
+const ANALYSIS_CACHE_TTL_MS = 15 * 60 * 1000;
+const ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
 
 function readCachedTarget(userId: string): TopicStat | null {
   if (typeof window === "undefined") return null;
   try {
+    if (window.sessionStorage.getItem(ANALYSIS_STALE_KEY) === "1") return null;
     const raw = window.sessionStorage.getItem(`${ANALYSIS_CACHE_PREFIX}:${userId}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { data?: ProAnalysisPayload };
+    const parsed = JSON.parse(raw) as { savedAt?: number; data?: ProAnalysisPayload };
+    if (
+      typeof parsed.savedAt !== "number" ||
+      Date.now() - parsed.savedAt > ANALYSIS_CACHE_TTL_MS
+    ) {
+      return null;
+    }
     return parsed.data?.weakestSubtopic ?? parsed.data?.weakestTopic ?? null;
   } catch {
     return null;
