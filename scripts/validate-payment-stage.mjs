@@ -97,6 +97,10 @@ if (checks.every(Boolean)) {
 console.error("\nFAIL: ECPay stage environment is not ready yet.");
 if (payload.environmentProblem) console.error(`Environment problem: ${payload.environmentProblem}`);
 if (Array.isArray(payload.schemaErrors) && payload.schemaErrors.length > 0) {
-  console.error(payload.schemaErrors.join("\n"));
+  console.error("Schema diagnostics:");
+  for (const error of payload.schemaErrors) console.error(`- ${error}`);
+} else if (payload.schemaDiagnostics) {
+  console.error("Schema diagnostics:");
+  console.error(JSON.stringify(payload.schemaDiagnostics, null, 2));
 }
 process.exit(1);
