@@ -137,17 +137,17 @@ async function main() {
     body: JSON.stringify({ ids: targetIds }),
   });
 
-  const preparedIds = Array.isArray(preparation.preparedIds)
-    ? preparation.preparedIds.map(String)
+  const queueIds = Array.isArray(preparation.queueIds)
+    ? preparation.queueIds.map(String)
     : [];
-  const preparedSet = new Set(preparedIds);
+  const queueSet = new Set(queueIds);
   console.log(
-    `Prepared: ${preparedIds.length}/${targetIds.length}; skipped=${Array.isArray(preparation.skippedIds) ? preparation.skippedIds.length : 0}`,
+    `Prepared now: ${preparation.preparedCount ?? 0}; already pending: ${preparation.alreadyPendingCount ?? 0}; already repaired: ${preparation.alreadyRepairedCount ?? 0}; queue=${queueIds.length}`,
   );
 
-  if (!preparedIds.length) {
+  if (!queueIds.length) {
     throw new Error(
-      "No eligible checkpoint rows were prepared. If this validation already ran once, inspect the previous taxonomy-v1-3-validation.json instead of running it again.",
+      "No target rows remain in the repair queue. If this validation already completed, inspect taxonomy-v1-3-validation.json instead of running it again.",
     );
   }
 
@@ -155,8 +155,8 @@ async function main() {
   const seenIds = new Set();
   let batchNumber = 0;
 
-  while (updates.length < preparedIds.length) {
-    const remaining = preparedIds.length - updates.length;
+  while (updates.length < queueIds.length) {
+    const remaining = queueIds.length - updates.length;
     const limit = Math.min(batchSize, remaining);
     batchNumber += 1;
     process.stdout.write(`[batch ${batchNumber}] reclassifying ${limit} ... `);
@@ -167,10 +167,10 @@ async function main() {
     });
     const batch = Array.isArray(result.updates) ? result.updates : [];
 
-    const unexpected = batch.filter((item) => !preparedSet.has(String(item.id)));
+    const unexpected = batch.filter((item) => !queueSet.has(String(item.id)));
     if (unexpected.length) {
       throw new Error(
-        `Queue returned non-target rows: ${unexpected.map((item) => item.id).join(", ")}. Stop here; remaining prepared rows stay pending and can be resumed safely.`,
+        `Queue returned non-target rows: ${unexpected.map((item) => item.id).join(", ")}. Stop here; remaining target rows stay pending and can be resumed safely by rerunning this same command.`,
       );
     }
 
@@ -188,7 +188,7 @@ async function main() {
 
     if (!batch.length) {
       throw new Error(
-        `Target queue stopped early after ${updates.length}/${preparedIds.length} rows.`,
+        `Target queue stopped early after ${updates.length}/${queueIds.length} rows. Rerun this same command to resume.`,
       );
     }
   }
@@ -196,16 +196,18 @@ async function main() {
   const after = await request("/api/internal/taxonomy/backfill");
   const summary = summarize(updates);
   const returnedIds = new Set(updates.map((item) => String(item.id)));
-  const missingPreparedIds = preparedIds.filter((id) => !returnedIds.has(id));
+  const missingQueueIds = queueIds.filter((id) => !returnedIds.has(id));
   const unexpectedIds = updates
     .map((item) => String(item.id))
-    .filter((id) => !preparedSet.has(id));
+    .filter((id) => !queueSet.has(id));
 
   const checks = {
-    versionIsV13: updates.every((item) => item.previousVersion === "topic-taxonomy-v1.2") && before.version === "topic-taxonomy-v1.3",
-    exactCheckpointSelection: preparedIds.every((id) => targetIds.includes(id)),
+    versionIsV13:
+      updates.every((item) => item.previousVersion === "topic-taxonomy-v1.2") &&
+      before.version === "topic-taxonomy-v1.3",
+    exactCheckpointSelection: queueIds.every((id) => targetIds.includes(id)),
     noUnexpectedQueueRows: unexpectedIds.length === 0,
-    allPreparedRowsReturned: missingPreparedIds.length === 0,
+    allQueuedRowsReturned: missingQueueIds.length === 0,
     otherSubtopicAtOrBelow5Percent:
       summary.otherSubtopicRateOfCheckpoint <= 0.05,
   };
@@ -221,7 +223,7 @@ async function main() {
     preparation,
     summary,
     checks,
-    missingPreparedIds,
+    missingQueueIds,
     unexpectedIds,
     before: before.counts ?? null,
     after: after.counts ?? null,
@@ -232,7 +234,7 @@ async function main() {
 
   console.log("");
   console.log(
-    `Done: ${summary.processed} repaired; ${summary.classified} classified / ${summary.needsReview} needs_review; ${summary.otherSubtopic} still use subtopic=其他.`,
+    `Done this validation run: ${summary.processed} repaired; ${summary.classified} classified / ${summary.needsReview} needs_review; ${summary.otherSubtopic} still use subtopic=其他.`,
   );
   console.log(
     `Remaining 其他 rate vs original 500-question checkpoint: ${(summary.otherSubtopicRateOfCheckpoint * 100).toFixed(1)}%`,
