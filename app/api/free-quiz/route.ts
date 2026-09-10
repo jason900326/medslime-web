@@ -74,13 +74,19 @@ function hasExplicitVisualReference(questionText: string, imageUrl: string | nul
     /下圖(?:中|為|所示|顯示)?/,
     /上圖(?:中|為|所示|顯示)?/,
     /附圖(?:中|為|所示|顯示)?/,
+    /此圖(?:中|為|所示|顯示)?/,
+    /這張圖/,
     /圖(?:\d+|[一二三四五六七八九十]+)(?:中|為|所示|顯示)/,
-    /圖中(?:所示|顯示|箭頭|標示)/,
+    /圖中(?:所示|顯示|箭頭|箭號|標示)/,
     /圖示(?:中|為|所示)?/,
     /影像(?:中|如下|所示)/,
     /照片(?:中|如下|所示)/,
     /顯微鏡下(?:圖|影像|照片)/,
-    /箭頭所指/,
+    /箭(?:頭|號|矢)所指/,
+    /箭(?:頭|號|矢)(?:標示|指示)/,
+    /(?:這張|此張|下列)心電圖/,
+    /(?:這張|此張|下列)腦波圖/,
+    /(?:這張|此張|下列)血球圖/,
   ].some((pattern) => pattern.test(text));
 }
 
@@ -99,6 +105,8 @@ export async function GET(request: NextRequest) {
     const toRoc = Number(request.nextUrl.searchParams.get("to"));
     const subject = String(request.nextUrl.searchParams.get("subject") ?? "").trim();
     const requestedCount = Number(request.nextUrl.searchParams.get("count"));
+    const topic = String(request.nextUrl.searchParams.get("topic") ?? "").trim();
+    const subtopic = String(request.nextUrl.searchParams.get("subtopic") ?? "").trim();
 
     if (
       !Number.isFinite(fromRoc) ||
@@ -107,12 +115,14 @@ export async function GET(request: NextRequest) {
       toRoc < fromRoc ||
       toRoc - fromRoc > 20 ||
       !subject ||
-      !Number.isFinite(requestedCount)
+      !Number.isFinite(requestedCount) ||
+      (subtopic && !topic)
     ) {
       return NextResponse.json({ error: "自由測驗設定無效。" }, { status: 400 });
     }
 
     const count = Math.max(5, Math.min(80, Math.floor(requestedCount)));
+    const targeted = Boolean(topic);
     const supabaseUrl = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
     const supabaseKey = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
@@ -149,7 +159,12 @@ export async function GET(request: NextRequest) {
     const data = JSON.parse(rawText) as unknown;
     const rows = (Array.isArray(data) ? data : []).filter((rawRow) => {
       const row = rawRow as Record<string, unknown>;
-      return getSubjectKey(asString(row.subject)) === getSubjectKey(subject);
+      if (getSubjectKey(asString(row.subject)) !== getSubjectKey(subject)) return false;
+      if (!targeted) return true;
+      if (asString(row.taxonomy_status) !== "classified") return false;
+      if (asString(row.topic).trim() !== topic) return false;
+      if (subtopic && asString(row.subtopic).trim() !== subtopic) return false;
+      return true;
     });
 
     const candidates = rows
@@ -186,13 +201,20 @@ export async function GET(request: NextRequest) {
           sourcePageUrl: asNullableString(row.source_page_url),
           sourceUrl:
             asNullableString(row.source_page_url) ?? asNullableString(row.question_pdf_url),
+          topic: asString(row.topic).trim() || null,
+          subtopic: asString(row.subtopic).trim() || null,
+          taxonomyStatus: asString(row.taxonomy_status).trim() || null,
         };
       })
       .filter((item) => item.sourceQuestionNumber > 0);
 
     if (candidates.length === 0) {
       return NextResponse.json(
-        { error: "這個年份範圍與科目目前找不到可用題目。" },
+        {
+          error: targeted
+            ? `目前找不到「${subtopic || topic}」可用的已分類國考題，請改用主題層級或調整年份範圍。`
+            : "這個年份範圍與科目目前找不到可用題目。",
+        },
         { status: 404 },
       );
     }
@@ -209,6 +231,9 @@ export async function GET(request: NextRequest) {
         requestedCount: count,
         count: selected.length,
         availableCount: candidates.length,
+        mode: targeted ? "targeted" : "random",
+        topic: topic || null,
+        subtopic: subtopic || null,
       },
       questions: selected,
     });
