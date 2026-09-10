@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { QUESTION_TAXONOMY_VERSION } from "@/lib/question-taxonomy";
+import {
+  QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
+  QUESTION_TAXONOMY_REPAIR_SOURCE_VERSION,
+  QUESTION_TAXONOMY_REPROCESS_VERSIONS,
+  QUESTION_TAXONOMY_VERSION,
+} from "@/lib/question-taxonomy";
 import {
   getAllowedSubtopics,
   getAllowedTaxonomy,
   getTaxonomySubjectKey,
   type TaxonomySubjectKey,
-} from "@/lib/topic-taxonomy-catalog";
+} from "@/lib/topic-taxonomy-v1-2";
 
 type OpenAIResponse = {
   output_text?: string;
@@ -23,8 +28,19 @@ type ClassificationItem = {
   needsReview: boolean;
 };
 
-type ClassificationMode = "queue" | "calibration";
+type ClassificationMode = "queue" | "calibration" | "repair_v1_2";
 type SourceRow = Record<string, unknown>;
+type SelectionReason =
+  | "legacy_outdated"
+  | "queue"
+  | "calibration"
+  | "previous_needs_review"
+  | "new_visual_detection";
+
+type SelectedRow = {
+  row: SourceRow;
+  selectionReason: SelectionReason;
+};
 
 const TAXONOMY_SUBJECT_KEYS: TaxonomySubjectKey[] = [
   "biochemistry",
@@ -147,12 +163,13 @@ function hasExplicitVisualReference(questionText: string, imageUrl: string | nul
     /此圖(?:中|為|所示|顯示)?/,
     /這張圖/,
     /圖(?:\d+|[一二三四五六七八九十]+)(?:中|為|所示|顯示)/,
-    /圖中(?:所示|顯示|箭頭|標示)/,
+    /圖中(?:所示|顯示|箭頭|箭號|標示)/,
     /圖示(?:中|為|所示)?/,
     /影像(?:中|如下|所示)/,
     /照片(?:中|如下|所示)/,
     /顯微鏡下(?:圖|影像|照片)/,
-    /箭頭所指/,
+    /箭(?:頭|號|矢)所指/,
+    /箭(?:頭|號|矢)(?:標示|指示)/,
     /(?:這張|此張|下列)心電圖/,
     /(?:這張|此張|下列)腦波圖/,
     /(?:這張|此張|下列)血球圖/,
@@ -164,7 +181,7 @@ async function scanRowsForSubject(
   input: {
     subjectKey: TaxonomySubjectKey;
     limit: number;
-    state: "pending" | "outdated";
+    state: "pending" | "legacy_outdated";
     ascending: boolean;
   },
 ) {
@@ -183,8 +200,7 @@ async function scanRowsForSubject(
     } else {
       query = query
         .neq("taxonomy_status", "pending")
-        .not("taxonomy_version", "is", null)
-        .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION);
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_REPROCESS_VERSIONS]);
     }
 
     const { data, error } = await query;
@@ -208,14 +224,78 @@ async function scanRowsForSubject(
   return rows.slice(0, input.limit);
 }
 
-function dedupeRows(rows: SourceRow[]) {
+function dedupeSelectedRows(rows: SelectedRow[]) {
   const seen = new Set<string>();
-  return rows.filter((row) => {
-    const id = String(row.id ?? "");
+  return rows.filter((item) => {
+    const id = String(item.row.id ?? "");
     if (!id || seen.has(id)) return false;
     seen.add(id);
     return true;
   });
+}
+
+function wrapRows(rows: SourceRow[], selectionReason: SelectionReason): SelectedRow[] {
+  return rows.map((row) => ({ row, selectionReason }));
+}
+
+async function loadRepairRows(
+  admin: ReturnType<typeof createAdminClient>,
+  limit: number,
+): Promise<SelectedRow[]> {
+  const { data: reviewRows, error: reviewError } = await admin
+    .from("national_exam_questions")
+    .select("*")
+    .eq("taxonomy_status", "needs_review")
+    .eq("taxonomy_version", QUESTION_TAXONOMY_REPAIR_SOURCE_VERSION)
+    .order("taxonomy_updated_at", { ascending: true, nullsFirst: true })
+    .limit(limit);
+
+  if (reviewError) {
+    throw new Error(`讀取 v1.1 待複核題目失敗：${reviewError.message}`);
+  }
+
+  let selected = wrapRows(
+    (reviewRows ?? []) as SourceRow[],
+    "previous_needs_review",
+  );
+  let remainingSlots = Math.max(0, limit - selected.length);
+  if (remainingSlots === 0) return selected;
+
+  // v1.2 adds broader visual-reference detection. Re-scan v1.1 classified rows
+  // so questions such as「如箭號所指」cannot silently remain classified.
+  let offset = 0;
+  while (remainingSlots > 0) {
+    const { data, error } = await admin
+      .from("national_exam_questions")
+      .select("*")
+      .eq("taxonomy_status", "classified")
+      .eq("taxonomy_version", QUESTION_TAXONOMY_REPAIR_SOURCE_VERSION)
+      .order("id", { ascending: true })
+      .range(offset, offset + SUBJECT_SCAN_PAGE_SIZE - 1);
+
+    if (error) {
+      throw new Error(`掃描 v1.1 圖像依賴題失敗：${error.message}`);
+    }
+
+    const page = (data ?? []) as SourceRow[];
+    const visualRows = page.filter((row) =>
+      hasExplicitVisualReference(
+        String(row.question ?? ""),
+        firstImageUrl(row),
+      ),
+    );
+
+    selected = dedupeSelectedRows([
+      ...selected,
+      ...wrapRows(visualRows, "new_visual_detection"),
+    ]).slice(0, limit);
+    remainingSlots = Math.max(0, limit - selected.length);
+
+    if (page.length < SUBJECT_SCAN_PAGE_SIZE) break;
+    offset += SUBJECT_SCAN_PAGE_SIZE;
+  }
+
+  return selected;
 }
 
 async function loadClassificationRows(
@@ -223,14 +303,17 @@ async function loadClassificationRows(
   limit: number,
   subjectKey: TaxonomySubjectKey | null,
   mode: ClassificationMode,
-) {
+): Promise<SelectedRow[]> {
+  if (mode === "repair_v1_2") {
+    return loadRepairRows(admin, limit);
+  }
+
   if (!subjectKey) {
     const { data: outdatedRows, error: outdatedError } = await admin
       .from("national_exam_questions")
       .select("*")
       .neq("taxonomy_status", "pending")
-      .not("taxonomy_version", "is", null)
-      .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION)
+      .in("taxonomy_version", [...QUESTION_TAXONOMY_REPROCESS_VERSIONS])
       .order("id", { ascending: false })
       .limit(limit);
 
@@ -238,9 +321,12 @@ async function loadClassificationRows(
       throw new Error(`讀取舊版分類題目失敗：${outdatedError.message}`);
     }
 
-    const rows = [...((outdatedRows ?? []) as SourceRow[])];
-    const remainingSlots = Math.max(0, limit - rows.length);
-    if (remainingSlots === 0) return rows;
+    const selected = wrapRows(
+      (outdatedRows ?? []) as SourceRow[],
+      "legacy_outdated",
+    );
+    const remainingSlots = Math.max(0, limit - selected.length);
+    if (remainingSlots === 0) return selected;
 
     const { data: pendingRows, error: pendingError } = await admin
       .from("national_exam_questions")
@@ -253,17 +339,21 @@ async function loadClassificationRows(
       throw new Error(`讀取待分類題目失敗：${pendingError.message}`);
     }
 
-    return [...rows, ...((pendingRows ?? []) as SourceRow[])];
+    return [
+      ...selected,
+      ...wrapRows((pendingRows ?? []) as SourceRow[], "queue"),
+    ];
   }
 
   const outdatedRows = await scanRowsForSubject(admin, {
     subjectKey,
     limit,
-    state: "outdated",
+    state: "legacy_outdated",
     ascending: false,
   });
-  const remainingSlots = Math.max(0, limit - outdatedRows.length);
-  if (remainingSlots === 0) return outdatedRows;
+  const selectedOutdated = wrapRows(outdatedRows, "legacy_outdated");
+  const remainingSlots = Math.max(0, limit - selectedOutdated.length);
+  if (remainingSlots === 0) return selectedOutdated;
 
   if (mode === "queue") {
     const pendingRows = await scanRowsForSubject(admin, {
@@ -272,7 +362,10 @@ async function loadClassificationRows(
       state: "pending",
       ascending: true,
     });
-    return dedupeRows([...outdatedRows, ...pendingRows]).slice(0, limit);
+    return dedupeSelectedRows([
+      ...selectedOutdated,
+      ...wrapRows(pendingRows, "queue"),
+    ]).slice(0, limit);
   }
 
   const olderTarget = Math.ceil(remainingSlots / 2);
@@ -292,7 +385,11 @@ async function loadClassificationRows(
     }),
   ]);
 
-  let rows = dedupeRows([...outdatedRows, ...oldestPending, ...newestPending]);
+  let rows = dedupeSelectedRows([
+    ...selectedOutdated,
+    ...wrapRows(oldestPending, "calibration"),
+    ...wrapRows(newestPending, "calibration"),
+  ]);
   if (rows.length < limit) {
     const fallback = await scanRowsForSubject(admin, {
       subjectKey,
@@ -300,7 +397,10 @@ async function loadClassificationRows(
       state: "pending",
       ascending: true,
     });
-    rows = dedupeRows([...rows, ...fallback]);
+    rows = dedupeSelectedRows([
+      ...rows,
+      ...wrapRows(fallback, "calibration"),
+    ]);
   }
 
   return rows.slice(0, limit);
@@ -316,8 +416,7 @@ async function getRemainingCounts(admin: ReturnType<typeof createAdminClient>) {
       .from("national_exam_questions")
       .select("id", { count: "exact", head: true })
       .neq("taxonomy_status", "pending")
-      .not("taxonomy_version", "is", null)
-      .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+      .in("taxonomy_version", [...QUESTION_TAXONOMY_REPROCESS_VERSIONS]),
   ]);
 
   if (pendingResult.error) throw new Error(pendingResult.error.message);
@@ -335,47 +434,59 @@ export async function GET(request: NextRequest) {
 
   try {
     const admin = createAdminClient();
-    const [pendingResult, classifiedResult, needsReviewResult, outdatedResult] =
-      await Promise.all([
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .eq("taxonomy_status", "pending"),
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .eq("taxonomy_status", "classified")
-          .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .eq("taxonomy_status", "needs_review")
-          .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
-        admin
-          .from("national_exam_questions")
-          .select("id", { count: "exact", head: true })
-          .neq("taxonomy_status", "pending")
-          .not("taxonomy_version", "is", null)
-          .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
-      ]);
+    const [
+      pendingResult,
+      classifiedResult,
+      needsReviewResult,
+      outdatedResult,
+      repairSourceResult,
+    ] = await Promise.all([
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "pending"),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "classified")
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_COMPATIBLE_VERSIONS]),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "needs_review")
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_COMPATIBLE_VERSIONS]),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .neq("taxonomy_status", "pending")
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_REPROCESS_VERSIONS]),
+      admin
+        .from("national_exam_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("taxonomy_status", "needs_review")
+        .eq("taxonomy_version", QUESTION_TAXONOMY_REPAIR_SOURCE_VERSION),
+    ]);
 
     for (const result of [
       pendingResult,
       classifiedResult,
       needsReviewResult,
       outdatedResult,
+      repairSourceResult,
     ]) {
       if (result.error) throw new Error(result.error.message);
     }
 
     return NextResponse.json({
       version: QUESTION_TAXONOMY_VERSION,
+      compatibleVersions: QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
       calibrationSubjectKeys: TAXONOMY_SUBJECT_KEYS,
       counts: {
         pending: pendingResult.count ?? 0,
         classified: classifiedResult.count ?? 0,
         needs_review: needsReviewResult.count ?? 0,
         outdated: outdatedResult.count ?? 0,
+        repair_source_needs_review: repairSourceResult.count ?? 0,
       },
     });
   } catch (error) {
@@ -405,7 +516,12 @@ export async function POST(request: NextRequest) {
         ? requestedSubjectKey
         : null
       : null;
-    const mode: ClassificationMode = body.mode === "calibration" ? "calibration" : "queue";
+    const mode: ClassificationMode =
+      body.mode === "calibration"
+        ? "calibration"
+        : body.mode === "repair_v1_2"
+          ? "repair_v1_2"
+          : "queue";
 
     if (requestedSubjectKey && !subjectKey) {
       return NextResponse.json(
@@ -425,6 +541,12 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (mode === "repair_v1_2" && subjectKey) {
+      return NextResponse.json(
+        { error: "repair_v1_2 mode does not accept subjectKey." },
+        { status: 400 },
+      );
+    }
 
     const apiKey = String(process.env.OPENAI_API_KEY ?? "").trim();
     if (!apiKey) {
@@ -435,9 +557,14 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient();
-    const rows = await loadClassificationRows(admin, limit, subjectKey, mode);
+    const selectedRows = await loadClassificationRows(
+      admin,
+      limit,
+      subjectKey,
+      mode,
+    );
 
-    if (!rows.length) {
+    if (!selectedRows.length) {
       const remaining = await getRemainingCounts(admin);
       return NextResponse.json({
         version: QUESTION_TAXONOMY_VERSION,
@@ -447,13 +574,16 @@ export async function POST(request: NextRequest) {
         remaining: remaining.total,
         remainingPending: remaining.pending,
         remainingOutdated: remaining.outdated,
-        message: subjectKey
-          ? `No ${subjectKey} questions need classification for the current taxonomy version.`
-          : "No questions need classification for the current taxonomy version.",
+        message:
+          mode === "repair_v1_2"
+            ? "No v1.1 repair candidates remain."
+            : subjectKey
+              ? `No ${subjectKey} questions need classification for the current taxonomy version.`
+              : "No questions need classification for the current taxonomy version.",
       });
     }
 
-    const prepared = rows.map((row) => {
+    const prepared = selectedRows.map(({ row, selectionReason }) => {
       const subject = String(row.subject ?? "").trim();
       const rowSubjectKey = getTaxonomySubjectKey(subject);
       const stem = String(row.question ?? "").trim();
@@ -478,6 +608,7 @@ export async function POST(request: NextRequest) {
         visualDependent,
         previousVersion:
           typeof row.taxonomy_version === "string" ? row.taxonomy_version : null,
+        selectionReason,
       };
     });
 
@@ -566,6 +697,7 @@ export async function POST(request: NextRequest) {
       confidence: number;
       visualDependent: boolean;
       previousVersion: string | null;
+      selectionReason: SelectionReason;
     }>;
 
     for (const source of prepared) {
@@ -629,6 +761,7 @@ export async function POST(request: NextRequest) {
         confidence,
         visualDependent: source.visualDependent,
         previousVersion: source.previousVersion,
+        selectionReason: source.selectionReason,
       });
     }
 
@@ -636,6 +769,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       version: QUESTION_TAXONOMY_VERSION,
+      compatibleVersions: QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
       model,
       mode,
       subjectKey,
