@@ -11,6 +11,7 @@
     "backfill:taxonomy": "node scripts/backfill-taxonomy.mjs",
     "validate:topic-analytics": "node scripts/validate-topic-analytics.mjs",
     "validate:weak-topic-quiz": "node scripts/validate-weak-topic-quiz.mjs",
+    "validate:payment-stage": "node scripts/validate-payment-stage.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
