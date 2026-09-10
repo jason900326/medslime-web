@@ -1,6 +1,6 @@
 # MedSlime Supabase schema map
 
-Last audited: 2026-09-09
+Last audited: 2026-09-10
 
 This file defines the intended source of truth for the current MedSlime app. Keep it updated when adding or replacing tables so the project does not accumulate duplicate persistence paths again.
 
@@ -12,9 +12,9 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `player_mistakes` | User mistake library | Current mistake read/write store |
 | `player_entitlements` | Service entitlements | Daily free detailed-explanation usage + fixed Pro expiry (`pro_expires_at`) |
 | `exam_explanation_entitlements` | Permanent paid content access | One row per user + purchased national-exam explanation set |
-| `exam_attempts` | Exam/free-quiz attempt history | Score history, review snapshots, all-question outcomes, subject trends and Pro analysis |
+| `exam_attempts` | Exam/free-quiz attempt history | Score history, review snapshots, all-question outcomes, subject trends and Pro topic analysis |
 | `payment_orders` | Payment ledger | ECPay ledger; new orders store direct `entitlement_type` / `entitlement_key`, never wallet or credit grants |
-| `national_exam_questions` | National-exam question bank + shared topic taxonomy | Current national-exam/free-quiz APIs; Phase C adds canonical `topic`, `subtopic`, `concepts` metadata |
+| `national_exam_questions` | National-exam question bank + shared topic taxonomy | Current national-exam/free-quiz APIs; canonical `topic`, `subtopic`, `concepts` metadata |
 | `shared_ai_explanations` | Shared national-exam explanation cache | Internal cost optimization for reusable national-exam explanations |
 | `ai_question_explanations` | Per-user material AI cache | Material explanations generated from user-uploaded content |
 | `ai_explanation_events` | AI explanation analytics | Existing-content view / generated events |
@@ -120,9 +120,9 @@ The active migration is `supabase/question_topic_taxonomy.sql`. It adds:
 
 Taxonomy is question metadata, not learner data. A question is classified once and the result is reused for every user, every attempt, free quiz, Pro analysis and later weak-topic quiz generation.
 
-Top-level `topic` values must come from the canonical subject catalog in `lib/topic-taxonomy-catalog.ts`; this avoids AI-created synonyms splitting one medical topic into several analytics buckets. `subtopic` may be more specific, and `concepts` should contain only a small set of genuine tested concepts.
+Both `topic` and `subtopic` values must come from the canonical subject catalog in `lib/topic-taxonomy-catalog.ts`. The classifier must not invent synonyms; otherwise one medical topic would split into several analytics buckets. `concepts` remains a small free-text list of genuine tested concepts and is display metadata, not a normalized aggregation key.
 
-`app/api/internal/taxonomy/backfill` is an internal batch classifier. It requires `TAXONOMY_ADMIN_SECRET`, processes only `pending` rows, stores the prompt/catalog version, and sends uncertain/catalog-mismatched results to `needs_review` instead of silently treating them as valid analytics data.
+`app/api/internal/taxonomy/backfill` is an internal batch classifier. It requires `TAXONOMY_ADMIN_SECRET`, stores the prompt/catalog version, and sends uncertain/catalog-mismatched or visual-dependent results to `needs_review` instead of silently treating them as valid analytics data.
 
 Do not classify the same question again for each user attempt. Do not expose the internal backfill endpoint as a learner feature.
 
@@ -153,8 +153,9 @@ Single exam full explanation (NT$59)
 
 MedSlime Pro 30-day access (NT$149)
     -> cross-exam subject performance / weak-subject ranking
-    -> recent score trend comparisons
-    -> review priority suggestions based on attempts + mistakes
+    -> per-question Topic / Subtopic weakness analysis
+    -> recent score and topic trend comparisons
+    -> review priority suggestions based on weak topics + attempts + mistakes
     -> Pro analysis dashboard for the active 30-day period
 ```
 
@@ -191,6 +192,28 @@ A correct answer must therefore remain available to analytics even though it nev
 Old attempts created before this migration legitimately have an empty `question_outcomes` array. Do not fabricate topic history for those rows. New national-exam and free-quiz attempts populate the snapshot at submission time.
 
 The Study area intentionally exposes learner flows separately: `/study/records` is 作答歷史與 Pro 分析；`/study/mistakes` is the standalone 錯題複習 experience.
+
+## Pro topic-analytics rule
+
+Phase D joins learner outcomes to the shared question taxonomy at read time. Do not duplicate `topic` or `subtopic` into every attempt row.
+
+```text
+exam_attempts.question_outcomes[].questionId
+        ↓
+national_exam_questions.id
+        ↓
+classified topic / subtopic
+        ↓
+per-user accuracy / uncertainty / recent trend
+```
+
+`app/api/pro-analysis` uses the most recent attempts that contain `question_outcomes`, maps only answered questions with a boolean correctness result, and only treats `taxonomy_status = classified` as trusted Topic/Subtopic evidence. `needs_review` questions remain excluded from topic accuracy until their taxonomy is explicitly accepted.
+
+Weak-topic ranking must account for evidence size so a single missed question cannot automatically become the user's strongest weakness. The current ranking combines error rate, sample weight and uncertainty rate. A Topic/Subtopic needs at least three answered questions before it can become the headline weakest topic.
+
+Review priority may use the canonical `questionKey` stored in `question_outcomes` to connect a current mistake to the learner's weakest topic. If old attempts have no outcome snapshot, the existing subject-level trend and mistake logic remains valid; the app must not fabricate topic statistics.
+
+The internal `app/api/internal/pro-analysis/health` endpoint and `npm run validate:topic-analytics` verify that the `question_outcomes` column exists and that recent attempts are producing analytics snapshots. They require the same `TAXONOMY_ADMIN_SECRET` used by internal taxonomy maintenance.
 
 ## Payment rule
 
