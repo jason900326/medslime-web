@@ -57,8 +57,12 @@ type DailyUsage = {
 
 export default function AIExplanationButton({
   payload,
+  directPurchasedAccess = false,
+  buttonLabel,
 }: {
   payload: AIExplanationPayload;
+  directPurchasedAccess?: boolean;
+  buttonLabel?: string;
 }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailResult, setDetailResult] = useState<ExplanationResult | null>(null);
@@ -66,7 +70,9 @@ export default function AIExplanationButton({
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDailyLimitReached, setShowDailyLimitReached] = useState(false);
   const [usage, setUsage] = useState<DailyUsage | null>(null);
-  const [purchasedExamAccess, setPurchasedExamAccess] = useState(false);
+  const [purchasedExamAccess, setPurchasedExamAccess] = useState(
+    directPurchasedAccess,
+  );
   const [noticeMessage, setNoticeMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [feedback, setFeedback] = useState<FeedbackValue | null>(null);
@@ -112,44 +118,6 @@ export default function AIExplanationButton({
     return Boolean(data.purchasedExamAccess);
   };
 
-  const requestDetailedExplanation = async () => {
-    if (detailLoading) return;
-
-    if (detailResult) {
-      setDetailOpen((current) => !current);
-      return;
-    }
-
-    setDetailLoading(true);
-    setErrorMessage("");
-    setNoticeMessage("");
-    setShowDailyLimitReached(false);
-
-    try {
-      const hasPurchasedAccess = await loadPurchasedAccess();
-      setPurchasedExamAccess(hasPurchasedAccess);
-
-      if (hasPurchasedAccess) {
-        setShowConfirm(true);
-        return;
-      }
-
-      const current = await loadUsage();
-      if (current.remaining <= 0) {
-        setShowDailyLimitReached(true);
-        return;
-      }
-
-      setShowConfirm(true);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "完整詳解發生未知錯誤。",
-      );
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
   const generateDetailedExplanation = async () => {
     if (detailLoading) return;
 
@@ -179,18 +147,68 @@ export default function AIExplanationButton({
         throw new Error(data.error ?? "完整詳解產生失敗，請稍後再試。");
       }
 
+      if (directPurchasedAccess && data.accessSource !== "exam_entitlement") {
+        throw new Error("這份考卷的完整詳解權限目前無法確認，請重新整理後再試。");
+      }
+
       setDetailResult(data.explanation);
       setDetailOpen(true);
 
       if (data.accessSource === "exam_entitlement") {
         setPurchasedExamAccess(true);
-        setNoticeMessage("這份考卷已解鎖，本題不計入每日 5 次使用上限。");
+        if (!directPurchasedAccess) {
+          setNoticeMessage("這份考卷已解鎖，本題不計入每日 5 次使用上限。");
+        }
       } else {
         const current = await loadUsage();
         setNoticeMessage(
           `今日完整詳解還可使用 ${current.remaining} / ${current.limit} 次。`,
         );
       }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "完整詳解發生未知錯誤。",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const requestDetailedExplanation = async () => {
+    if (detailLoading) return;
+
+    if (detailResult) {
+      setDetailOpen((current) => !current);
+      return;
+    }
+
+    if (directPurchasedAccess) {
+      setPurchasedExamAccess(true);
+      await generateDetailedExplanation();
+      return;
+    }
+
+    setDetailLoading(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    setShowDailyLimitReached(false);
+
+    try {
+      const hasPurchasedAccess = await loadPurchasedAccess();
+      setPurchasedExamAccess(hasPurchasedAccess);
+
+      if (hasPurchasedAccess) {
+        setShowConfirm(true);
+        return;
+      }
+
+      const current = await loadUsage();
+      if (current.remaining <= 0) {
+        setShowDailyLimitReached(true);
+        return;
+      }
+
+      setShowConfirm(true);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "完整詳解發生未知錯誤。",
@@ -230,6 +248,9 @@ export default function AIExplanationButton({
     }
   };
 
+  const idleLabel =
+    buttonLabel ?? (directPurchasedAccess ? "展開完整解析" : "📚 查看完整詳解");
+
   return (
     <div className="mt-4">
       <button
@@ -241,8 +262,10 @@ export default function AIExplanationButton({
         {detailLoading
           ? "正在整理完整詳解..."
           : detailResult && detailOpen
-            ? "收起完整詳解"
-            : "📚 查看完整詳解"}
+            ? directPurchasedAccess
+              ? "收起完整解析"
+              : "收起完整詳解"
+            : idleLabel}
       </button>
 
       {noticeMessage && (

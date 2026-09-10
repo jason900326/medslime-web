@@ -154,7 +154,7 @@ export default function PaymentResultClient() {
 
           {paid && state.productId === "exam-full-explanation" && (
             <div className="mt-5 rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-4 text-sm font-black text-[#237849]">
-              這份國考完整詳解已永久解鎖。
+              這份國考完整詳解已永久解鎖，可以直接進入整份詳解閱讀模式。
             </div>
           )}
 
@@ -231,8 +231,8 @@ function getPrimaryAction(
     if (year && session && subject) {
       const params = new URLSearchParams({ year, session, subject });
       return {
-        href: `/study/exam/quiz?${params.toString()}`,
-        label: "前往這份考卷",
+        href: `/study/exam/explanation?${params.toString()}`,
+        label: "查看整份完整詳解",
       };
     }
 
