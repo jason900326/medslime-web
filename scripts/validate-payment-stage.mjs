@@ -14,18 +14,43 @@ console.log(`Base URL: ${baseUrl}`);
 const response = await fetch(`${baseUrl}/api/internal/payments/readiness`, {
   headers: { "x-payment-secret": secret },
   cache: "no-store",
+  redirect: "follow",
 });
 
-let payload;
-try {
-  payload = await response.json();
-} catch {
-  payload = null;
+const contentType = response.headers.get("content-type") || "";
+const rawBody = await response.text();
+let payload = null;
+
+if (contentType.includes("application/json") || rawBody.trim().startsWith("{")) {
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    payload = null;
+  }
 }
 
 if (!response.ok) {
   console.error(`Readiness failed: HTTP ${response.status}`);
   if (payload) console.error(payload);
+  else if (rawBody.trim()) console.error(rawBody.slice(0, 500));
+  process.exit(1);
+}
+
+if (!payload || typeof payload !== "object") {
+  console.error("Readiness endpoint returned a non-JSON page instead of the MedSlime API response.");
+  console.error(`Content-Type: ${contentType || "unknown"}`);
+  const lower = rawBody.toLowerCase();
+  if (
+    lower.includes("vercel") &&
+    (lower.includes("authentication") || lower.includes("login") || lower.includes("deployment protection"))
+  ) {
+    console.error("Likely cause: Vercel Deployment Protection / Vercel Authentication is blocking the Preview deployment.");
+    console.error("For ECPay stage testing, the Preview URL must be publicly reachable so ECPay can POST the server callback.");
+    console.error("Temporarily disable Vercel Authentication for Preview deployments, rerun this readiness test, then re-enable it after stage testing.");
+  } else {
+    console.error("Response preview:");
+    console.error(rawBody.slice(0, 500) || "<empty body>");
+  }
   process.exit(1);
 }
 
