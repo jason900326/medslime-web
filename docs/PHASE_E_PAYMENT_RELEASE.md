@@ -27,24 +27,58 @@ A successful payment inserts one row in `exam_explanation_entitlements` keyed by
 - Buying the same exam again is prevented by checkout preflight and the database primary key.
 - Purchased exam explanations bypass the daily 5-use limit for that exam.
 
-## Before enabling checkout
+## Stage test must use Vercel Preview
+
+Do not switch the live Production deployment to ECPay stage mode.
+
+The code enforces this separation:
+
+- Vercel `production` + `ECPAY_MODE=stage` cannot create or fulfill payments.
+- Vercel `preview` + `ECPAY_MODE=production` cannot create or fulfill payments.
+- Stage checkout is restricted to `PAYMENT_STAGE_TEST_EMAILS`.
+- Preview callbacks automatically point back to the exact Vercel Preview deployment through `VERCEL_URL`.
+
+For the Preview environment set:
+
+- `ECPAY_MERCHANT_ID=<ECPay stage merchant id>`
+- `ECPAY_HASH_KEY=<ECPay stage HashKey>`
+- `ECPAY_HASH_IV=<ECPay stage HashIV>`
+- `ECPAY_MODE=stage`
+- `PAYMENT_STAGE_TEST_EMAILS=<comma-separated test account emails>`
+- `NEXT_PUBLIC_ECPAY_ENABLED=true`
+- `NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED=true`
+- `SHOP_CHECKOUT_ENABLED=true`
+
+Do not set `PAYMENT_CALLBACK_BASE_URL` for a normal Vercel Preview test; the deployment URL is resolved automatically.
+
+After setting the Preview variables, redeploy the payment-test PR and run:
+
+```powershell
+$env:TAXONOMY_SECRET = "<same admin secret already used for taxonomy>"
+npm run validate:payment-stage -- --base-url=https://<preview-deployment>.vercel.app
+```
+
+The readiness test must end with:
+
+`PASS: ECPay stage environment is ready for a real test checkout.`
+
+## Before enabling Production checkout
 
 1. Run `supabase/payment_entitlement_v2.sql` once in the MedSlime Supabase project.
 2. Run `supabase/verify_payment_entitlements.sql` and confirm:
    - all three tables resolve,
    - all four required entitlement columns are `true`,
    - `fulfill_payment_order`, `consume_ai_detail_daily_use`, and `refund_ai_detail_daily_use` exist.
-3. In Vercel Production environment variables, set the real merchant values:
+3. In Vercel Production environment variables, set the approved merchant values:
    - `ECPAY_MERCHANT_ID`
    - `ECPAY_HASH_KEY`
    - `ECPAY_HASH_IV`
    - `NEXT_PUBLIC_SITE_URL=https://medslime.vercel.app`
-4. While testing ECPay staging, use `ECPAY_MODE=stage`.
-5. For real production payments, switch to `ECPAY_MODE=production` only after the merchant account is approved.
-6. Keep both checkout release gates false until the database and ECPay credentials are ready:
+   - `ECPAY_MODE=production`
+4. Keep both checkout release gates false until ECPay approval and stage smoke tests are complete:
    - `NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED=false`
    - `SHOP_CHECKOUT_ENABLED=false`
-7. When ready to accept payments, set both checkout gates to `true` and redeploy Production.
+5. When ready to accept real payments, set both checkout gates to `true` and redeploy Production.
 
 ## Release smoke test
 
@@ -70,10 +104,11 @@ Then revisit the same exam and confirm the purchase button is replaced with the 
 
 The callback must reject a success notification when any of these checks fail:
 
-- CheckMacValue is invalid.
-- MerchantID does not equal the configured merchant account.
-- MedSlime order does not exist.
-- The order provider is not ECPay.
+- deployment environment and ECPay mode do not match,
+- CheckMacValue is invalid,
+- MerchantID does not equal the configured merchant account,
+- MedSlime order does not exist,
+- the order provider is not ECPay,
 - `TradeAmt` is missing, invalid, or differs from the server-created order amount.
 
 Never fulfill an entitlement from the browser return URL alone. Only the verified server-to-server ECPay callback may mark an order paid and grant access.

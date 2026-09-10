@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCheckMacValue } from "@/lib/ecpay";
+import { getPaymentEnvironmentProblem } from "@/lib/payment-environment";
 
 export async function POST(request: NextRequest) {
   const merchantId = process.env.ECPAY_MERCHANT_ID?.trim();
@@ -9,6 +10,12 @@ export async function POST(request: NextRequest) {
 
   if (!merchantId || !hashKey || !hashIv) {
     return new NextResponse("0|ServerConfigError", { status: 500 });
+  }
+
+  const environmentProblem = getPaymentEnvironmentProblem();
+  if (environmentProblem) {
+    console.error("ECPay callback payment environment mismatch", environmentProblem);
+    return new NextResponse("0|EnvironmentMismatch", { status: 503 });
   }
 
   try {

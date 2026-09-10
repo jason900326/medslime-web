@@ -8,6 +8,12 @@ import {
   formatMerchantTradeDate,
   getEcpayCheckoutUrl,
 } from "@/lib/ecpay";
+import {
+  getEcpayMode,
+  getPaymentCallbackBaseUrl,
+  getPaymentEnvironmentProblem,
+  isAllowedStageTester,
+} from "@/lib/payment-environment";
 
 function escapeHtml(value: string) {
   return value
@@ -16,11 +22,6 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-function normalizeSiteUrl(request: NextRequest) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return (configured || request.nextUrl.origin).replace(/\/$/, "");
 }
 
 function checkoutDocument(action: string, params: Record<string, string>) {
@@ -57,6 +58,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const environmentProblem = getPaymentEnvironmentProblem();
+    if (environmentProblem) {
+      console.error("付款環境安全檢查未通過：", environmentProblem);
+      return NextResponse.json(
+        { error: "付款環境設定不安全，已停止建立訂單。" },
+        { status: 503 },
+      );
+    }
+
     const merchantId = process.env.ECPAY_MERCHANT_ID?.trim();
     const hashKey = process.env.ECPAY_HASH_KEY?.trim();
     const hashIv = process.env.ECPAY_HASH_IV?.trim();
@@ -77,6 +87,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "請先登入。" }, { status: 401 });
     }
 
+    if (getEcpayMode() === "stage" && !isAllowedStageTester(user.email)) {
+      return NextResponse.json(
+        { error: "綠界測試付款目前只開放指定測試帳號。" },
+        { status: 403 },
+      );
+    }
+
     const form = await request.formData();
     const productId = String(form.get("productId") ?? "").trim();
     const product = SHOP_PRODUCT_BY_ID[productId];
@@ -85,7 +102,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "找不到這個商品。" }, { status: 400 });
     }
 
-    const siteUrl = normalizeSiteUrl(request);
+    const siteUrl = getPaymentCallbackBaseUrl(request.nextUrl.origin);
     const admin = createAdminClient();
     let entitlementType: "pro_30d" | "exam_explanation";
     let entitlementKey: string | null = null;
