@@ -256,13 +256,13 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
 
 export async function saveNationalExamAttempt(
   input: SaveExamAttemptInput,
-): Promise<string | null> {
+): Promise<void> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  if (!user) return;
 
   const examKey = `${input.year}-${input.session}-${input.subject}`;
   const baseInsert = {
@@ -280,33 +280,21 @@ export async function saveNationalExamAttempt(
     completed_at: new Date().toISOString(),
   };
 
-  let result = await supabase
-    .from("exam_attempts")
-    .insert({
-      ...baseInsert,
-      review_items: input.reviewItems,
-      question_outcomes: input.questionOutcomes,
-    })
-    .select("id")
-    .single();
+  let result = await supabase.from("exam_attempts").insert({
+    ...baseInsert,
+    review_items: input.reviewItems,
+    question_outcomes: input.questionOutcomes,
+  });
 
   if (result.error && missingColumn(result.error.message, "question_outcomes")) {
-    result = await supabase
-      .from("exam_attempts")
-      .insert({
-        ...baseInsert,
-        review_items: input.reviewItems,
-      })
-      .select("id")
-      .single();
+    result = await supabase.from("exam_attempts").insert({
+      ...baseInsert,
+      review_items: input.reviewItems,
+    });
   }
 
   if (result.error && missingColumn(result.error.message, "review_items")) {
-    result = await supabase
-      .from("exam_attempts")
-      .insert(baseInsert)
-      .select("id")
-      .single();
+    result = await supabase.from("exam_attempts").insert(baseInsert);
   }
 
   if (result.error) {
@@ -315,7 +303,6 @@ export async function saveNationalExamAttempt(
   }
 
   markProAnalysisStale();
-  return typeof result.data?.id === "string" ? result.data.id : null;
 }
 
 export function latestAttemptMap(attempts: ExamAttempt[]) {
