@@ -6,6 +6,7 @@
     "start": "next start",
     "lint": "eslint .",
     "calibrate:taxonomy": "node scripts/calibrate-taxonomy.mjs",
+    "validate:taxonomy-v1.2": "node scripts/validate-taxonomy-v1-2.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
