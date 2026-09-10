@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       if (owned) {
         const params = new URLSearchParams({ year, session, subject });
         return NextResponse.redirect(
-          `${siteUrl}/study/exam/quiz?${params.toString()}`,
+          `${siteUrl}/study/exam/explanation?${params.toString()}`,
           { status: 303 },
         );
       }
