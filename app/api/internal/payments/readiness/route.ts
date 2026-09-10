@@ -20,6 +20,54 @@ function supabaseEnvSnapshot() {
   };
 }
 
+type SchemaProbeResult = {
+  ok: boolean;
+  attempts: number;
+  error: null | {
+    message: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+  };
+};
+
+function serializeSupabaseError(error: unknown): SchemaProbeResult["error"] {
+  if (!error || typeof error !== "object") return null;
+  const value = error as Record<string, unknown>;
+  return {
+    message:
+      typeof value.message === "string" ? value.message : "unknown schema error",
+    code: typeof value.code === "string" ? value.code : undefined,
+    details: typeof value.details === "string" ? value.details : undefined,
+    hint: typeof value.hint === "string" ? value.hint : undefined,
+  };
+}
+
+async function probeTable(
+  query: () => PromiseLike<{ error: unknown }>,
+  maxAttempts = 3,
+): Promise<SchemaProbeResult> {
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = await query();
+    if (!result.error) {
+      return { ok: true, attempts: attempt, error: null };
+    }
+
+    lastError = result.error;
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+  }
+
+  return {
+    ok: false,
+    attempts: maxAttempts,
+    error: serializeSupabaseError(lastError),
+  };
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,24 +94,48 @@ export async function GET(request: NextRequest) {
   try {
     const admin = createAdminClient();
     const [orders, entitlements, examEntitlements] = await Promise.all([
-      admin.from("payment_orders").select("id", { count: "exact", head: true }),
-      admin.from("player_entitlements").select("user_id", { count: "exact", head: true }),
-      admin
-        .from("exam_explanation_entitlements")
-        .select("user_id", { count: "exact", head: true }),
+      probeTable(() =>
+        admin.from("payment_orders").select("id", { count: "exact", head: true }),
+      ),
+      probeTable(() =>
+        admin
+          .from("player_entitlements")
+          .select("user_id", { count: "exact", head: true }),
+      ),
+      probeTable(() =>
+        admin
+          .from("exam_explanation_entitlements")
+          .select("user_id", { count: "exact", head: true }),
+      ),
     ]);
+
+    const schemaDiagnostics = {
+      paymentOrders: orders,
+      playerEntitlements: entitlements,
+      examExplanationEntitlements: examEntitlements,
+    };
 
     return NextResponse.json({
       ...getPaymentReadinessSnapshot(),
       supabaseEnv,
       schema: {
-        paymentOrders: !orders.error,
-        playerEntitlements: !entitlements.error,
-        examExplanationEntitlements: !examEntitlements.error,
+        paymentOrders: orders.ok,
+        playerEntitlements: entitlements.ok,
+        examExplanationEntitlements: examEntitlements.ok,
       },
-      schemaErrors: [orders.error, entitlements.error, examEntitlements.error]
-        .filter(Boolean)
-        .map((error) => error?.message ?? "unknown schema error"),
+      schemaDiagnostics,
+      schemaErrors: Object.entries(schemaDiagnostics)
+        .filter(([, result]) => !result.ok)
+        .map(([name, result]) => {
+          const error = result.error;
+          const parts = [
+            `${name}: ${error?.message ?? "unknown schema error"}`,
+            error?.code ? `code=${error.code}` : null,
+            error?.details ? `details=${error.details}` : null,
+            error?.hint ? `hint=${error.hint}` : null,
+          ].filter(Boolean);
+          return parts.join(" | ");
+        }),
     });
   } catch (error) {
     return NextResponse.json(
