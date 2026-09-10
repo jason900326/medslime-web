@@ -16,9 +16,16 @@ function argValue(name) {
 }
 
 function clampInt(value, fallback, min, max) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return fallback;
+  }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const secret = String(
@@ -37,30 +44,85 @@ if (!secret) {
   process.exit(1);
 }
 
+function formatPayload(payload, fallbackText = "") {
+  if (payload && typeof payload === "object") {
+    const parts = [];
+    if (payload.error) parts.push(String(payload.error));
+    if (payload.details) parts.push(String(payload.details));
+    if (parts.length) return parts.join(" | ");
+    try {
+      return JSON.stringify(payload).slice(0, 600);
+    } catch {
+      // fall through
+    }
+  }
+  return String(fallbackText || "").slice(0, 600);
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: {
-      "x-taxonomy-secret": secret,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  const maxAttempts = 3;
+  let lastError = null;
 
-  const text = await response.text();
-  let payload;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers: {
+          "x-taxonomy-secret": secret,
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(options.headers ?? {}),
+        },
+      });
+
+      const text = await response.text();
+      let payload;
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch {
+        payload = null;
+      }
+
+      if (response.ok) return payload ?? {};
+
+      const message = formatPayload(payload, text) || response.statusText || "Request failed";
+      const error = new Error(`HTTP ${response.status}: ${message}`);
+      error.status = response.status;
+
+      if ([500, 502, 503, 504].includes(response.status) && attempt < maxAttempts) {
+        console.warn(`  transient HTTP ${response.status}; retrying (${attempt}/${maxAttempts})...`);
+        await sleep(800 * attempt);
+        lastError = error;
+        continue;
+      }
+
+      throw error;
+    } catch (error) {
+      const status = Number(error?.status ?? 0);
+      if (!status && attempt < maxAttempts) {
+        console.warn(`  network error; retrying (${attempt}/${maxAttempts})...`);
+        await sleep(800 * attempt);
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error("Request failed after retries.");
+}
+
+async function safeStatus(label) {
   try {
-    payload = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error(`HTTP ${response.status}: non-JSON response: ${text.slice(0, 300)}`);
+    const payload = await request("/api/internal/taxonomy/backfill");
+    console.log(`${label}: pending=${payload.counts?.pending ?? "?"}, classified=${payload.counts?.classified ?? "?"}, needs_review=${payload.counts?.needs_review ?? "?"}, outdated=${payload.counts?.outdated ?? "?"}`);
+    return payload;
+  } catch (error) {
+    const status = Number(error?.status ?? 0);
+    if (status === 401 || status === 403) throw error;
+    console.warn(`${label} status check unavailable: ${error instanceof Error ? error.message : error}`);
+    console.warn("Continuing with calibration batches; the POST results remain the source of truth.");
+    return null;
   }
-
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status}: ${payload.error ?? JSON.stringify(payload).slice(0, 300)}`,
-    );
-  }
-  return payload;
 }
 
 function summarizeUpdates(updates) {
@@ -79,16 +141,13 @@ function summarizeUpdates(updates) {
 }
 
 async function main() {
-  console.log(`MedSlime taxonomy calibration`);
+  console.log("MedSlime taxonomy calibration");
   console.log(`Base URL: ${baseUrl}`);
   console.log(`Target: ${SUBJECTS.length} subjects × ${perSubject} = ${SUBJECTS.length * perSubject} questions`);
   console.log("");
 
-  const before = await request("/api/internal/taxonomy/backfill");
-  console.log(`Version: ${before.version}`);
-  console.log(
-    `Before: pending=${before.counts?.pending ?? "?"}, classified=${before.counts?.classified ?? "?"}, needs_review=${before.counts?.needs_review ?? "?"}, outdated=${before.counts?.outdated ?? "?"}`,
-  );
+  const before = await safeStatus("Before");
+  if (before?.version) console.log(`Version: ${before.version}`);
   console.log("");
 
   const subjectResults = [];
@@ -131,7 +190,7 @@ async function main() {
     });
   }
 
-  const after = await request("/api/internal/taxonomy/backfill");
+  const after = await safeStatus("After");
   const allUpdates = subjectResults.flatMap((item) => item.updates);
   const totals = summarizeUpdates(allUpdates);
   const reviewRate = allUpdates.length
@@ -141,7 +200,7 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl,
-    version: after.version ?? before.version,
+    version: after?.version ?? before?.version ?? null,
     requestedPerSubject: perSubject,
     requestedTotal: SUBJECTS.length * perSubject,
     processedTotal: allUpdates.length,
@@ -149,8 +208,8 @@ async function main() {
       ...totals,
       needsReviewRate: reviewRate,
     },
-    before: before.counts ?? null,
-    after: after.counts ?? null,
+    before: before?.counts ?? null,
+    after: after?.counts ?? null,
     subjects: subjectResults,
   };
 
@@ -169,5 +228,6 @@ async function main() {
 main().catch((error) => {
   console.error("");
   console.error(`Calibration failed: ${error instanceof Error ? error.message : error}`);
+  console.error("No additional batches were started after this failure.");
   process.exit(1);
 });
