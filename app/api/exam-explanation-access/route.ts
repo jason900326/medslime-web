@@ -13,12 +13,29 @@ export async function GET(request: NextRequest) {
         authenticated: false,
         purchased: false,
         purchasedAt: null,
+        purchases: [],
       });
     }
 
     const year = request.nextUrl.searchParams.get("year")?.trim() ?? "";
     const session = request.nextUrl.searchParams.get("session")?.trim() ?? "";
     const subject = request.nextUrl.searchParams.get("subject")?.trim() ?? "";
+    const hasAnyTarget = Boolean(year || session || subject);
+
+    if (!hasAnyTarget) {
+      const { data, error } = await supabase
+        .from("exam_explanation_entitlements")
+        .select("exam_key,year,session,subject,purchased_at")
+        .eq("user_id", user.id)
+        .order("purchased_at", { ascending: false });
+
+      if (error) throw new Error(error.message);
+
+      return NextResponse.json({
+        authenticated: true,
+        purchases: data ?? [],
+      });
+    }
 
     if (!year || !session || !subject) {
       return NextResponse.json(
