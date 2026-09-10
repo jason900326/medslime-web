@@ -5,13 +5,14 @@ const baseUrl = String(
 const subject = "臨床生理學與病理學";
 const topic = "心血管生理";
 const subtopic = "心律不整與心電圖判讀";
+const requestedCount = 10;
 
 async function fetchTarget(params) {
   const query = new URLSearchParams({
     from: "106",
     to: "115",
     subject,
-    count: "5",
+    count: String(requestedCount),
     topic,
     ...params,
   });
@@ -31,7 +32,7 @@ async function fetchTarget(params) {
   return payload;
 }
 
-function validatePayload(payload, expectedSubtopic = null) {
+function validateSharedTarget(payload, expectedSubtopic = null) {
   const questions = Array.isArray(payload.questions) ? payload.questions : [];
   if (payload.meta?.mode !== "targeted") {
     throw new Error(`Expected targeted mode, got ${String(payload.meta?.mode)}`);
@@ -55,13 +56,75 @@ function validatePayload(payload, expectedSubtopic = null) {
         `Question ${question.id} is not classified: ${String(question.taxonomyStatus)}`,
       );
     }
-    if (expectedSubtopic && question.subtopic !== expectedSubtopic) {
-      throw new Error(
-        `Question ${question.id} escaped subtopic filter: ${String(question.subtopic)}`,
-      );
-    }
+  }
+  return questions;
+}
+
+function validateTopicPayload(payload) {
+  const questions = validateSharedTarget(payload);
+  if (payload.meta?.fallbackApplied) {
+    throw new Error("Topic-only practice must not report a subtopic fallback.");
   }
   return questions.length;
+}
+
+function validateSubtopicPayload(payload) {
+  const questions = validateSharedTarget(payload, subtopic);
+  const exactAvailable = Number(payload.meta?.exactSubtopicAvailableCount ?? 0);
+  const topicAvailable = Number(payload.meta?.topicAvailableCount ?? 0);
+  const expectedTotal = Math.min(requestedCount, topicAvailable);
+  const exactQuestions = questions.filter((question) => question.subtopic === subtopic);
+  const fallbackQuestions = questions.filter((question) => question.subtopic !== subtopic);
+
+  if (questions.length !== expectedTotal) {
+    throw new Error(
+      `Expected ${expectedTotal} total questions from topic pool, got ${questions.length}.`,
+    );
+  }
+
+  const expectedExact = Math.min(requestedCount, exactAvailable);
+  if (exactQuestions.length !== expectedExact) {
+    throw new Error(
+      `Expected ${expectedExact} exact subtopic questions, got ${exactQuestions.length}.`,
+    );
+  }
+
+  const expectedFallback = Math.max(0, expectedTotal - expectedExact);
+  if (fallbackQuestions.length !== expectedFallback) {
+    throw new Error(
+      `Expected ${expectedFallback} same-topic fallback questions, got ${fallbackQuestions.length}.`,
+    );
+  }
+
+  const fallbackApplied = Boolean(payload.meta?.fallbackApplied);
+  if (fallbackApplied !== (expectedFallback > 0)) {
+    throw new Error(
+      `fallbackApplied mismatch: expected ${expectedFallback > 0}, got ${fallbackApplied}.`,
+    );
+  }
+
+  if (Number(payload.meta?.exactSubtopicSelectedCount ?? 0) !== exactQuestions.length) {
+    throw new Error("exactSubtopicSelectedCount does not match returned questions.");
+  }
+  if (Number(payload.meta?.topicFallbackSelectedCount ?? 0) !== fallbackQuestions.length) {
+    throw new Error("topicFallbackSelectedCount does not match returned questions.");
+  }
+
+  if (
+    fallbackApplied &&
+    payload.meta?.selectionStrategy !== "targeted_subtopic_with_topic_fallback"
+  ) {
+    throw new Error(`Unexpected fallback strategy: ${String(payload.meta?.selectionStrategy)}`);
+  }
+
+  return {
+    total: questions.length,
+    exactAvailable,
+    topicAvailable,
+    exactSelected: exactQuestions.length,
+    fallbackSelected: fallbackQuestions.length,
+    fallbackApplied,
+  };
 }
 
 async function main() {
@@ -70,14 +133,21 @@ async function main() {
   console.log("");
 
   const topicPayload = await fetchTarget({});
-  const topicCount = validatePayload(topicPayload);
-  console.log(`Topic pool: ${topic} -> ${topicCount} sampled / ${topicPayload.meta?.availableCount ?? "?"} available`);
+  const topicCount = validateTopicPayload(topicPayload);
+  console.log(
+    `Topic pool: ${topic} -> ${topicCount} sampled / ${topicPayload.meta?.topicAvailableCount ?? topicPayload.meta?.availableCount ?? "?"} available`,
+  );
 
   const subtopicPayload = await fetchTarget({ subtopic });
-  const subtopicCount = validatePayload(subtopicPayload, subtopic);
-  console.log(`Subtopic pool: ${subtopic} -> ${subtopicCount} sampled / ${subtopicPayload.meta?.availableCount ?? "?"} available`);
+  const result = validateSubtopicPayload(subtopicPayload);
+  console.log(
+    `Subtopic practice: ${subtopic} -> ${result.exactSelected} exact / ${result.exactAvailable} exact available + ${result.fallbackSelected} same-topic fallback = ${result.total} questions`,
+  );
+  console.log(`Topic pool available for fallback: ${result.topicAvailable}`);
   console.log("");
-  console.log("PASS: weak Topic/Subtopic filters only return classified matching questions.");
+  console.log(
+    "PASS: weak Subtopic practice preserves exact questions first and only fills shortages from the same classified Topic.",
+  );
 }
 
 main().catch((error) => {

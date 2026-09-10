@@ -162,9 +162,7 @@ export async function GET(request: NextRequest) {
       if (getSubjectKey(asString(row.subject)) !== getSubjectKey(subject)) return false;
       if (!targeted) return true;
       if (asString(row.taxonomy_status) !== "classified") return false;
-      if (asString(row.topic).trim() !== topic) return false;
-      if (subtopic && asString(row.subtopic).trim() !== subtopic) return false;
-      return true;
+      return asString(row.topic).trim() === topic;
     });
 
     const candidates = rows
@@ -212,16 +210,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error: targeted
-            ? `目前找不到「${subtopic || topic}」可用的已分類國考題，請改用主題層級或調整年份範圍。`
+            ? `目前找不到「${topic}」可用的已分類國考題，請調整年份範圍。`
             : "這個年份範圍與科目目前找不到可用題目。",
         },
         { status: 404 },
       );
     }
 
-    const selected = shuffle(candidates)
-      .slice(0, Math.min(count, candidates.length))
-      .map((item, index) => ({ ...item, questionNumber: index + 1 }));
+    let exactSubtopicAvailableCount: number | null = null;
+    let exactSubtopicSelectedCount = 0;
+    let topicFallbackSelectedCount = 0;
+    let fallbackApplied = false;
+    let selectedCandidates = [] as typeof candidates;
+
+    if (targeted && subtopic) {
+      const exact = candidates.filter((item) => item.subtopic === subtopic);
+      const sameTopicOther = candidates.filter((item) => item.subtopic !== subtopic);
+      exactSubtopicAvailableCount = exact.length;
+
+      const exactSelected = shuffle(exact).slice(0, Math.min(count, exact.length));
+      const remaining = Math.max(0, count - exactSelected.length);
+      const fallbackSelected =
+        remaining > 0 ? shuffle(sameTopicOther).slice(0, remaining) : [];
+
+      exactSubtopicSelectedCount = exactSelected.length;
+      topicFallbackSelectedCount = fallbackSelected.length;
+      fallbackApplied = fallbackSelected.length > 0;
+      selectedCandidates = shuffle([...exactSelected, ...fallbackSelected]);
+    } else {
+      selectedCandidates = shuffle(candidates).slice(0, Math.min(count, candidates.length));
+    }
+
+    const selected = selectedCandidates.map((item, index) => ({
+      ...item,
+      questionNumber: index + 1,
+    }));
 
     return NextResponse.json({
       meta: {
@@ -230,7 +253,21 @@ export async function GET(request: NextRequest) {
         subject,
         requestedCount: count,
         count: selected.length,
-        availableCount: candidates.length,
+        availableCount:
+          targeted && subtopic ? exactSubtopicAvailableCount : candidates.length,
+        topicAvailableCount: targeted ? candidates.length : null,
+        exactSubtopicAvailableCount,
+        exactSubtopicSelectedCount,
+        topicFallbackSelectedCount,
+        fallbackApplied,
+        fallbackReason: fallbackApplied ? "subtopic_insufficient" : null,
+        selectionStrategy: targeted
+          ? subtopic
+            ? fallbackApplied
+              ? "targeted_subtopic_with_topic_fallback"
+              : "targeted_subtopic_exact"
+            : "targeted_topic"
+          : "random",
         mode: targeted ? "targeted" : "random",
         topic: topic || null,
         subtopic: subtopic || null,

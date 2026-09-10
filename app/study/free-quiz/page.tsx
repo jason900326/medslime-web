@@ -81,7 +81,7 @@ function FreeQuizConfigurator() {
           <h1 className="ms-page-title mt-2">{targeted ? "弱主題練習" : "自由測驗"}</h1>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
             {targeted
-              ? "這份練習會鎖定 Pro 分析找到的弱主題，從歷屆國考中抽出同 Topic／Subtopic 題目，完成後的新作答也會回到弱點分析。"
+              ? "這份練習會鎖定 Pro 分析找到的弱主題，優先抽出同 Subtopic 題目；細分題量不足時，只會用同一 Topic 的相關題補足。完成後的新作答也會回到弱點分析。"
               : "自己決定年份範圍、科目與題數。系統會從歷屆國考中隨機組一份練習，答錯或標記不確定的題目一樣會進錯題紀錄。"}
           </p>
         </section>
@@ -208,7 +208,7 @@ function FreeQuizConfigurator() {
 
         <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/70 px-5 py-4 text-sm font-bold leading-6 text-[#789083]">
           {targeted
-            ? "弱主題模式只會使用已確認 taxonomy 的題目；若細分主題題量不足，實際題數可能少於你設定的題數。"
+            ? "弱主題模式只使用已確認 taxonomy 的題目。若指定 Subtopic 題量不足，會先保留所有精準弱點題，再從同一 Topic 補足；只有整個 Topic 題量也不足時，實際題數才會少於設定。"
             : "自由測驗目前採隨機抽題；交卷後會保存作答紀錄與當次錯題快照。"}
         </section>
       </div>
