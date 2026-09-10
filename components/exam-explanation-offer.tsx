@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
 const checkoutEnabled =
@@ -23,6 +24,10 @@ export default function ExamExplanationOffer({
   reviewCount: number;
 }) {
   const [access, setAccess] = useState<AccessState>({ status: "loading" });
+  const explanationHref = useMemo(() => {
+    const params = new URLSearchParams({ year, session, subject });
+    return `/study/exam/explanation?${params.toString()}`;
+  }, [year, session, subject]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -85,9 +90,17 @@ export default function ExamExplanationOffer({
       </div>
 
       {purchased ? (
-        <div className="mt-4 rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-4 text-sm font-black leading-6 text-[#315b45]">
-          ✓ 這份考卷的所有完整詳解都已永久開放；查看本考卷題目時，不會計入每日 5 次免費使用上限。
-        </div>
+        <>
+          <div className="mt-4 rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-4 text-sm font-black leading-6 text-[#315b45]">
+            ✓ 這份考卷的所有完整詳解都已永久開放；查看本考卷題目時，不會計入每日 5 次免費使用上限。
+          </div>
+          <Link
+            href={explanationHref}
+            className="mt-4 block w-full rounded-xl bg-[#31c978] px-4 py-3.5 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+          >
+            📚 進入整份完整詳解
+          </Link>
+        </>
       ) : access.status === "loading" ? (
         <div className="mt-4 rounded-xl border border-[#e4e9e6] bg-[#f7faf8] px-4 py-3 text-center text-sm font-black text-[#91a298]">
           正在確認完整詳解權限…
@@ -122,7 +135,7 @@ export default function ExamExplanationOffer({
 
       <p className="mt-4 text-sm font-bold leading-6 text-[#70877a]">
         {purchased
-          ? `你這次有 ${reviewCount} 題需要優先檢討，可以直接從下方錯題開始查看完整解析。`
+          ? `你這次有 ${reviewCount} 題需要優先檢討；也可以直接進入整份詳解，依題號查看所有題目的答案與解析。`
           : `購買後可永久查看這份考卷全部題目的完整解析。你這次有 ${reviewCount} 題需要優先檢討，會先從這些題目開始整理。`}
       </p>
 
