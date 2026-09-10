@@ -70,7 +70,7 @@ function ExamPicker() {
           signal: controller.signal,
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? "讀取完整詳解失敗。");
+        if (!response.ok) throw new Error(payload?.error ?? "讀取詳解權限失敗。");
         setPurchases(Array.isArray(payload?.purchases) ? payload.purchases : []);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -94,62 +94,18 @@ function ExamPicker() {
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-            NATIONAL EXAM
-          </div>
-
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
-            歷屆國考
-          </h1>
-
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">NATIONAL EXAM</div>
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">歷屆國考</h1>
           <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            選年度與梯次，再挑一份考卷開始作答；寫過的考卷會留下成績紀錄。
+            選年度與梯次，再挑一份考卷開始作答；寫過的考卷會留下成績與錯題紀錄。
           </p>
         </section>
 
-        {purchases.length > 0 && (
-          <section className="mt-5 rounded-[24px] border border-[#bfe1cb] bg-[#f3fbf6] p-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
-                  MY FULL EXPLANATIONS
-                </div>
-                <h2 className="mt-1 text-xl font-black">我的完整詳解</h2>
-              </div>
-              <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#237849]">
-                {purchases.length} 份已解鎖
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              {purchases.map((item) => (
-                <Link
-                  key={item.exam_key}
-                  href={buildExplanationHref(item.year, item.session, item.subject)}
-                  className="rounded-2xl border border-[#d3e8db] bg-white px-4 py-3 transition hover:border-[#9ed9b5] hover:bg-[#fbfefc]"
-                >
-                  <div className="text-xs font-black text-[#2ba962]">
-                    {item.year} 年 · 第 {item.session} 次
-                  </div>
-                  <div className="mt-1 text-sm font-black leading-6 text-[#315b45]">
-                    {item.subject}
-                  </div>
-                  <div className="mt-2 text-xs font-black text-[#237849]">
-                    查看完整詳解 →
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {explanationMode && purchases.length === 0 && (
+        {explanationMode && (
           <section className="mt-5 rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] px-5 py-4">
-            <div className="text-sm font-black text-[#237849]">
-              想解鎖 NT$59 單份完整詳解？
-            </div>
+            <div className="text-sm font-black text-[#237849]">單份考卷詳解怎麼用？</div>
             <p className="mt-1 text-sm font-bold leading-6 text-[#668276]">
-              先完成指定考卷；交卷後會在成績頁顯示該份完整詳解的解鎖入口。
+              完成考卷後可一次解鎖該份考卷的詳解權限；之後從作答紀錄查看自己的錯題，需要哪題再展開哪題，不會自動產生整份解析。
             </p>
           </section>
         )}
@@ -164,9 +120,7 @@ function ExamPicker() {
                 className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold text-[#17372a] outline-none focus:border-[#65d795]"
               >
                 {rocYears.map((item) => (
-                  <option key={item} value={item}>
-                    {item} 年
-                  </option>
+                  <option key={item} value={item}>{item} 年</option>
                 ))}
               </select>
             </div>
@@ -240,18 +194,9 @@ function ExamCard({
   purchased: boolean;
 }) {
   const quizHref = useMemo(() => {
-    const params = new URLSearchParams({
-      year: String(year),
-      session: String(session),
-      subject,
-    });
+    const params = new URLSearchParams({ year: String(year), session: String(session), subject });
     return `/study/exam/quiz?${params.toString()}`;
   }, [year, session, subject]);
-
-  const explanationHref = useMemo(
-    () => buildExplanationHref(String(year), String(session), subject),
-    [year, session, subject],
-  );
 
   const historyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -271,83 +216,48 @@ function ExamCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start gap-2">
-            <h3 className="min-w-0 flex-1 text-base font-black leading-7 text-[#17372a]">
-              {subject}
-            </h3>
+            <h3 className="min-w-0 flex-1 text-base font-black leading-7 text-[#17372a]">{subject}</h3>
             {purchased && (
               <span className="shrink-0 rounded-full bg-[#eaf9f0] px-2.5 py-1 text-[11px] font-black text-[#237849]">
-                ✓ 詳解已解鎖
+                ✓ 詳解權限已解鎖
               </span>
             )}
           </div>
           {latestAttempt ? (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-[#789083]">
-              <span className="font-black text-[#237849]">
-                最近 {latestAttempt.score.toFixed(2)} 分
-              </span>
+              <span className="font-black text-[#237849]">最近 {latestAttempt.score.toFixed(2)} 分</span>
               <span>{formatAttemptDate(latestAttempt.completedAt)}</span>
               <span>{latestAttempt.reviewCount} 題需複習</span>
             </div>
           ) : (
             <div className="mt-2 text-xs font-bold text-[#9aa9a1]">尚無作答紀錄</div>
           )}
+          {purchased && latestAttempt && (
+            <div className="mt-2 text-xs font-bold text-[#668276]">到作答紀錄查看這次錯題，需要哪題再開哪題詳解。</div>
+          )}
         </div>
       </div>
 
-      {purchased ? (
-        <div className="mt-auto space-y-2 pt-5">
+      <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
+        <Link
+          href={quizHref}
+          className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+        >
+          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+        </Link>
+        {latestAttempt ? (
           <Link
-            href={explanationHref}
-            className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+            href={historyHref}
+            className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
           >
-            📚 查看完整詳解
+            {purchased ? "查看錯題與詳解" : "歷史作答"}
           </Link>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Link
-              href={quizHref}
-              className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
-            >
-              ✏️ {latestAttempt ? "再次作答" : "開始作答"}
-            </Link>
-            {latestAttempt ? (
-              <Link
-                href={historyHref}
-                className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
-              >
-                歷史作答
-              </Link>
-            ) : (
-              <div className="hidden sm:block" />
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
-          <Link
-            href={quizHref}
-            className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
-          >
-            ✏️ {latestAttempt ? "再次作答" : "開始作答"}
-          </Link>
-          {latestAttempt ? (
-            <Link
-              href={historyHref}
-              className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
-            >
-              歷史作答
-            </Link>
-          ) : (
-            <div className="hidden sm:block" />
-          )}
-        </div>
-      )}
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+      </div>
     </article>
   );
-}
-
-function buildExplanationHref(year: string, session: string, subject: string) {
-  const params = new URLSearchParams({ year, session, subject });
-  return `/study/exam/explanation?${params.toString()}`;
 }
 
 function LoadingExamPicker() {
