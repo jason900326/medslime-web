@@ -1,4 +1,4 @@
-export const QUESTION_TAXONOMY_VERSION = "topic-taxonomy-v1";
+export const QUESTION_TAXONOMY_VERSION = "topic-taxonomy-v1.1";
 
 export type QuestionTaxonomyStatus =
   | "pending"
@@ -28,7 +28,7 @@ function normalizeConcepts(value: unknown) {
         .map((item) => String(item ?? "").trim())
         .filter(Boolean),
     ),
-  ).slice(0, 8);
+  ).slice(0, 3);
 }
 
 function normalizeStatus(value: unknown): QuestionTaxonomyStatus {
@@ -60,6 +60,7 @@ export function normalizeQuestionTaxonomy(
 export function hasUsableTaxonomy(taxonomy: QuestionTaxonomy) {
   return (
     taxonomy.status === "classified" &&
+    taxonomy.version === QUESTION_TAXONOMY_VERSION &&
     Boolean(taxonomy.topic) &&
     Boolean(taxonomy.subtopic)
   );
