@@ -5,6 +5,7 @@ import {
   getAllowedSubtopics,
   getAllowedTaxonomy,
   getTaxonomySubjectKey,
+  type TaxonomySubjectKey,
 } from "@/lib/topic-taxonomy-catalog";
 
 type OpenAIResponse = {
@@ -21,6 +22,20 @@ type ClassificationItem = {
   confidence: number;
   needsReview: boolean;
 };
+
+type ClassificationMode = "queue" | "calibration";
+type SourceRow = Record<string, unknown>;
+
+const TAXONOMY_SUBJECT_KEYS: TaxonomySubjectKey[] = [
+  "biochemistry",
+  "microbiology",
+  "physiology-pathology",
+  "hematology-bloodbank",
+  "immunology-virology",
+  "molecular-microscopy",
+];
+
+const SUBJECT_SCAN_PAGE_SIZE = 200;
 
 const classificationSchema = {
   type: "object",
@@ -84,6 +99,10 @@ function isAuthorized(request: NextRequest) {
   return Boolean(configured && supplied && configured === supplied);
 }
 
+function isTaxonomySubjectKey(value: string): value is TaxonomySubjectKey {
+  return TAXONOMY_SUBJECT_KEYS.includes(value as TaxonomySubjectKey);
+}
+
 function normalizeConcepts(value: unknown) {
   if (!Array.isArray(value)) return [];
   return Array.from(
@@ -102,7 +121,7 @@ function normalizeCorrectAnswers(value: unknown) {
     .filter((item) => /^[A-D]$/.test(item));
 }
 
-function firstImageUrl(row: Record<string, unknown>) {
+function firstImageUrl(row: SourceRow) {
   const candidates = [
     row.question_image_url,
     row.image_url,
@@ -140,39 +159,151 @@ function hasExplicitVisualReference(questionText: string, imageUrl: string | nul
   ].some((pattern) => pattern.test(text));
 }
 
+async function scanRowsForSubject(
+  admin: ReturnType<typeof createAdminClient>,
+  input: {
+    subjectKey: TaxonomySubjectKey;
+    limit: number;
+    state: "pending" | "outdated";
+    ascending: boolean;
+  },
+) {
+  const rows: SourceRow[] = [];
+  let offset = 0;
+
+  while (rows.length < input.limit) {
+    let query = admin
+      .from("national_exam_questions")
+      .select("*")
+      .order("id", { ascending: input.ascending })
+      .range(offset, offset + SUBJECT_SCAN_PAGE_SIZE - 1);
+
+    if (input.state === "pending") {
+      query = query.eq("taxonomy_status", "pending");
+    } else {
+      query = query
+        .neq("taxonomy_status", "pending")
+        .not("taxonomy_version", "is", null)
+        .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      const label = input.state === "pending" ? "待分類" : "舊版分類";
+      throw new Error(`讀取${label}題目失敗：${error.message}`);
+    }
+
+    const page = (data ?? []) as SourceRow[];
+    for (const row of page) {
+      if (getTaxonomySubjectKey(String(row.subject ?? "")) === input.subjectKey) {
+        rows.push(row);
+        if (rows.length >= input.limit) break;
+      }
+    }
+
+    if (page.length < SUBJECT_SCAN_PAGE_SIZE) break;
+    offset += SUBJECT_SCAN_PAGE_SIZE;
+  }
+
+  return rows.slice(0, input.limit);
+}
+
+function dedupeRows(rows: SourceRow[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const id = String(row.id ?? "");
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 async function loadClassificationRows(
   admin: ReturnType<typeof createAdminClient>,
   limit: number,
+  subjectKey: TaxonomySubjectKey | null,
+  mode: ClassificationMode,
 ) {
-  const { data: outdatedRows, error: outdatedError } = await admin
-    .from("national_exam_questions")
-    .select("*")
-    .neq("taxonomy_status", "pending")
-    .not("taxonomy_version", "is", null)
-    .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION)
-    .order("id", { ascending: false })
-    .limit(limit);
+  if (!subjectKey) {
+    const { data: outdatedRows, error: outdatedError } = await admin
+      .from("national_exam_questions")
+      .select("*")
+      .neq("taxonomy_status", "pending")
+      .not("taxonomy_version", "is", null)
+      .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION)
+      .order("id", { ascending: false })
+      .limit(limit);
 
-  if (outdatedError) {
-    throw new Error(`讀取舊版分類題目失敗：${outdatedError.message}`);
+    if (outdatedError) {
+      throw new Error(`讀取舊版分類題目失敗：${outdatedError.message}`);
+    }
+
+    const rows = [...((outdatedRows ?? []) as SourceRow[])];
+    const remainingSlots = Math.max(0, limit - rows.length);
+    if (remainingSlots === 0) return rows;
+
+    const { data: pendingRows, error: pendingError } = await admin
+      .from("national_exam_questions")
+      .select("*")
+      .eq("taxonomy_status", "pending")
+      .order("id", { ascending: true })
+      .limit(remainingSlots);
+
+    if (pendingError) {
+      throw new Error(`讀取待分類題目失敗：${pendingError.message}`);
+    }
+
+    return [...rows, ...((pendingRows ?? []) as SourceRow[])];
   }
 
-  const rows = [...(outdatedRows ?? [])];
-  const remainingSlots = Math.max(0, limit - rows.length);
-  if (remainingSlots === 0) return rows;
+  const outdatedRows = await scanRowsForSubject(admin, {
+    subjectKey,
+    limit,
+    state: "outdated",
+    ascending: false,
+  });
+  const remainingSlots = Math.max(0, limit - outdatedRows.length);
+  if (remainingSlots === 0) return outdatedRows;
 
-  const { data: pendingRows, error: pendingError } = await admin
-    .from("national_exam_questions")
-    .select("*")
-    .eq("taxonomy_status", "pending")
-    .order("id", { ascending: true })
-    .limit(remainingSlots);
-
-  if (pendingError) {
-    throw new Error(`讀取待分類題目失敗：${pendingError.message}`);
+  if (mode === "queue") {
+    const pendingRows = await scanRowsForSubject(admin, {
+      subjectKey,
+      limit: remainingSlots,
+      state: "pending",
+      ascending: true,
+    });
+    return dedupeRows([...outdatedRows, ...pendingRows]).slice(0, limit);
   }
 
-  return [...rows, ...(pendingRows ?? [])];
+  const olderTarget = Math.ceil(remainingSlots / 2);
+  const newerTarget = Math.floor(remainingSlots / 2);
+  const [oldestPending, newestPending] = await Promise.all([
+    scanRowsForSubject(admin, {
+      subjectKey,
+      limit: olderTarget,
+      state: "pending",
+      ascending: true,
+    }),
+    scanRowsForSubject(admin, {
+      subjectKey,
+      limit: newerTarget,
+      state: "pending",
+      ascending: false,
+    }),
+  ]);
+
+  let rows = dedupeRows([...outdatedRows, ...oldestPending, ...newestPending]);
+  if (rows.length < limit) {
+    const fallback = await scanRowsForSubject(admin, {
+      subjectKey,
+      limit,
+      state: "pending",
+      ascending: true,
+    });
+    rows = dedupeRows([...rows, ...fallback]);
+  }
+
+  return rows.slice(0, limit);
 }
 
 async function getRemainingCounts(admin: ReturnType<typeof createAdminClient>) {
@@ -239,6 +370,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       version: QUESTION_TAXONOMY_VERSION,
+      calibrationSubjectKeys: TAXONOMY_SUBJECT_KEYS,
       counts: {
         pending: pendingResult.count ?? 0,
         classified: classifiedResult.count ?? 0,
@@ -260,11 +392,41 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json().catch(() => ({}))) as { limit?: number };
+    const body = (await request.json().catch(() => ({}))) as {
+      limit?: number;
+      subjectKey?: string;
+      mode?: string;
+    };
     const requestedLimit = Number(body.limit ?? 12);
     const limit = Math.max(1, Math.min(25, Math.floor(requestedLimit || 12)));
-    const apiKey = String(process.env.OPENAI_API_KEY ?? "").trim();
+    const requestedSubjectKey = String(body.subjectKey ?? "").trim();
+    const subjectKey = requestedSubjectKey
+      ? isTaxonomySubjectKey(requestedSubjectKey)
+        ? requestedSubjectKey
+        : null
+      : null;
+    const mode: ClassificationMode = body.mode === "calibration" ? "calibration" : "queue";
 
+    if (requestedSubjectKey && !subjectKey) {
+      return NextResponse.json(
+        {
+          error: "Unknown taxonomy subjectKey.",
+          allowedSubjectKeys: TAXONOMY_SUBJECT_KEYS,
+        },
+        { status: 400 },
+      );
+    }
+    if (mode === "calibration" && !subjectKey) {
+      return NextResponse.json(
+        {
+          error: "Calibration mode requires subjectKey.",
+          allowedSubjectKeys: TAXONOMY_SUBJECT_KEYS,
+        },
+        { status: 400 },
+      );
+    }
+
+    const apiKey = String(process.env.OPENAI_API_KEY ?? "").trim();
     if (!apiKey) {
       return NextResponse.json(
         { error: "OPENAI_API_KEY is not configured." },
@@ -273,23 +435,27 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient();
-    const rows = await loadClassificationRows(admin, limit);
+    const rows = await loadClassificationRows(admin, limit, subjectKey, mode);
 
     if (!rows.length) {
+      const remaining = await getRemainingCounts(admin);
       return NextResponse.json({
         version: QUESTION_TAXONOMY_VERSION,
+        mode,
+        subjectKey,
         processed: 0,
-        remaining: 0,
-        remainingPending: 0,
-        remainingOutdated: 0,
-        message: "No questions need classification for the current taxonomy version.",
+        remaining: remaining.total,
+        remainingPending: remaining.pending,
+        remainingOutdated: remaining.outdated,
+        message: subjectKey
+          ? `No ${subjectKey} questions need classification for the current taxonomy version.`
+          : "No questions need classification for the current taxonomy version.",
       });
     }
 
-    const prepared = rows.map((rawRow) => {
-      const row = rawRow as Record<string, unknown>;
+    const prepared = rows.map((row) => {
       const subject = String(row.subject ?? "").trim();
-      const subjectKey = getTaxonomySubjectKey(subject);
+      const rowSubjectKey = getTaxonomySubjectKey(subject);
       const stem = String(row.question ?? "").trim();
       const options = Array.isArray(row.options)
         ? row.options.map((item) => String(item ?? "").trim())
@@ -298,9 +464,14 @@ export async function POST(request: NextRequest) {
 
       return {
         id: String(row.id),
+        examYear: row.exam_year ?? null,
+        examRound: String(row.exam_round ?? "").trim() || null,
+        questionNumber: Number.isFinite(Number(row.question_number))
+          ? Number(row.question_number)
+          : null,
         subject,
-        subjectKey,
-        allowedTaxonomy: subjectKey ? getAllowedTaxonomy(subjectKey) : [],
+        subjectKey: rowSubjectKey,
+        allowedTaxonomy: rowSubjectKey ? getAllowedTaxonomy(rowSubjectKey) : [],
         stem,
         options,
         correctAnswers: normalizeCorrectAnswers(row.correct_answers),
@@ -382,6 +553,12 @@ export async function POST(request: NextRequest) {
 
     const updates = [] as Array<{
       id: string;
+      examYear: unknown;
+      examRound: string | null;
+      questionNumber: number | null;
+      subject: string;
+      subjectKey: TaxonomySubjectKey | null;
+      question: string;
       status: "classified" | "needs_review";
       topic: string;
       subtopic: string;
@@ -439,6 +616,12 @@ export async function POST(request: NextRequest) {
 
       updates.push({
         id: source.id,
+        examYear: source.examYear,
+        examRound: source.examRound,
+        questionNumber: source.questionNumber,
+        subject: source.subject,
+        subjectKey: source.subjectKey,
+        question: source.stem,
         status,
         topic,
         subtopic,
@@ -454,6 +637,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       version: QUESTION_TAXONOMY_VERSION,
       model,
+      mode,
+      subjectKey,
       processed: updates.length,
       remaining: remaining.total,
       remainingPending: remaining.pending,
