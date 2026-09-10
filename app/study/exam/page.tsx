@@ -22,6 +22,14 @@ const subjects = [
   "醫學分子檢驗學與臨床鏡檢學（包括寄生蟲學）",
 ];
 
+type PurchasedExam = {
+  exam_key: string;
+  year: string;
+  session: string;
+  subject: string;
+  purchased_at: string | null;
+};
+
 export default function ExamPage() {
   return (
     <Suspense fallback={<LoadingExamPicker />}>
@@ -35,6 +43,7 @@ function ExamPicker() {
   const [rocYear, setRocYear] = useState(115);
   const [session, setSession] = useState<1 | 2>(1);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
+  const [purchases, setPurchases] = useState<PurchasedExam[]>([]);
   const explanationMode = searchParams.get("mode") === "explanation";
 
   useEffect(() => {
@@ -51,7 +60,33 @@ function ExamPicker() {
     };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPurchases() {
+      try {
+        const response = await fetch("/api/exam-explanation-access", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? "讀取完整詳解失敗。");
+        setPurchases(Array.isArray(payload?.purchases) ? payload.purchases : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setPurchases([]);
+      }
+    }
+
+    void loadPurchases();
+    return () => controller.abort();
+  }, []);
+
   const latestMap = useMemo(() => latestAttemptMap(attempts), [attempts]);
+  const purchaseMap = useMemo(
+    () => new Map(purchases.map((item) => [item.exam_key, item])),
+    [purchases],
+  );
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -72,7 +107,43 @@ function ExamPicker() {
           </p>
         </section>
 
-        {explanationMode && (
+        {purchases.length > 0 && (
+          <section className="mt-5 rounded-[24px] border border-[#bfe1cb] bg-[#f3fbf6] p-5">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
+                  MY FULL EXPLANATIONS
+                </div>
+                <h2 className="mt-1 text-xl font-black">我的完整詳解</h2>
+              </div>
+              <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#237849]">
+                {purchases.length} 份已解鎖
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {purchases.map((item) => (
+                <Link
+                  key={item.exam_key}
+                  href={buildExplanationHref(item.year, item.session, item.subject)}
+                  className="rounded-2xl border border-[#d3e8db] bg-white px-4 py-3 transition hover:border-[#9ed9b5] hover:bg-[#fbfefc]"
+                >
+                  <div className="text-xs font-black text-[#2ba962]">
+                    {item.year} 年 · 第 {item.session} 次
+                  </div>
+                  <div className="mt-1 text-sm font-black leading-6 text-[#315b45]">
+                    {item.subject}
+                  </div>
+                  <div className="mt-2 text-xs font-black text-[#237849]">
+                    查看完整詳解 →
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {explanationMode && purchases.length === 0 && (
           <section className="mt-5 rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] px-5 py-4">
             <div className="text-sm font-black text-[#237849]">
               想解鎖 NT$59 單份完整詳解？
@@ -142,6 +213,7 @@ function ExamPicker() {
                   session={session}
                   subject={subject}
                   latestAttempt={latestMap.get(examKey) ?? null}
+                  purchased={purchaseMap.has(examKey)}
                 />
               );
             })}
@@ -158,12 +230,14 @@ function ExamCard({
   session,
   subject,
   latestAttempt,
+  purchased,
 }: {
   index: number;
   year: number;
   session: 1 | 2;
   subject: string;
   latestAttempt: ExamAttempt | null;
+  purchased: boolean;
 }) {
   const quizHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -173,6 +247,11 @@ function ExamCard({
     });
     return `/study/exam/quiz?${params.toString()}`;
   }, [year, session, subject]);
+
+  const explanationHref = useMemo(
+    () => buildExplanationHref(String(year), String(session), subject),
+    [year, session, subject],
+  );
 
   const historyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -191,7 +270,16 @@ function ExamCard({
           {index + 1}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-black leading-7 text-[#17372a]">{subject}</h3>
+          <div className="flex flex-wrap items-start gap-2">
+            <h3 className="min-w-0 flex-1 text-base font-black leading-7 text-[#17372a]">
+              {subject}
+            </h3>
+            {purchased && (
+              <span className="shrink-0 rounded-full bg-[#eaf9f0] px-2.5 py-1 text-[11px] font-black text-[#237849]">
+                ✓ 詳解已解鎖
+              </span>
+            )}
+          </div>
           {latestAttempt ? (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-[#789083]">
               <span className="font-black text-[#237849]">
@@ -206,26 +294,60 @@ function ExamCard({
         </div>
       </div>
 
-      <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
-        <Link
-          href={quizHref}
-          className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
-        >
-          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
-        </Link>
-        {latestAttempt ? (
+      {purchased ? (
+        <div className="mt-auto space-y-2 pt-5">
           <Link
-            href={historyHref}
-            className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+            href={explanationHref}
+            className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
           >
-            歷史作答
+            📚 查看完整詳解
           </Link>
-        ) : (
-          <div className="hidden sm:block" />
-        )}
-      </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Link
+              href={quizHref}
+              className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+            >
+              ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+            </Link>
+            {latestAttempt ? (
+              <Link
+                href={historyHref}
+                className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+              >
+                歷史作答
+              </Link>
+            ) : (
+              <div className="hidden sm:block" />
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
+          <Link
+            href={quizHref}
+            className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+          >
+            ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+          </Link>
+          {latestAttempt ? (
+            <Link
+              href={historyHref}
+              className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+            >
+              歷史作答
+            </Link>
+          ) : (
+            <div className="hidden sm:block" />
+          )}
+        </div>
+      )}
     </article>
   );
+}
+
+function buildExplanationHref(year: string, session: string, subject: string) {
+  const params = new URLSearchParams({ year, session, subject });
+  return `/study/exam/explanation?${params.toString()}`;
 }
 
 function LoadingExamPicker() {
