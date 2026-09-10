@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function entitlementMetadata(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {} as Record<string, unknown>;
+  }
+  return value as Record<string, unknown>;
+}
+
+function metadataString(metadata: Record<string, unknown>, key: string) {
+  return typeof metadata[key] === "string" ? metadata[key] : null;
+}
+
 export async function GET(request: NextRequest) {
   const trade = request.nextUrl.searchParams.get("trade")?.trim();
   if (!trade) {
@@ -33,6 +44,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "找不到這筆訂單。" }, { status: 404 });
     }
 
+    const metadata = entitlementMetadata(data.entitlement_metadata);
     let entitlement: Record<string, unknown> | null = null;
 
     if (data.status === "paid" && data.entitlement_type === "pro_30d") {
@@ -70,9 +82,9 @@ export async function GET(request: NextRequest) {
         type: "exam_explanation",
         purchased: Boolean(exam),
         purchasedAt: exam?.purchased_at ?? null,
-        year: exam?.year ?? data.entitlement_metadata?.year ?? null,
-        session: exam?.session ?? data.entitlement_metadata?.session ?? null,
-        subject: exam?.subject ?? data.entitlement_metadata?.subject ?? null,
+        year: exam?.year ?? metadataString(metadata, "year"),
+        session: exam?.session ?? metadataString(metadata, "session"),
+        subject: exam?.subject ?? metadataString(metadata, "subject"),
       };
     }
 
