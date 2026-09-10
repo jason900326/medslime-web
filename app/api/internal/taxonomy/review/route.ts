@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { QUESTION_TAXONOMY_VERSION } from "@/lib/question-taxonomy";
+import {
+  QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
+  QUESTION_TAXONOMY_REPROCESS_VERSIONS,
+  QUESTION_TAXONOMY_VERSION,
+} from "@/lib/question-taxonomy";
 
 const allowedStatuses = new Set(["classified", "needs_review", "pending"]);
 
@@ -40,7 +44,9 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     if (status !== "pending") {
-      sampleQuery = sampleQuery.eq("taxonomy_version", QUESTION_TAXONOMY_VERSION);
+      sampleQuery = sampleQuery.in("taxonomy_version", [
+        ...QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
+      ]);
     }
     if (subject) sampleQuery = sampleQuery.eq("subject", subject);
 
@@ -56,12 +62,12 @@ export async function GET(request: NextRequest) {
         .from("national_exam_questions")
         .select("subject,topic,taxonomy_confidence")
         .eq("taxonomy_status", "classified")
-        .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_COMPATIBLE_VERSIONS]),
       admin
         .from("national_exam_questions")
         .select("id", { count: "exact", head: true })
         .eq("taxonomy_status", "needs_review")
-        .eq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_COMPATIBLE_VERSIONS]),
       admin
         .from("national_exam_questions")
         .select("id", { count: "exact", head: true })
@@ -70,8 +76,7 @@ export async function GET(request: NextRequest) {
         .from("national_exam_questions")
         .select("id", { count: "exact", head: true })
         .neq("taxonomy_status", "pending")
-        .not("taxonomy_version", "is", null)
-        .neq("taxonomy_version", QUESTION_TAXONOMY_VERSION),
+        .in("taxonomy_version", [...QUESTION_TAXONOMY_REPROCESS_VERSIONS]),
     ]);
 
     if (sampleResult.error) throw new Error(sampleResult.error.message);
@@ -118,6 +123,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       version: QUESTION_TAXONOMY_VERSION,
+      compatibleVersions: QUESTION_TAXONOMY_COMPATIBLE_VERSIONS,
       status,
       subject: subject || null,
       counts: {
