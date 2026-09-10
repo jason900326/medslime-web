@@ -153,8 +153,8 @@ export default function PaymentResultClient() {
           )}
 
           {paid && state.productId === "exam-full-explanation" && (
-            <div className="mt-5 rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-4 text-sm font-black text-[#237849]">
-              這份國考完整詳解已永久解鎖，可以直接進入整份詳解閱讀模式。
+            <div className="mt-5 rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-4 text-left text-sm font-black leading-6 text-[#237849]">
+              ✓ 這份考卷的詳解權限已永久解鎖。回到作答紀錄後，先看自己答錯或不確定的題目，需要哪題再展開哪題解析；系統不會一次產生整份考卷。
             </div>
           )}
 
@@ -207,7 +207,7 @@ function successMessage(
   }
 
   if (productId === "exam-full-explanation") {
-    return "付款已確認，指定國考的完整詳解已永久開通。";
+    return "付款已確認，指定國考的詳解權限已永久開通。";
   }
 
   return "付款已確認，購買的學習服務已開通。";
@@ -229,14 +229,19 @@ function getPrimaryAction(
       typeof entitlement?.subject === "string" ? entitlement.subject : "";
 
     if (year && session && subject) {
-      const params = new URLSearchParams({ year, session, subject });
+      const params = new URLSearchParams({
+        tab: "attempts",
+        year,
+        session,
+        subject,
+      });
       return {
-        href: `/study/exam/explanation?${params.toString()}`,
-        label: "查看整份完整詳解",
+        href: `/study/records?${params.toString()}`,
+        label: "回顧這份考卷的錯題",
       };
     }
 
-    return { href: "/study/exam?mode=explanation", label: "前往國考題庫" };
+    return { href: "/study/records?tab=attempts", label: "前往作答紀錄" };
   }
 
   return null;
