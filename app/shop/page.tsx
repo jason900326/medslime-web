@@ -3,6 +3,7 @@
 import Link from "next/link";
 import TopBar from "@/components/top-bar";
 import InfoDialogButton from "@/components/info-dialog-button";
+import ProPurchaseAction from "@/components/pro-purchase-action";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { SHOP_PRODUCTS, type ShopProduct } from "@/lib/shop-products";
 
@@ -128,31 +129,8 @@ function ProductCard({
           >
             選擇考卷 · NT$59／份
           </Link>
-        ) : !checkoutEnabled ? (
-          <button
-            type="button"
-            disabled
-            className="w-full cursor-not-allowed rounded-xl border border-[#e4e9e6] bg-[#eef2ef] px-4 py-3 text-sm font-black text-[#91a298]"
-          >
-            金流審核中
-          </button>
-        ) : isLoggedIn ? (
-          <form action="/api/payments/ecpay/checkout" method="post">
-            <input type="hidden" name="productId" value={product.id} />
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#2dbc70]"
-            >
-              開通 30 天 Pro
-            </button>
-          </form>
         ) : (
-          <Link
-            href={`/auth/login?redirect=${encodeURIComponent("/shop")}`}
-            className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
-          >
-            登入後開通 Pro
-          </Link>
+          <ProPurchaseAction isLoggedIn={isLoggedIn} />
         )}
       </div>
     </article>
