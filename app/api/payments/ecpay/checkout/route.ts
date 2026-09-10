@@ -136,9 +136,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (owned) {
-        const params = new URLSearchParams({ year, session, subject });
+        const params = new URLSearchParams({
+          tab: "attempts",
+          year,
+          session,
+          subject,
+        });
         return NextResponse.redirect(
-          `${siteUrl}/study/exam/explanation?${params.toString()}`,
+          `${siteUrl}/study/records?${params.toString()}`,
           { status: 303 },
         );
       }
