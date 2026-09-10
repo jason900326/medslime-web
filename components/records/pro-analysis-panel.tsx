@@ -12,6 +12,22 @@ type SubjectStat = {
   delta: number | null;
 };
 
+type TopicStat = {
+  key: string;
+  subject: string;
+  topic: string;
+  subtopic: string | null;
+  attempts: number;
+  answeredCount: number;
+  correctCount: number;
+  accuracy: number;
+  uncertainCount: number;
+  uncertainRate: number;
+  latestAccuracy: number | null;
+  delta: number | null;
+  priorityScore: number;
+};
+
 type RepeatWeakness = {
   key: string;
   subject: string;
@@ -27,6 +43,8 @@ type ReviewPriority = {
   stem: string;
   reason: string;
   score: number;
+  topic: string | null;
+  subtopic: string | null;
 };
 
 type ProAnalysisPayload = {
@@ -40,6 +58,19 @@ type ProAnalysisPayload = {
   repeatWeaknesses: RepeatWeakness[];
   reviewPriorities: ReviewPriority[];
   subjectStats: SubjectStat[];
+  topicAnalyticsAvailable: boolean;
+  topicAnalyticsMessage: string | null;
+  topicCoverage: {
+    attemptsWithOutcomes: number;
+    capturedOutcomeCount: number;
+    answeredOutcomeCount: number;
+    mappedAnsweredCount: number;
+    coverageRate: number;
+  };
+  weakestTopic: TopicStat | null;
+  weakestSubtopic: TopicStat | null;
+  topicStats: TopicStat[];
+  subtopicStats: TopicStat[];
   code?: string;
   error?: string;
 };
@@ -50,7 +81,7 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; data: ProAnalysisPayload };
 
-const ANALYSIS_CACHE_PREFIX = "medslime_pro_analysis_v1";
+const ANALYSIS_CACHE_PREFIX = "medslime_pro_analysis_v2";
 const ANALYSIS_CACHE_TTL_MS = 15 * 60 * 1000;
 const ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
 const PANEL_OPEN_PREFIX = "medslime_pro_panel_open_v1";
@@ -128,6 +159,7 @@ export default function ProAnalysisPanel() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const [topicsOpen, setTopicsOpen] = useState(false);
   const [weaknessOpen, setWeaknessOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(false);
@@ -239,7 +271,7 @@ export default function ProAnalysisPanel() {
           <ActiveBadge />
         </div>
         <div className="mt-3 text-sm font-bold leading-6 text-[#668276]">
-          先完成幾份國考，系統就會開始整理跨考卷趨勢、反覆弱點與複習優先順序。
+          先完成幾份國考或自由測驗，系統就會開始整理跨考卷趨勢、弱主題與複習優先順序。
         </div>
       </section>
     );
@@ -278,16 +310,8 @@ export default function ProAnalysisPanel() {
             open={overviewOpen}
             onToggle={() => setOverviewOpen((current) => !current)}
           >
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <InsightCard label="最近 5 次平均" value={`${data.recentAverage.toFixed(1)} 分`} />
-              <InsightCard
-                label="最近一次變化"
-                value={
-                  data.overallDelta === null
-                    ? "資料累積中"
-                    : `${data.overallDelta >= 0 ? "+" : ""}${data.overallDelta.toFixed(1)} 分`
-                }
-              />
               <InsightCard
                 label="近期趨勢"
                 value={
@@ -304,6 +328,14 @@ export default function ProAnalysisPanel() {
                     : "資料累積中"
                 }
               />
+              <InsightCard
+                label="目前最弱主題"
+                value={
+                  data.weakestTopic
+                    ? `${data.weakestTopic.topic} ${data.weakestTopic.accuracy.toFixed(0)}%`
+                    : "資料累積中"
+                }
+              />
             </div>
           </Disclosure>
 
@@ -315,6 +347,55 @@ export default function ProAnalysisPanel() {
             <p className="text-sm font-bold leading-7 text-[#668276]">
               {data.recommendation}
             </p>
+          </Disclosure>
+
+          <Disclosure
+            title="弱主題與細分弱點"
+            subtitle="依每一題實際作答結果 × 題庫 taxonomy 統計"
+            badge={
+              data.topicCoverage.mappedAnsweredCount > 0
+                ? `${data.topicCoverage.mappedAnsweredCount} 題樣本`
+                : "累積中"
+            }
+            open={topicsOpen}
+            onToggle={() => setTopicsOpen((current) => !current)}
+          >
+            {!data.topicAnalyticsAvailable || data.topicCoverage.mappedAnsweredCount === 0 ? (
+              <div className="rounded-xl bg-[#f7faf8] px-3 py-3 text-xs font-bold leading-5 text-[#789083]">
+                {data.topicAnalyticsMessage ??
+                  "完成新版國考或自由測驗後，這裡會開始累積逐題主題表現。"}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="rounded-xl bg-[#f3fbf6] px-3 py-3 text-xs font-bold leading-5 text-[#668276]">
+                  最近 {data.topicCoverage.attemptsWithOutcomes} 次有逐題資料的作答中，已把 {data.topicCoverage.mappedAnsweredCount} / {data.topicCoverage.answeredOutcomeCount} 題有效作答對應到已確認 taxonomy（{data.topicCoverage.coverageRate.toFixed(1)}%）。
+                </div>
+
+                <div>
+                  <div className="mb-2 text-xs font-black text-[#315b45]">優先補強主題</div>
+                  <div className="space-y-2">
+                    {data.topicStats.slice(0, 6).map((stat) => (
+                      <TopicStatRow key={stat.key} stat={stat} />
+                    ))}
+                  </div>
+                </div>
+
+                {data.subtopicStats.length > 0 && (
+                  <div>
+                    <div className="mb-2 text-xs font-black text-[#315b45]">細分弱點</div>
+                    <div className="space-y-2">
+                      {data.subtopicStats.slice(0, 5).map((stat) => (
+                        <TopicStatRow key={stat.key} stat={stat} showSubtopic />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-[11px] font-bold leading-5 text-[#8a9c92]">
+                  排序會同時考慮錯誤率、作答樣本量與「不確定」標記；樣本很少的主題不會直接被當成最弱主題。
+                </div>
+              </div>
+            )}
           </Disclosure>
 
           <div className="grid gap-3 lg:grid-cols-2">
@@ -356,7 +437,7 @@ export default function ProAnalysisPanel() {
 
             <Disclosure
               title="今日複習優先清單"
-              subtitle="依弱科、不確定標記與未複習錯題排序"
+              subtitle="依弱主題、弱科、不確定標記與未複習錯題排序"
               badge={`${data.reviewPriorities.length} 題`}
               open={priorityOpen}
               onToggle={() => setPriorityOpen((current) => !current)}
@@ -389,6 +470,11 @@ export default function ProAnalysisPanel() {
                             {shortSubject(item.subject)}
                             {item.questionNumber ? ` · 第 ${item.questionNumber} 題` : ""}
                           </div>
+                          {item.topic && (
+                            <div className="mt-1 text-[11px] font-black text-[#557768]">
+                              {item.topic}{item.subtopic && item.subtopic !== "其他" ? ` · ${item.subtopic}` : ""}
+                            </div>
+                          )}
                           <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">
                             {item.stem}
                           </div>
@@ -400,10 +486,10 @@ export default function ProAnalysisPanel() {
                     ))}
                   </div>
                   <Link
-                    href="/study/records?tab=mistakes"
+                    href="/study/mistakes"
                     className="mt-3 inline-block text-xs font-black text-[#237849]"
                   >
-                    前往錯題紀錄 →
+                    前往錯題複習 →
                   </Link>
                 </>
               )}
@@ -448,6 +534,41 @@ export default function ProAnalysisPanel() {
         </div>
       )}
     </section>
+  );
+}
+
+function TopicStatRow({ stat, showSubtopic = false }: { stat: TopicStat; showSubtopic?: boolean }) {
+  const title = showSubtopic && stat.subtopic ? stat.subtopic : stat.topic;
+  const width = Math.max(3, Math.min(100, stat.accuracy));
+
+  return (
+    <div className="rounded-xl border border-[#e1ebe5] bg-white px-3 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-black text-[#789083]">
+            {shortSubject(stat.subject)}{showSubtopic ? ` · ${stat.topic}` : ""}
+          </div>
+          <div className="mt-1 truncate text-sm font-black text-[#315b45]">{title}</div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-base font-black text-[#237849]">{stat.accuracy.toFixed(1)}%</div>
+          <div className="text-[10px] font-bold text-[#8a9c92]">{stat.correctCount}/{stat.answeredCount} 題</div>
+        </div>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf3ef]">
+        <div className="h-full rounded-full bg-[#79d7a3]" style={{ width: `${width}%` }} />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold text-[#8a9c92]">
+        <span>{stat.attempts} 次作答</span>
+        {stat.uncertainCount > 0 && <span>不確定 {stat.uncertainCount} 題</span>}
+        {stat.delta !== null && (
+          <span className={stat.delta >= 0 ? "text-[#2b9b60]" : "text-[#b86b6b]"}>
+            最近 {stat.delta >= 0 ? "+" : ""}{stat.delta.toFixed(1)}%
+          </span>
+        )}
+        {stat.answeredCount < 5 && <span>樣本仍少</span>}
+      </div>
+    </div>
   );
 }
 
@@ -525,8 +646,8 @@ function LockedPanel() {
       </div>
       <div className="mt-4 grid gap-2 text-sm font-bold text-[#617a6e] sm:grid-cols-3">
         <MiniFeature>跨考卷弱科與改善趨勢</MiniFeature>
-        <MiniFeature>反覆出錯題目偵測</MiniFeature>
-        <MiniFeature>今日複習優先清單</MiniFeature>
+        <MiniFeature>逐題 Topic / Subtopic 弱點分析</MiniFeature>
+        <MiniFeature>弱主題驅動的複習優先清單</MiniFeature>
       </div>
       <Link
         href="/shop"
