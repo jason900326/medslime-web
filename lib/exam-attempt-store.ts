@@ -24,6 +24,23 @@ export type ExamQuestionOutcome = {
   uncertain: boolean;
 };
 
+export type ExamAttemptQuestionItem = {
+  id: string;
+  questionKey: string;
+  questionNumber: number | null;
+  sourceYear: string | null;
+  sourceSession: string | null;
+  sourceSubject: string | null;
+  stem: string;
+  options: string[];
+  correctIndex: number | null;
+  userAnswer: number | null;
+  answered: boolean;
+  correct: boolean | null;
+  uncertain: boolean;
+  officialPdfUrl: string | null;
+};
+
 export type ExamAttempt = {
   id: string;
   year: string;
@@ -39,6 +56,7 @@ export type ExamAttempt = {
   completedAt: string;
   reviewItems: ExamAttemptReviewItem[];
   questionOutcomes: ExamQuestionOutcome[];
+  questionItems: ExamAttemptQuestionItem[];
 };
 
 export type SaveExamAttemptInput = {
@@ -53,6 +71,7 @@ export type SaveExamAttemptInput = {
   durationSeconds: number;
   reviewItems: ExamAttemptReviewItem[];
   questionOutcomes: ExamQuestionOutcome[];
+  questionItems: ExamAttemptQuestionItem[];
 };
 
 type AttemptRow = {
@@ -70,12 +89,14 @@ type AttemptRow = {
   completed_at: string;
   review_items?: unknown;
   question_outcomes?: unknown;
+  question_items?: unknown;
 };
 
 const ATTEMPT_SELECT_BASE =
   "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
 const ATTEMPT_SELECT_WITH_REVIEW = `${ATTEMPT_SELECT_BASE},review_items`;
-const ATTEMPT_SELECT = `${ATTEMPT_SELECT_WITH_REVIEW},question_outcomes`;
+const ATTEMPT_SELECT_WITH_OUTCOMES = `${ATTEMPT_SELECT_WITH_REVIEW},question_outcomes`;
+const ATTEMPT_SELECT = `${ATTEMPT_SELECT_WITH_OUTCOMES},question_items`;
 const PRO_ANALYSIS_STALE_KEY = "medslime_pro_analysis_stale";
 
 function markProAnalysisStale() {
@@ -85,6 +106,10 @@ function markProAnalysisStale() {
   } catch {
     // Cache invalidation is only a UX optimization.
   }
+}
+
+function finiteIndex(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
@@ -98,20 +123,11 @@ function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
 
       return {
         id: typeof raw.id === "string" ? raw.id : `review-${index}`,
-        questionNumber:
-          typeof raw.questionNumber === "number" && Number.isFinite(raw.questionNumber)
-            ? raw.questionNumber
-            : null,
+        questionNumber: finiteIndex(raw.questionNumber),
         stem: raw.stem,
         options: raw.options.filter((option): option is string => typeof option === "string"),
-        correctIndex:
-          typeof raw.correctIndex === "number" && Number.isFinite(raw.correctIndex)
-            ? raw.correctIndex
-            : null,
-        userAnswer:
-          typeof raw.userAnswer === "number" && Number.isFinite(raw.userAnswer)
-            ? raw.userAnswer
-            : null,
+        correctIndex: finiteIndex(raw.correctIndex),
+        userAnswer: finiteIndex(raw.userAnswer),
         uncertain: raw.uncertain === true,
         officialPdfUrl:
           typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
@@ -131,14 +147,8 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
       const questionKey = typeof raw.questionKey === "string" ? raw.questionKey.trim() : "";
       if (!questionId || !questionKey) return null;
 
-      const userAnswer =
-        typeof raw.userAnswer === "number" && Number.isFinite(raw.userAnswer)
-          ? raw.userAnswer
-          : null;
-      const correctIndex =
-        typeof raw.correctIndex === "number" && Number.isFinite(raw.correctIndex)
-          ? raw.correctIndex
-          : null;
+      const userAnswer = finiteIndex(raw.userAnswer);
+      const correctIndex = finiteIndex(raw.correctIndex);
       const answered = raw.answered === true;
       const correct =
         typeof raw.correct === "boolean"
@@ -150,10 +160,7 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
       return {
         questionId,
         questionKey,
-        questionNumber:
-          typeof raw.questionNumber === "number" && Number.isFinite(raw.questionNumber)
-            ? raw.questionNumber
-            : null,
+        questionNumber: finiteIndex(raw.questionNumber),
         userAnswer,
         correctIndex,
         answered,
@@ -162,6 +169,49 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
       } satisfies ExamQuestionOutcome;
     })
     .filter((item): item is ExamQuestionOutcome => Boolean(item));
+}
+
+function normalizeQuestionItems(value: unknown): ExamAttemptQuestionItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as Partial<ExamAttemptQuestionItem>;
+      const questionKey = typeof raw.questionKey === "string" ? raw.questionKey.trim() : "";
+      if (!questionKey || typeof raw.stem !== "string" || !Array.isArray(raw.options)) {
+        return null;
+      }
+
+      const userAnswer = finiteIndex(raw.userAnswer);
+      const correctIndex = finiteIndex(raw.correctIndex);
+      const answered = raw.answered === true || userAnswer !== null;
+      const correct =
+        typeof raw.correct === "boolean"
+          ? raw.correct
+          : answered && userAnswer !== null && correctIndex !== null
+            ? userAnswer === correctIndex
+            : null;
+
+      return {
+        id: typeof raw.id === "string" && raw.id.trim() ? raw.id : `question-${index}`,
+        questionKey,
+        questionNumber: finiteIndex(raw.questionNumber),
+        sourceYear: typeof raw.sourceYear === "string" ? raw.sourceYear : null,
+        sourceSession: typeof raw.sourceSession === "string" ? raw.sourceSession : null,
+        sourceSubject: typeof raw.sourceSubject === "string" ? raw.sourceSubject : null,
+        stem: raw.stem,
+        options: raw.options.filter((option): option is string => typeof option === "string"),
+        correctIndex,
+        userAnswer,
+        answered,
+        correct,
+        uncertain: raw.uncertain === true,
+        officialPdfUrl:
+          typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
+      } satisfies ExamAttemptQuestionItem;
+    })
+    .filter((item): item is ExamAttemptQuestionItem => Boolean(item));
 }
 
 function mapRow(row: AttemptRow): ExamAttempt {
@@ -180,6 +230,7 @@ function mapRow(row: AttemptRow): ExamAttempt {
     completedAt: row.completed_at,
     reviewItems: normalizeReviewItems(row.review_items),
     questionOutcomes: normalizeQuestionOutcomes(row.question_outcomes),
+    questionItems: normalizeQuestionItems(row.question_items),
   };
 }
 
@@ -206,6 +257,9 @@ async function readAttemptRows(input: {
   };
 
   let result = await run(ATTEMPT_SELECT);
+  if (result.error && missingColumn(result.error.message, "question_items")) {
+    result = await run(ATTEMPT_SELECT_WITH_OUTCOMES);
+  }
   if (result.error && missingColumn(result.error.message, "question_outcomes")) {
     result = await run(ATTEMPT_SELECT_WITH_REVIEW);
   }
@@ -256,13 +310,13 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
 
 export async function saveNationalExamAttempt(
   input: SaveExamAttemptInput,
-): Promise<void> {
+): Promise<string | null> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return;
+  if (!user) return null;
 
   const examKey = `${input.year}-${input.session}-${input.subject}`;
   const baseInsert = {
@@ -280,21 +334,33 @@ export async function saveNationalExamAttempt(
     completed_at: new Date().toISOString(),
   };
 
-  let result = await supabase.from("exam_attempts").insert({
+  const insertWithId = (payload: Record<string, unknown>) =>
+    supabase.from("exam_attempts").insert(payload).select("id").single();
+
+  let result = await insertWithId({
     ...baseInsert,
     review_items: input.reviewItems,
     question_outcomes: input.questionOutcomes,
+    question_items: input.questionItems,
   });
 
+  if (result.error && missingColumn(result.error.message, "question_items")) {
+    result = await insertWithId({
+      ...baseInsert,
+      review_items: input.reviewItems,
+      question_outcomes: input.questionOutcomes,
+    });
+  }
+
   if (result.error && missingColumn(result.error.message, "question_outcomes")) {
-    result = await supabase.from("exam_attempts").insert({
+    result = await insertWithId({
       ...baseInsert,
       review_items: input.reviewItems,
     });
   }
 
   if (result.error && missingColumn(result.error.message, "review_items")) {
-    result = await supabase.from("exam_attempts").insert(baseInsert);
+    result = await insertWithId(baseInsert);
   }
 
   if (result.error) {
@@ -303,6 +369,8 @@ export async function saveNationalExamAttempt(
   }
 
   markProAnalysisStale();
+  const row = result.data as { id?: string } | null;
+  return typeof row?.id === "string" ? row.id : null;
 }
 
 export function latestAttemptMap(attempts: ExamAttempt[]) {
