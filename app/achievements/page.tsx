@@ -38,37 +38,37 @@ const rarityKindsOwned = (game: Game) =>
   ).length;
 
 const achievementDefinitions: AchievementDefinition[] = [
-  // 學習 10
-  { id: "focus-1", category: "學習", name: "坐得住了", description: "累積專注 1 小時", target: 60, unit: "分鐘", reward: { type: "coins", amount: 100 }, getProgress: focusMinutes },
-  { id: "focus-10", category: "學習", name: "開始認真", description: "累積專注 10 小時", target: 600, unit: "分鐘", reward: { type: "coins", amount: 300 }, getProgress: focusMinutes },
-  { id: "focus-30", category: "學習", name: "屁股黏住了", description: "累積專注 30 小時", target: 1800, unit: "分鐘", reward: { type: "tickets", amount: 3 }, getProgress: focusMinutes },
-  { id: "focus-60", category: "學習", name: "真正的備考生活", description: "累積專注 60 小時", target: 3600, unit: "分鐘", reward: { type: "tickets", amount: 5 }, getProgress: focusMinutes },
-  { id: "focus-100", category: "學習", name: "閉關修煉", description: "累積專注 100 小時", target: 6000, unit: "分鐘", reward: { type: "tickets", amount: 8 }, getProgress: focusMinutes },
-  { id: "focus-150", category: "學習", name: "時間黑洞", description: "累積專注 150 小時", target: 9000, unit: "分鐘", reward: { type: "tickets", amount: 10 }, getProgress: focusMinutes },
-  { id: "questions-100", category: "學習", name: "暖身完成", description: "累積作答 100 題", target: 100, unit: "題", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalQuestionsAnswered },
-  { id: "questions-500", category: "學習", name: "題目開始有臉了", description: "累積作答 500 題", target: 500, unit: "題", reward: { type: "coins", amount: 300 }, getProgress: (game) => game.totalQuestionsAnswered },
-  { id: "questions-1000", category: "學習", name: "題海居民", description: "累積作答 1,000 題", target: 1000, unit: "題", reward: { type: "tickets", amount: 5 }, getProgress: (game) => game.totalQuestionsAnswered },
-  { id: "mistakes-50", category: "學習", name: "錯過就不要再錯", description: "累積複習 50 題錯題", target: 50, unit: "題", reward: { type: "coins", amount: 250 }, getProgress: (game) => game.totalMistakesReviewed },
+  // 學習 10：合計約 12 抽等值
+  { id: "focus-1", category: "學習", name: "坐得住了", description: "累積專注 1 小時", target: 60, unit: "分鐘", reward: { type: "coins", amount: 50 }, getProgress: focusMinutes },
+  { id: "focus-10", category: "學習", name: "開始認真", description: "累積專注 10 小時", target: 600, unit: "分鐘", reward: { type: "coins", amount: 100 }, getProgress: focusMinutes },
+  { id: "focus-30", category: "學習", name: "屁股黏住了", description: "累積專注 30 小時", target: 1800, unit: "分鐘", reward: { type: "tickets", amount: 1 }, getProgress: focusMinutes },
+  { id: "focus-60", category: "學習", name: "真正的備考生活", description: "累積專注 60 小時", target: 3600, unit: "分鐘", reward: { type: "tickets", amount: 1 }, getProgress: focusMinutes },
+  { id: "focus-100", category: "學習", name: "閉關修煉", description: "累積專注 100 小時", target: 6000, unit: "分鐘", reward: { type: "tickets", amount: 2 }, getProgress: focusMinutes },
+  { id: "focus-150", category: "學習", name: "時間黑洞", description: "累積專注 150 小時", target: 9000, unit: "分鐘", reward: { type: "tickets", amount: 2 }, getProgress: focusMinutes },
+  { id: "questions-100", category: "學習", name: "暖身完成", description: "累積作答 100 題", target: 100, unit: "題", reward: { type: "coins", amount: 50 }, getProgress: (game) => game.totalQuestionsAnswered },
+  { id: "questions-500", category: "學習", name: "題目開始有臉了", description: "累積作答 500 題", target: 500, unit: "題", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalQuestionsAnswered },
+  { id: "questions-1000", category: "學習", name: "題海居民", description: "累積作答 1,000 題", target: 1000, unit: "題", reward: { type: "tickets", amount: 2 }, getProgress: (game) => game.totalQuestionsAnswered },
+  { id: "mistakes-50", category: "學習", name: "錯過就不要再錯", description: "累積複習 50 題錯題", target: 50, unit: "題", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalMistakesReviewed },
 
-  // 收藏 6
-  { id: "collection-5", category: "收藏", name: "開始有點擠了", description: "收集 5 隻不同史萊姆", target: 5, unit: "隻", reward: { type: "coins", amount: 150 }, getProgress: ownedCount },
-  { id: "collection-10", category: "收藏", name: "史萊姆宿舍", description: "收集 10 隻不同史萊姆", target: 10, unit: "隻", reward: { type: "coins", amount: 300 }, getProgress: ownedCount },
-  { id: "collection-all-n", category: "收藏", name: "普通但完整", description: "收集全部 N 史萊姆", target: SLIMES.filter((s) => s.rarity === "N").length, unit: "隻", reward: { type: "tickets", amount: 2 }, getProgress: (game) => ownedByRarity(game, "N") },
-  { id: "collection-all-r", category: "收藏", name: "稀有居民區", description: "收集全部 R 史萊姆", target: SLIMES.filter((s) => s.rarity === "R").length, unit: "隻", reward: { type: "tickets", amount: 3 }, getProgress: (game) => ownedByRarity(game, "R") },
-  { id: "collection-all-sr", category: "收藏", name: "金光閃閃", description: "收集全部 SR 史萊姆", target: SLIMES.filter((s) => s.rarity === "SR").length, unit: "隻", reward: { type: "tickets", amount: 5 }, getProgress: (game) => ownedByRarity(game, "SR") },
-  { id: "collection-complete", category: "收藏", name: "圖鑑完成", description: "收集目前圖鑑中的全部史萊姆", target: SLIMES.length, unit: "隻", reward: { type: "tickets", amount: 10 }, getProgress: ownedCount },
+  // 收藏 6：合計約 6.5 抽等值
+  { id: "collection-5", category: "收藏", name: "開始有點擠了", description: "收集 5 隻不同史萊姆", target: 5, unit: "隻", reward: { type: "coins", amount: 50 }, getProgress: ownedCount },
+  { id: "collection-10", category: "收藏", name: "史萊姆宿舍", description: "收集 10 隻不同史萊姆", target: 10, unit: "隻", reward: { type: "coins", amount: 100 }, getProgress: ownedCount },
+  { id: "collection-all-n", category: "收藏", name: "普通但完整", description: "收集全部 N 史萊姆", target: SLIMES.filter((s) => s.rarity === "N").length, unit: "隻", reward: { type: "tickets", amount: 1 }, getProgress: (game) => ownedByRarity(game, "N") },
+  { id: "collection-all-r", category: "收藏", name: "稀有居民區", description: "收集全部 R 史萊姆", target: SLIMES.filter((s) => s.rarity === "R").length, unit: "隻", reward: { type: "tickets", amount: 1 }, getProgress: (game) => ownedByRarity(game, "R") },
+  { id: "collection-all-sr", category: "收藏", name: "金光閃閃", description: "收集全部 SR 史萊姆", target: SLIMES.filter((s) => s.rarity === "SR").length, unit: "隻", reward: { type: "tickets", amount: 2 }, getProgress: (game) => ownedByRarity(game, "SR") },
+  { id: "collection-complete", category: "收藏", name: "圖鑑完成", description: "收集目前圖鑑中的全部史萊姆", target: SLIMES.length, unit: "隻", reward: { type: "tickets", amount: 1 }, getProgress: ownedCount },
 
-  // 抽卡 4：全部都落在第一輪完整圖鑑的 100 抽目標內
-  { id: "pull-10", category: "抽卡", name: "手癢了", description: "累積抽卡 10 次", target: 10, unit: "抽", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalPulls },
-  { id: "pull-25", category: "抽卡", name: "再一抽就好", description: "累積抽卡 25 次", target: 25, unit: "抽", reward: { type: "coins", amount: 200 }, getProgress: (game) => game.totalPulls },
-  { id: "pull-50", category: "抽卡", name: "這不是賭博", description: "累積抽卡 50 次", target: 50, unit: "抽", reward: { type: "tickets", amount: 3 }, getProgress: (game) => game.totalPulls },
-  { id: "pull-100", category: "抽卡", name: "史萊姆批發商", description: "累積抽卡 100 次", target: 100, unit: "抽", reward: { type: "tickets", amount: 8 }, getProgress: (game) => game.totalPulls },
+  // 抽卡 4：早期里程碑，合計約 4.5 抽等值
+  { id: "pull-10", category: "抽卡", name: "手癢了", description: "累積抽卡 10 次", target: 10, unit: "抽", reward: { type: "coins", amount: 50 }, getProgress: (game) => game.totalPulls },
+  { id: "pull-25", category: "抽卡", name: "再一抽就好", description: "累積抽卡 25 次", target: 25, unit: "抽", reward: { type: "coins", amount: 100 }, getProgress: (game) => game.totalPulls },
+  { id: "pull-50", category: "抽卡", name: "這不是賭博", description: "累積抽卡 50 次", target: 50, unit: "抽", reward: { type: "tickets", amount: 1 }, getProgress: (game) => game.totalPulls },
+  { id: "pull-100", category: "抽卡", name: "史萊姆批發商", description: "累積抽卡 100 次", target: 100, unit: "抽", reward: { type: "tickets", amount: 2 }, getProgress: (game) => game.totalPulls },
 
-  // 特殊 4
-  { id: "special-ssr", category: "特殊", name: "SSR！", description: "第一次抽到 SSR 史萊姆", target: 1, unit: "次", reward: { type: "tickets", amount: 3 }, getProgress: (game) => ownedByRarity(game, "SSR") > 0 ? 1 : 0 },
-  { id: "special-rarity-set", category: "特殊", name: "四色到齊", description: "N、R、SR、SSR 四種稀有度都至少收藏 1 隻", target: 4, unit: "種", reward: { type: "tickets", amount: 5 }, getProgress: rarityKindsOwned },
-  { id: "special-nickname", category: "特殊", name: "你有名字了", description: "第一次替史萊姆取名字", target: 1, unit: "隻", reward: { type: "coins", amount: 100 }, getProgress: (game) => Object.values(game.slimes).some((slime) => Boolean(slime.nickname?.trim())) ? 1 : 0 },
-  { id: "special-streak-7", category: "特殊", name: "一週沒逃跑", description: "連續學習 7 天", target: 7, unit: "天", reward: { type: "tickets", amount: 3 }, getProgress: (game) => game.streak },
+  // 特殊 4：合計約 3.5 抽等值；全套成就約 26.5 抽等值
+  { id: "special-ssr", category: "特殊", name: "SSR！", description: "第一次抽到 SSR 史萊姆", target: 1, unit: "次", reward: { type: "tickets", amount: 1 }, getProgress: (game) => ownedByRarity(game, "SSR") > 0 ? 1 : 0 },
+  { id: "special-rarity-set", category: "特殊", name: "四色到齊", description: "N、R、SR、SSR 四種稀有度都至少收藏 1 隻", target: 4, unit: "種", reward: { type: "tickets", amount: 1 }, getProgress: rarityKindsOwned },
+  { id: "special-nickname", category: "特殊", name: "你有名字了", description: "第一次替史萊姆取名字", target: 1, unit: "隻", reward: { type: "coins", amount: 50 }, getProgress: (game) => Object.values(game.slimes).some((slime) => Boolean(slime.nickname?.trim())) ? 1 : 0 },
+  { id: "special-streak-7", category: "特殊", name: "一週沒逃跑", description: "連續學習 7 天", target: 7, unit: "天", reward: { type: "tickets", amount: 1 }, getProgress: (game) => game.streak },
 ];
 
 const categories = ["全部", "學習", "收藏", "抽卡", "特殊"] as const;
