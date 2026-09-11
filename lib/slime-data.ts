@@ -37,6 +37,29 @@ export const SLIMES: SlimeDefinition[] = [
     image: "/slimes/n-purple.png",
     description: "有點神秘，據說很會在考前突然想起重點。",
   },
+  {
+    // Stable legacy ID: this character moved from R to N in the 24-slime refresh.
+    // Keeping the ID preserves existing ownership, nicknames, and companion selection.
+    id: "r-melting",
+    defaultName: "融化史萊姆",
+    rarity: "N",
+    image: "/slimes/n-melting.png",
+    description: "讀到快失去形狀了，但還是勉強黏在書桌旁。",
+  },
+  {
+    id: "n-white",
+    defaultName: "白色史萊姆",
+    rarity: "N",
+    image: "/slimes/n-white.png",
+    description: "看起來乾乾淨淨，腦袋也希望可以保持這麼清爽。",
+  },
+  {
+    id: "n-yellow",
+    defaultName: "黃色史萊姆",
+    rarity: "N",
+    image: "/slimes/n-yellow.png",
+    description: "自帶一點亮度，適合在讀書讀到發黑時出現。",
+  },
 
   {
     id: "r-insomnia",
@@ -74,11 +97,18 @@ export const SLIMES: SlimeDefinition[] = [
     description: "不是不想讀，只是今天對世界的耐心比較少。",
   },
   {
-    id: "r-melting",
-    defaultName: "融化史萊姆",
+    id: "r-cloud",
+    defaultName: "雲朵史萊姆",
     rarity: "R",
-    image: "/slimes/r-melting.png",
-    description: "再多一題就要沿著桌邊流下去了。",
+    image: "/slimes/r-cloud.png",
+    description: "腦袋偶爾飄得有點遠，叫幾次還是會慢慢飄回來。",
+  },
+  {
+    id: "r-frog",
+    defaultName: "青蛙史萊姆",
+    rarity: "R",
+    image: "/slimes/r-frog.png",
+    description: "遇到難題先蹲一下，想通之後再一口氣跳過去。",
   },
 
   {
@@ -130,6 +160,27 @@ export const SLIMES: SlimeDefinition[] = [
     rarity: "SSR",
     image: "/slimes/ssr-404.png",
     description: "ERROR 404：剛剛背過的內容目前找不到。",
+  },
+  {
+    id: "ssr-burnout",
+    defaultName: "爆肝史萊姆",
+    rarity: "SSR",
+    image: "/slimes/ssr-burnout.png",
+    description: "被參考書和考試壓到只剩一點靈魂，卻還沒打算投降。",
+  },
+  {
+    id: "ssr-medgod",
+    defaultName: "醫神史萊姆",
+    rarity: "SSR",
+    image: "/slimes/ssr-medgod.png",
+    description: "傳說讀到最高境界時會出現，手上的每一本書都像開過光。",
+  },
+  {
+    id: "ssr-notes",
+    defaultName: "筆記海史萊姆",
+    rarity: "SSR",
+    image: "/slimes/ssr-notes.png",
+    description: "便利貼、講義和重點整理堆成海，牠本人已經找不到出口。",
   },
 ];
 
