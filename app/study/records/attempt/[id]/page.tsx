@@ -7,6 +7,7 @@ import TopBar from "@/components/top-bar";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import OfficialQuestionCrop from "@/components/official-question-crop";
+import QuestionSlimeMap from "@/components/question-slime-map";
 import {
   formatAttemptDate,
   formatAttemptDuration,
@@ -309,25 +310,19 @@ export default function AttemptDetailPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">QUESTION MAP</div>
-              <div className="mt-1 text-sm font-black text-[#315b45]">點題號直接跳到該題</div>
+              <div className="mt-1 text-sm font-black text-[#315b45]">點史萊姆直接跳到該題</div>
             </div>
             <div className="text-xs font-bold text-[#789083]">
               {wrongCount} 錯 · {uncertainCount} 不確定 · {unfamiliarCount} 觀念不熟 · {unansweredCount} 未作答
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
-            {questions.map((item, index) => (
-              <button
-                key={`${item.questionKey}-${index}`}
-                type="button"
-                onClick={() => jumpToQuestion(item.questionKey)}
-                className={questionMapClass(item, learningStates.get(item.questionKey))}
-                title={questionStatusLabel(item, learningStates.get(item.questionKey))}
-              >
-                {item.questionNumber ?? index + 1}
-              </button>
-            ))}
-          </div>
+
+          <QuestionSlimeMap
+            questions={questions}
+            learningStates={learningStates}
+            onJump={jumpToQuestion}
+          />
+
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-[#789083]">
             <Legend className="bg-[#eaf9f0] border-[#9ed9b5]" label="答對" />
             <Legend className="bg-[#fff1f1] border-[#e6a2a2]" label="答錯" />
@@ -756,31 +751,6 @@ function jumpToQuestion(questionKey: string) {
 
 function questionAnchorId(questionKey: string) {
   return `review-${encodeURIComponent(questionKey).replaceAll("%", "-")}`;
-}
-
-function questionStatusLabel(
-  item: ExamAttemptQuestionItem,
-  learning?: QuestionLearningState,
-) {
-  if (learning?.conceptUnfamiliar) return "觀念不熟";
-  if (item.uncertain) return "不確定";
-  if (!item.answered) return "未作答";
-  if (item.correct === false) return "答錯";
-  return "答對";
-}
-
-function questionMapClass(
-  item: ExamAttemptQuestionItem,
-  learning?: QuestionLearningState,
-) {
-  const base = "aspect-square rounded-lg border text-xs font-black transition";
-  if (learning?.conceptUnfamiliar) {
-    return `${base} border-[#cbbdf5] bg-[#f0ebff] text-[#6952a5]`;
-  }
-  if (item.uncertain) return `${base} border-[#e7d083] bg-[#fff8df] text-[#80651e]`;
-  if (!item.answered) return `${base} border-[#d8dfdb] bg-[#f3f4f3] text-[#789083]`;
-  if (item.correct === false) return `${base} border-[#e6a2a2] bg-[#fff1f1] text-[#9b5050]`;
-  return `${base} border-[#9ed9b5] bg-[#eaf9f0] text-[#237849]`;
 }
 
 function FilterButton({
