@@ -92,6 +92,22 @@ type AttemptRow = {
   question_items?: unknown;
 };
 
+type NationalExamQuestion = {
+  id: string;
+  questionNumber: number;
+  stem: string;
+  options: string[];
+  correctIndex: number | null;
+  questionPdfUrl: string | null;
+};
+
+type ParsedQuestionKey = {
+  year: string;
+  session: string;
+  subject: string;
+  questionNumber: number;
+};
+
 const ATTEMPT_SELECT_BASE =
   "id,year,session,subject,exam_key,answered_count,correct_count,score,review_count,uncertain_count,duration_seconds,completed_at";
 const ATTEMPT_SELECT_WITH_REVIEW = `${ATTEMPT_SELECT_BASE},review_items`;
@@ -114,13 +130,11 @@ function finiteIndex(value: unknown) {
 
 function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
   if (!Array.isArray(value)) return [];
-
   return value
     .map((item, index) => {
       if (!item || typeof item !== "object") return null;
       const raw = item as Partial<ExamAttemptReviewItem>;
       if (typeof raw.stem !== "string" || !Array.isArray(raw.options)) return null;
-
       return {
         id: typeof raw.id === "string" ? raw.id : `review-${index}`,
         questionNumber: finiteIndex(raw.questionNumber),
@@ -129,8 +143,7 @@ function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
         correctIndex: finiteIndex(raw.correctIndex),
         userAnswer: finiteIndex(raw.userAnswer),
         uncertain: raw.uncertain === true,
-        officialPdfUrl:
-          typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
+        officialPdfUrl: typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
       } satisfies ExamAttemptReviewItem;
     })
     .filter((item): item is ExamAttemptReviewItem => Boolean(item));
@@ -138,7 +151,6 @@ function normalizeReviewItems(value: unknown): ExamAttemptReviewItem[] {
 
 function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
   if (!Array.isArray(value)) return [];
-
   return value
     .map((item) => {
       if (!item || typeof item !== "object") return null;
@@ -146,7 +158,6 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
       const questionId = typeof raw.questionId === "string" ? raw.questionId.trim() : "";
       const questionKey = typeof raw.questionKey === "string" ? raw.questionKey.trim() : "";
       if (!questionId || !questionKey) return null;
-
       const userAnswer = finiteIndex(raw.userAnswer);
       const correctIndex = finiteIndex(raw.correctIndex);
       const answered = raw.answered === true;
@@ -156,7 +167,6 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
           : answered && userAnswer !== null && correctIndex !== null
             ? userAnswer === correctIndex
             : null;
-
       return {
         questionId,
         questionKey,
@@ -173,16 +183,12 @@ function normalizeQuestionOutcomes(value: unknown): ExamQuestionOutcome[] {
 
 function normalizeQuestionItems(value: unknown): ExamAttemptQuestionItem[] {
   if (!Array.isArray(value)) return [];
-
   return value
     .map((item, index) => {
       if (!item || typeof item !== "object") return null;
       const raw = item as Partial<ExamAttemptQuestionItem>;
       const questionKey = typeof raw.questionKey === "string" ? raw.questionKey.trim() : "";
-      if (!questionKey || typeof raw.stem !== "string" || !Array.isArray(raw.options)) {
-        return null;
-      }
-
+      if (!questionKey || typeof raw.stem !== "string" || !Array.isArray(raw.options)) return null;
       const userAnswer = finiteIndex(raw.userAnswer);
       const correctIndex = finiteIndex(raw.correctIndex);
       const answered = raw.answered === true || userAnswer !== null;
@@ -192,7 +198,6 @@ function normalizeQuestionItems(value: unknown): ExamAttemptQuestionItem[] {
           : answered && userAnswer !== null && correctIndex !== null
             ? userAnswer === correctIndex
             : null;
-
       return {
         id: typeof raw.id === "string" && raw.id.trim() ? raw.id : `question-${index}`,
         questionKey,
@@ -207,8 +212,7 @@ function normalizeQuestionItems(value: unknown): ExamAttemptQuestionItem[] {
         answered,
         correct,
         uncertain: raw.uncertain === true,
-        officialPdfUrl:
-          typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
+        officialPdfUrl: typeof raw.officialPdfUrl === "string" ? raw.officialPdfUrl : null,
       } satisfies ExamAttemptQuestionItem;
     })
     .filter((item): item is ExamAttemptQuestionItem => Boolean(item));
@@ -238,11 +242,7 @@ function missingColumn(message: string, column: string) {
   return message.toLowerCase().includes(column.toLowerCase());
 }
 
-async function readAttemptRows(input: {
-  userId: string;
-  limit?: number;
-  id?: string;
-}) {
+async function readAttemptRows(input: { userId: string; limit?: number; id?: string }) {
   const supabase = createClient();
   const run = async (select: string) => {
     let query = supabase
@@ -250,7 +250,6 @@ async function readAttemptRows(input: {
       .select(select)
       .eq("user_id", input.userId)
       .order("completed_at", { ascending: false });
-
     if (input.id) query = query.eq("id", input.id).limit(1);
     else query = query.limit(input.limit ?? 120);
     return query;
@@ -274,18 +273,15 @@ export async function readExamAttempts(limit = 120): Promise<ExamAttempt[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) return [];
 
   const safeLimit = Math.max(1, Math.min(300, limit));
   const result = await readAttemptRows({ userId: user.id, limit: safeLimit });
-
   if (result.error) {
     if (result.error.message.includes("exam_attempts")) return [];
     console.error("讀取國考作答紀錄失敗：", result.error);
     throw new Error("作答紀錄讀取失敗，請稍後再試。");
   }
-
   return ((result.data ?? []) as unknown as AttemptRow[]).map(mapRow);
 }
 
@@ -294,7 +290,6 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user || !id) return null;
 
   const result = await readAttemptRows({ userId: user.id, id });
@@ -305,7 +300,19 @@ export async function readExamAttempt(id: string): Promise<ExamAttempt | null> {
   }
 
   const row = ((result.data ?? []) as unknown as AttemptRow[])[0];
-  return row ? mapRow(row) : null;
+  if (!row) return null;
+  const attempt = mapRow(row);
+  if (attempt.questionItems.length > 0 || attempt.questionOutcomes.length === 0) {
+    return attempt;
+  }
+
+  try {
+    const hydrated = await hydrateQuestionItemsFromOutcomes(attempt.questionOutcomes);
+    return hydrated.length > 0 ? { ...attempt, questionItems: hydrated } : attempt;
+  } catch (error) {
+    console.warn("完整作答快照還原失敗，改用舊版複習快照：", error);
+    return attempt;
+  }
 }
 
 export async function saveNationalExamAttempt(
@@ -315,7 +322,6 @@ export async function saveNationalExamAttempt(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) return null;
 
   const examKey = `${input.year}-${input.session}-${input.subject}`;
@@ -343,7 +349,6 @@ export async function saveNationalExamAttempt(
     question_outcomes: input.questionOutcomes,
     question_items: input.questionItems ?? [],
   });
-
   if (result.error && missingColumn(result.error.message, "question_items")) {
     result = await insertWithId({
       ...baseInsert,
@@ -351,18 +356,12 @@ export async function saveNationalExamAttempt(
       question_outcomes: input.questionOutcomes,
     });
   }
-
   if (result.error && missingColumn(result.error.message, "question_outcomes")) {
-    result = await insertWithId({
-      ...baseInsert,
-      review_items: input.reviewItems,
-    });
+    result = await insertWithId({ ...baseInsert, review_items: input.reviewItems });
   }
-
   if (result.error && missingColumn(result.error.message, "review_items")) {
     result = await insertWithId(baseInsert);
   }
-
   if (result.error) {
     console.error("儲存國考作答紀錄失敗：", result.error);
     throw new Error("作答紀錄儲存失敗，請稍後再試。");
@@ -370,7 +369,88 @@ export async function saveNationalExamAttempt(
 
   markProAnalysisStale();
   const row = result.data as { id?: string } | null;
-  return typeof row?.id === "string" ? row.id : null;
+  const attemptId = typeof row?.id === "string" ? row.id : null;
+  if (attemptId && typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem("medslime_last_attempt_id", attemptId);
+    } catch {
+      // Navigation convenience only.
+    }
+  }
+  return attemptId;
+}
+
+async function hydrateQuestionItemsFromOutcomes(
+  outcomes: ExamQuestionOutcome[],
+): Promise<ExamAttemptQuestionItem[]> {
+  const parsedOutcomes = outcomes
+    .map((outcome) => ({ outcome, source: parseNationalExamQuestionKey(outcome.questionKey) }))
+    .filter(
+      (item): item is { outcome: ExamQuestionOutcome; source: ParsedQuestionKey } =>
+        Boolean(item.source),
+    );
+  if (parsedOutcomes.length === 0) return [];
+
+  const groupMap = new Map<string, ParsedQuestionKey>();
+  for (const { source } of parsedOutcomes) {
+    groupMap.set(`${source.year}\u0000${source.session}\u0000${source.subject}`, source);
+  }
+
+  const examQuestionMaps = new Map<string, Map<number, NationalExamQuestion>>();
+  await Promise.all(
+    Array.from(groupMap.entries()).map(async ([groupKey, source]) => {
+      const params = new URLSearchParams({
+        year: source.year,
+        session: source.session,
+        subject: source.subject,
+      });
+      const response = await fetch(`/api/national-exam?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+      if (!response.ok || !Array.isArray(payload?.questions)) return;
+      const map = new Map<number, NationalExamQuestion>();
+      for (const question of payload.questions as NationalExamQuestion[]) {
+        map.set(question.questionNumber, question);
+      }
+      examQuestionMaps.set(groupKey, map);
+    }),
+  );
+
+  return parsedOutcomes
+    .map(({ outcome, source }) => {
+      const groupKey = `${source.year}\u0000${source.session}\u0000${source.subject}`;
+      const question = examQuestionMaps.get(groupKey)?.get(source.questionNumber);
+      if (!question) return null;
+      return {
+        id: outcome.questionId || question.id,
+        questionKey: outcome.questionKey,
+        questionNumber: source.questionNumber,
+        sourceYear: source.year,
+        sourceSession: source.session,
+        sourceSubject: source.subject,
+        stem: question.stem,
+        options: question.options,
+        correctIndex: question.correctIndex ?? outcome.correctIndex,
+        userAnswer: outcome.userAnswer,
+        answered: outcome.answered,
+        correct: outcome.correct,
+        uncertain: outcome.uncertain,
+        officialPdfUrl: question.questionPdfUrl,
+      } satisfies ExamAttemptQuestionItem;
+    })
+    .filter((item): item is ExamAttemptQuestionItem => Boolean(item));
+}
+
+function parseNationalExamQuestionKey(value: string): ParsedQuestionKey | null {
+  const parts = value.split(":");
+  if (parts.length < 5 || parts[0] !== "national-exam") return null;
+  const questionNumber = Number(parts[parts.length - 1]);
+  const year = parts[1]?.trim();
+  const session = parts[2]?.trim();
+  const subject = parts.slice(3, -1).join(":").trim();
+  if (!year || !session || !subject || !Number.isFinite(questionNumber)) return null;
+  return { year, session, subject, questionNumber };
 }
 
 export function latestAttemptMap(attempts: ExamAttempt[]) {
