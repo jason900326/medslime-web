@@ -39,6 +39,17 @@ export type DailyActivity = {
   focusSeconds: number;
 };
 
+type NationalExamRewardRecord = {
+  examKey: string;
+  weekKey: string;
+  rewardedAt: string;
+};
+
+export type NationalExamRewardResult = {
+  amount: number;
+  status: "rewarded" | "duplicate" | "weekly-cap" | "unavailable";
+};
+
 type GameState = {
   coins: number;
   tickets: number;
@@ -54,6 +65,7 @@ type GameState = {
   claimedAchievementIds: string[];
   claimedTaskIds: string[];
   focusHistory: FocusSession[];
+  nationalExamRewardHistory: NationalExamRewardRecord[];
   hasSeenOnboarding: boolean;
 };
 
@@ -87,6 +99,7 @@ type GameStateContextValue = GameState & {
   recordQuestionsAnswered: (count: number) => void;
   recordMistakesReviewed: (count: number) => void;
   claimTaskReward: (taskClaimId: string, reward: Reward) => boolean;
+  claimNationalExamCompletionReward: (examKey: string) => NationalExamRewardResult;
   completeOnboarding: () => void;
   todayFocusSeconds: number;
   todayFocusMinutes: number;
@@ -101,8 +114,10 @@ type GameStateContextValue = GameState & {
   }) => number;
 };
 
-const FOCUS_COIN_CAP = 60;
-const SSR_PITY_PULLS = 80;
+const FOCUS_COIN_CAP = 30;
+const SSR_PITY_PULLS = 75;
+const NATIONAL_EXAM_COMPLETION_REWARD = 100;
+const NATIONAL_EXAM_WEEKLY_REWARD_CAP = 2;
 
 const starterState: GameState = {
   coins: 0,
@@ -118,6 +133,7 @@ const starterState: GameState = {
   claimedAchievementIds: [],
   claimedTaskIds: [],
   focusHistory: [],
+  nationalExamRewardHistory: [],
   hasSeenOnboarding: false,
   slimes: {
     "n-green": {
@@ -133,6 +149,7 @@ const anonymousState: GameState = {
   claimedAchievementIds: [],
   claimedTaskIds: [],
   focusHistory: [],
+  nationalExamRewardHistory: [],
   hasSeenOnboarding: true,
 };
 
@@ -148,6 +165,7 @@ function cloneStarterState(): GameState {
     claimedAchievementIds: [],
     claimedTaskIds: [],
     focusHistory: [],
+    nationalExamRewardHistory: [],
   };
 }
 
@@ -156,6 +174,14 @@ function getLocalDateKey(date = new Date()) {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function getLocalWeekKey(date = new Date()) {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+  return getLocalDateKey(monday);
 }
 
 function dateFromLocalKey(key: string) {
@@ -210,6 +236,18 @@ function normalizeState(raw: unknown): GameState {
       },
     ),
   ) as Record<string, PlayerSlimeState>;
+  const nationalExamRewardHistory = Array.isArray(parsed.nationalExamRewardHistory)
+    ? parsed.nationalExamRewardHistory.filter(
+        (item): item is NationalExamRewardRecord =>
+          Boolean(
+            item &&
+              typeof item === "object" &&
+              typeof (item as NationalExamRewardRecord).examKey === "string" &&
+              typeof (item as NationalExamRewardRecord).weekKey === "string" &&
+              typeof (item as NationalExamRewardRecord).rewardedAt === "string",
+          ),
+      )
+    : [];
 
   const normalized: GameState = {
     ...cloneStarterState(),
@@ -259,6 +297,7 @@ function normalizeState(raw: unknown): GameState {
         ? parsed.companionId
         : starterState.companionId,
     focusHistory: Array.isArray(parsed.focusHistory) ? parsed.focusHistory : [],
+    nationalExamRewardHistory,
     hasSeenOnboarding:
       typeof parsed.hasSeenOnboarding === "boolean"
         ? parsed.hasSeenOnboarding
@@ -339,6 +378,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
             claimedAchievementIds: [],
             claimedTaskIds: [],
             focusHistory: [],
+            nationalExamRewardHistory: [],
           });
           setIsReady(true);
         }
@@ -594,6 +634,39 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const claimNationalExamCompletionReward = (
+    examKey: string,
+  ): NationalExamRewardResult => {
+    if (!userId || !examKey.trim()) {
+      return { amount: 0, status: "unavailable" };
+    }
+
+    const current = stateRef.current;
+    if (current.nationalExamRewardHistory.some((item) => item.examKey === examKey)) {
+      return { amount: 0, status: "duplicate" };
+    }
+
+    const weekKey = getLocalWeekKey();
+    const rewardsThisWeek = current.nationalExamRewardHistory.filter(
+      (item) => item.weekKey === weekKey,
+    ).length;
+    if (rewardsThisWeek >= NATIONAL_EXAM_WEEKLY_REWARD_CAP) {
+      return { amount: 0, status: "weekly-cap" };
+    }
+
+    const rewardedAt = new Date().toISOString();
+    updateState((latest) => ({
+      ...latest,
+      coins: latest.coins + NATIONAL_EXAM_COMPLETION_REWARD,
+      nationalExamRewardHistory: [
+        ...latest.nationalExamRewardHistory,
+        { examKey, weekKey, rewardedAt },
+      ],
+    }));
+
+    return { amount: NATIONAL_EXAM_COMPLETION_REWARD, status: "rewarded" };
+  };
+
   const completeOnboarding = () => {
     if (!userId) return;
     updateState((current) => ({ ...current, hasSeenOnboarding: true }));
@@ -614,7 +687,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       .reduce((sum, session) => sum + session.coinsEarned, 0);
     const eligible = input.completed && input.actualSeconds >= 10 * 60;
     const remainingCap = Math.max(0, FOCUS_COIN_CAP - earnedBefore);
-    const sessionReward = Math.floor(input.actualSeconds / (5 * 60)) * 5;
+    const sessionReward = Math.floor(input.actualSeconds / (10 * 60)) * 5;
     const coinsEarned = eligible ? Math.min(sessionReward, remainingCap) : 0;
     const session: FocusSession = {
       id: `${input.endedAt}-${Math.random().toString(36).slice(2, 8)}`,
@@ -669,6 +742,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       recordQuestionsAnswered,
       recordMistakesReviewed,
       claimTaskReward,
+      claimNationalExamCompletionReward,
       completeOnboarding,
       todayFocusSeconds,
       todayFocusMinutes,
