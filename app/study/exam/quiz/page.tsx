@@ -14,7 +14,10 @@ import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import ExamExplanationOffer from "@/components/exam-explanation-offer";
-import { useGameState } from "@/components/game-state-provider";
+import {
+  useGameState,
+  type NationalExamRewardResult,
+} from "@/components/game-state-provider";
 import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 
@@ -83,6 +86,8 @@ function ExamQuizContent() {
   const [showOriginalQuestion, setShowOriginalQuestion] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
+  const [examRewardResult, setExamRewardResult] =
+    useState<NationalExamRewardResult | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -96,6 +101,7 @@ function ExamQuizContent() {
       setFinished(false);
       setRecorded(false);
       setElapsedAtFinish(0);
+      setExamRewardResult(null);
       setShowSubmitDialog(false);
 
       try {
@@ -295,6 +301,9 @@ function ExamQuizContent() {
       }
 
       game.recordQuestionsAnswered(answeredCount);
+      if (answeredCount === questions.length) {
+        setExamRewardResult(game.claimNationalExamCompletionReward(examKey));
+      }
     }
 
     try {
@@ -333,6 +342,24 @@ function ExamQuizContent() {
               <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
               <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
             </div>
+
+            {unansweredCount > 0 ? (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#eadfce] bg-[#fffaf2] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
+                完整作答全部題目才會發放國考完成獎勵；這次有 {unansweredCount} 題未作答，因此不發金幣。
+              </div>
+            ) : examRewardResult?.status === "rewarded" ? (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] p-3 text-sm font-black text-[#237849] sm:p-4">
+                國考完整作答獎勵：🪙 +{examRewardResult.amount}
+              </div>
+            ) : examRewardResult?.status === "duplicate" ? (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
+                這份國考的首次完成獎勵已領取過；重做仍會正常保存學習紀錄，但不重複發金幣。
+              </div>
+            ) : examRewardResult?.status === "weekly-cap" ? (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
+                本週已領滿 2 份國考完成獎勵；下週可再從新的國考取得獎勵。
+              </div>
+            ) : null}
 
             {gradableCount < questions.length && (
               <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
