@@ -26,10 +26,7 @@ export default function FocusPage() {
 
   const companion = SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
-  const companionImage =
-    playerSlime?.accessoryUnlocked && playerSlime?.accessoryEquipped
-      ? companion.accessoryImage
-      : companion.image;
+  const companionImage = companion.image;
   const companionName = getPlayerDisplayName(companion.id, playerSlime);
 
   const totalSeconds = plannedMinutes * 60;
@@ -363,30 +360,26 @@ export default function FocusPage() {
       </div>
 
       {showStopConfirm && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 px-5">
-          <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
-            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">FOCUS</div>
-            <div className="mt-2 text-2xl font-black">確定要提前結束嗎？</div>
-            <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-              提前結束會把這次專注記錄為未完成，本輪也不會獲得金幣。
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-[24px] bg-white p-5 shadow-xl">
+            <div className="text-lg font-black">要提前結束嗎？</div>
+            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+              這輪不會獲得金幣，但專注時間仍會被記錄。
             </p>
-            <div className="mt-4 rounded-2xl bg-[#f8fcf9] px-4 py-3 text-sm font-black text-[#557768]">
-              目前已專注 {Math.floor(elapsedSeconds / 60)} 分鐘
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mt-5 flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowStopConfirm(false)}
-                className="rounded-xl border border-[#d7e7de] bg-white px-4 py-3 font-black text-[#315b45]"
+                className="flex-1 rounded-xl border border-[#d7e7de] bg-white py-3 font-black text-[#315b45]"
               >
                 繼續專注
               </button>
               <button
                 type="button"
                 onClick={confirmStopEarly}
-                className="rounded-xl border border-[#ead8d8] bg-[#fff7f7] px-4 py-3 font-black text-[#9b5050]"
+                className="flex-1 rounded-xl bg-[#17372a] py-3 font-black text-white"
               >
-                提前結束
+                結束
               </button>
             </div>
           </div>
@@ -398,9 +391,9 @@ export default function FocusPage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-[#dfece4] bg-white px-4 py-4">
-      <div className="text-xs font-bold text-[#8a9c92]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
+    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
+      <div className="text-xs font-bold text-[#789083]">{label}</div>
+      <div className="mt-1 truncate text-lg font-black">{value}</div>
     </div>
   );
 }
