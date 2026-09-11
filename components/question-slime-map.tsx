@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SLIMES } from "@/lib/slime-data";
 import type { ExamAttemptQuestionItem } from "@/lib/exam-attempt-store";
 import type { QuestionLearningState } from "@/lib/question-learning-state";
 
@@ -10,8 +9,6 @@ type Props = {
   learningStates: Map<string, QuestionLearningState>;
   onJump: (questionKey: string) => void;
 };
-
-const MAP_SLIMES = SLIMES.filter((slime) => slime.rarity === "N");
 
 export default function QuestionSlimeMap({
   questions,
@@ -47,7 +44,6 @@ export default function QuestionSlimeMap({
             const fallbackEnd = fallbackStart + items.length - 1;
             const startNumber = first?.questionNumber ?? fallbackStart;
             const endNumber = last?.questionNumber ?? fallbackEnd;
-            const slime = MAP_SLIMES[groupIndex % MAP_SLIMES.length];
             const active = selectedGroup === groupIndex;
 
             return (
@@ -69,13 +65,7 @@ export default function QuestionSlimeMap({
                     active ? "bg-[#dff5e8]" : "bg-[#f0f5f2]",
                   ].join(" ")}
                 >
-                  <img
-                    src={slime.image}
-                    alt=""
-                    aria-hidden="true"
-                    draggable={false}
-                    className="h-7 w-9 select-none object-contain"
-                  />
+                  <DefaultSlimeIcon active={active} />
                 </span>
                 <span>{startNumber}–{endNumber}</span>
               </button>
@@ -87,7 +77,6 @@ export default function QuestionSlimeMap({
       <div className="mt-5 grid grid-cols-10 gap-1 sm:gap-2">
         {group.map((item, itemIndex) => {
           const absoluteIndex = selectedGroup * 10 + itemIndex;
-          const slime = MAP_SLIMES[absoluteIndex % MAP_SLIMES.length];
           const learning = learningStates.get(item.questionKey);
           const status = questionStatus(item, learning);
           const number = item.questionNumber ?? absoluteIndex + 1;
@@ -107,13 +96,7 @@ export default function QuestionSlimeMap({
                   status.shellClassName,
                 ].join(" ")}
               >
-                <img
-                  src={slime.image}
-                  alt=""
-                  aria-hidden="true"
-                  draggable={false}
-                  className="h-auto max-h-9 w-[90%] select-none object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
-                />
+                <DefaultSlimeIcon />
               </span>
               <span className={`mt-1 text-[10px] font-black leading-none sm:text-xs ${status.numberClassName}`}>
                 {number}
@@ -123,6 +106,33 @@ export default function QuestionSlimeMap({
         })}
       </div>
     </div>
+  );
+}
+
+function DefaultSlimeIcon({ active = false }: { active?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 64 48"
+      aria-hidden="true"
+      className="h-7 w-9 transition-transform duration-200 group-hover:scale-105"
+    >
+      <path
+        d="M9 36c-3-2-4-6-3-10 2-8 9-14 18-16 2-5 5-8 8-8 3 1 4 4 4 8 10 1 18 7 21 15 2 5 0 9-4 12-8 5-35 5-44-1Z"
+        fill={active ? "#d9f2e3" : "#edf5f0"}
+        stroke={active ? "#7bcf9d" : "#b8d2c3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="25" cy="27" rx="2.3" ry="3" fill="#70877a" />
+      <ellipse cx="39" cy="27" rx="2.3" ry="3" fill="#70877a" />
+      <path
+        d="M27 34c3 2 7 2 10 0"
+        fill="none"
+        stroke="#70877a"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
