@@ -39,7 +39,7 @@ export default function FocusPage() {
       ? Math.max(
           0,
           Math.min(
-            Math.floor(plannedMinutes / 5) * 5,
+            Math.floor(plannedMinutes / 10) * 5,
             game.focusCoinCap - game.todayFocusCoins,
           ),
         )
@@ -158,7 +158,7 @@ export default function FocusPage() {
           </div>
           <InfoDialogButton title="專注獎勵說明">
             <p>完成至少 10 分鐘即可獲得獎勵。</p>
-            <p>每完整 5 分鐘可獲得 🪙5，每日最多可從讀書計時器取得 🪙{game.focusCoinCap}。</p>
+            <p>每完整 10 分鐘可獲得 🪙5，每日最多可從讀書計時器取得 🪙{game.focusCoinCap}。</p>
             <p>提前結束的專注不會獲得本輪金幣。</p>
           </InfoDialogButton>
         </section>
