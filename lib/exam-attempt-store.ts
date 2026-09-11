@@ -71,7 +71,7 @@ export type SaveExamAttemptInput = {
   durationSeconds: number;
   reviewItems: ExamAttemptReviewItem[];
   questionOutcomes: ExamQuestionOutcome[];
-  questionItems: ExamAttemptQuestionItem[];
+  questionItems?: ExamAttemptQuestionItem[];
 };
 
 type AttemptRow = {
@@ -341,7 +341,7 @@ export async function saveNationalExamAttempt(
     ...baseInsert,
     review_items: input.reviewItems,
     question_outcomes: input.questionOutcomes,
-    question_items: input.questionItems,
+    question_items: input.questionItems ?? [],
   });
 
   if (result.error && missingColumn(result.error.message, "question_items")) {
