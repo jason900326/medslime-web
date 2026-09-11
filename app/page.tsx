@@ -66,12 +66,8 @@ export default function Home() {
   const companion = SLIME_BY_ID[game.companionId] ?? SLIME_BY_ID["n-green"];
   const playerSlime = game.slimes[companion.id];
   const companionName = getPlayerDisplayName(companion.id, playerSlime);
-  const accessoryEquipped =
-    playerSlime?.accessoryUnlocked && playerSlime?.accessoryEquipped;
-  const companionImage = accessoryEquipped
-    ? companion.accessoryImage
-    : companion.image;
-  const companionScale = accessoryEquipped ? 1.02 : 1.1;
+  const companionImage = companion.image;
+  const companionScale = 1.1;
 
   const today = todayKey
     ? game.activityByDate[todayKey] ?? {
