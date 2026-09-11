@@ -234,7 +234,6 @@ export default function AttemptDetailPage() {
   const unfamiliarCount = questions.filter(
     (item) => learningStates.get(item.questionKey)?.conceptUnfamiliar,
   ).length;
-  const unansweredCount = questions.filter((item) => !item.answered).length;
 
   const visibleQuestions = questions.filter((item) => {
     if (filter === "wrong") return item.correct === false;
