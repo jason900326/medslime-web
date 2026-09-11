@@ -19,10 +19,6 @@ import {
 type PlayerSlimeState = {
   owned: boolean;
   nickname?: string;
-  // Legacy accessory fields are kept read-only until the DB cleanup migration runs.
-  fragments?: number;
-  accessoryUnlocked?: boolean;
-  accessoryEquipped?: boolean;
 };
 
 export type FocusSession = {
@@ -209,15 +205,6 @@ function normalizeState(raw: unknown): GameState {
           {
             owned: item.owned === true,
             ...(typeof item.nickname === "string" ? { nickname: item.nickname } : {}),
-            ...(typeof item.fragments === "number" && Number.isFinite(item.fragments)
-              ? { fragments: Math.max(0, item.fragments) }
-              : {}),
-            ...(typeof item.accessoryUnlocked === "boolean"
-              ? { accessoryUnlocked: item.accessoryUnlocked }
-              : {}),
-            ...(typeof item.accessoryEquipped === "boolean"
-              ? { accessoryEquipped: item.accessoryEquipped }
-              : {}),
           },
         ];
       },
