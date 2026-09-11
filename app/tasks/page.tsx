@@ -102,7 +102,7 @@ export default function TasksPage() {
       progress: today.questionsAnswered,
       target: 5,
       unit: "題",
-      reward: { type: "coins", amount: 30 },
+      reward: { type: "coins", amount: 20 },
       claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
@@ -120,7 +120,7 @@ export default function TasksPage() {
       progress: Math.floor(today.focusSeconds / 60),
       target: 20,
       unit: "分鐘",
-      reward: { type: "coins", amount: 40 },
+      reward: { type: "coins", amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
@@ -199,9 +199,9 @@ export default function TasksPage() {
           </div>
 
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
-            <div className="text-lg font-black">每日全清獎勵：🎫 ×1</div>
+            <div className="text-lg font-black">每日全清獎勵：🪙 20</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-              三項每日任務合計可拿 100 金幣，再完成全清就多帶走 1 張抽卡券。
+              三項每日任務本身合計 80 金幣，全部完成後再領 20 金幣，剛好湊成 1 抽。
             </div>
 
             <button
@@ -209,8 +209,8 @@ export default function TasksPage() {
               disabled={!dailyComplete || dailyBonusClaimed}
               onClick={() =>
                 game.claimTaskReward(dailyBonusClaimId, {
-                  type: "tickets",
-                  amount: 1,
+                  type: "coins",
+                  amount: 20,
                 })
               }
               className={[
@@ -223,7 +223,7 @@ export default function TasksPage() {
               {dailyBonusClaimed
                 ? "已領取"
                 : dailyComplete
-                  ? "領取抽卡券"
+                  ? "領取 20 金幣"
                   : "完成全部每日任務後領取"}
             </button>
           </div>
@@ -255,9 +255,9 @@ export default function TasksPage() {
           </div>
 
           <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
-            <div className="text-lg font-black">本週全清獎勵：🎫 ×5</div>
+            <div className="text-lg font-black">本週全清獎勵：🎫 ×3</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-              這週有穩定回來學習，5 張抽卡券是你的。
+              這週有穩定回來學習，3 張抽卡券是你的。
             </div>
 
             <button
@@ -266,7 +266,7 @@ export default function TasksPage() {
               onClick={() =>
                 game.claimTaskReward(weeklyClaimId, {
                   type: "tickets",
-                  amount: 5,
+                  amount: 3,
                 })
               }
               className={[
@@ -279,7 +279,7 @@ export default function TasksPage() {
               {weeklyClaimed
                 ? "已領取"
                 : weeklyComplete
-                  ? "領取 5 張抽卡券"
+                  ? "領取 3 張抽卡券"
                   : "尚未完成"}
             </button>
           </div>
