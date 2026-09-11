@@ -1,19 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
 import AIExplanationButton from "@/components/ai-explanation-button";
+import OfficialQuestionCrop from "@/components/official-question-crop";
 import {
   formatAttemptDate,
   formatAttemptDuration,
   readExamAttempt,
   type ExamAttempt,
+  type ExamAttemptQuestionItem,
   type ExamAttemptReviewItem,
 } from "@/lib/exam-attempt-store";
 import { readMistakes } from "@/lib/mistake-store";
+import {
+  readQuestionLearningStates,
+  saveQuestionLearningState,
+  type QuestionLearningState,
+} from "@/lib/question-learning-state";
+
+type Filter = "all" | "wrong" | "uncertain" | "unfamiliar";
 
 type LoadState =
   | { status: "loading" }
@@ -21,14 +30,29 @@ type LoadState =
   | {
       status: "ready";
       attempt: ExamAttempt;
-      fallbackItems: ExamAttemptReviewItem[];
+      questions: ExamAttemptQuestionItem[];
+      legacyPartial: boolean;
     };
+
+type NationalExamQuestion = {
+  id: string;
+  questionNumber: number;
+  stem: string;
+  options: string[];
+  correctIndex: number | null;
+  questionPdfUrl: string | null;
+};
 
 export default function AttemptDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [purchased, setPurchased] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [learningStates, setLearningStates] = useState<
+    Map<string, QuestionLearningState>
+  >(new Map());
+  const [learningStateError, setLearningStateError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -39,34 +63,15 @@ export default function AttemptDetailPage() {
         const attempt = await readExamAttempt(id);
         if (!attempt) throw new Error("找不到這筆作答紀錄，或這筆紀錄不屬於目前帳號。");
 
-        let fallbackItems: ExamAttemptReviewItem[] = [];
-        if (
-          attempt.session !== "自由測驗" &&
-          attempt.reviewCount > 0 &&
-          attempt.reviewItems.length === 0
-        ) {
-          const mistakes = await readMistakes();
-          fallbackItems = mistakes
-            .filter(
-              (item) =>
-                item.source === "national-exam" &&
-                item.year === attempt.year &&
-                item.session === attempt.session &&
-                item.subject === attempt.subject,
-            )
-            .map((item) => ({
-              id: item.id,
-              questionNumber: item.questionNumber ?? null,
-              stem: item.stem,
-              options: item.options,
-              correctIndex: item.correctIndex,
-              userAnswer: item.userAnswer,
-              uncertain: item.uncertain,
-              officialPdfUrl: item.officialPdfUrl ?? null,
-            }));
+        const hydrated = await hydrateAttemptQuestions(attempt);
+        if (!cancelled) {
+          setState({
+            status: "ready",
+            attempt,
+            questions: hydrated.questions,
+            legacyPartial: hydrated.legacyPartial,
+          });
         }
-
-        if (!cancelled) setState({ status: "ready", attempt, fallbackItems });
       } catch (error) {
         if (!cancelled) {
           setState({
@@ -83,6 +88,7 @@ export default function AttemptDetailPage() {
   }, [id]);
 
   const attempt = state.status === "ready" ? state.attempt : null;
+  const questions = state.status === "ready" ? state.questions : [];
 
   useEffect(() => {
     if (!attempt || attempt.session === "自由測驗") {
@@ -114,11 +120,78 @@ export default function AttemptDetailPage() {
     return () => controller.abort();
   }, [attempt]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const keys = questions.map((item) => item.questionKey).filter(Boolean);
+    if (keys.length === 0) {
+      setLearningStates(new Map());
+      return;
+    }
+
+    void readQuestionLearningStates(keys)
+      .then((items) => {
+        if (!cancelled) {
+          setLearningStates(items);
+          setLearningStateError("");
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLearningStateError(
+            error instanceof Error ? error.message : "讀取題目筆記失敗。",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [questions]);
+
+  const updateLearningState = async (
+    questionKey: string,
+    next: { conceptUnfamiliar: boolean; note: string },
+  ) => {
+    const previous = learningStates.get(questionKey);
+    const optimistic: QuestionLearningState = {
+      questionKey,
+      conceptUnfamiliar: next.conceptUnfamiliar,
+      note: next.note,
+      updatedAt: new Date().toISOString(),
+    };
+    setLearningStates((current) => {
+      const copy = new Map(current);
+      copy.set(questionKey, optimistic);
+      return copy;
+    });
+
+    try {
+      const saved = await saveQuestionLearningState({ questionKey, ...next });
+      setLearningStates((current) => {
+        const copy = new Map(current);
+        copy.set(questionKey, saved);
+        return copy;
+      });
+      setLearningStateError("");
+    } catch (error) {
+      setLearningStates((current) => {
+        const copy = new Map(current);
+        if (previous) copy.set(questionKey, previous);
+        else copy.delete(questionKey);
+        return copy;
+      });
+      setLearningStateError(
+        error instanceof Error ? error.message : "儲存題目筆記失敗。",
+      );
+      throw error;
+    }
+  };
+
   if (state.status === "loading") {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-8 text-center font-black text-[#789083]">
-          正在讀取這次作答...
+          正在還原這次考卷...
         </div>
       </main>
     );
@@ -138,10 +211,8 @@ export default function AttemptDetailPage() {
     );
   }
 
-  const { attempt: readyAttempt, fallbackItems } = state;
+  const { attempt: readyAttempt, legacyPartial } = state;
   const freeQuiz = readyAttempt.session === "自由測驗";
-  const items = readyAttempt.reviewItems.length > 0 ? readyAttempt.reviewItems : fallbackItems;
-  const usingFallback = readyAttempt.reviewItems.length === 0 && fallbackItems.length > 0;
   const quizParams = new URLSearchParams({
     year: readyAttempt.year,
     session: readyAttempt.session,
@@ -153,56 +224,70 @@ export default function AttemptDetailPage() {
     to: range?.to ?? "115",
     subject: readyAttempt.subject,
   });
-  const wrongItems = items.filter(
-    (item) =>
-      item.correctIndex !== null &&
-      item.userAnswer !== null &&
-      item.userAnswer !== item.correctIndex,
-  );
-  const uncertainItems = items.filter((item) => item.uncertain);
-  const wrongNumbers = wrongItems
-    .map((item) => item.questionNumber)
-    .filter((value): value is number => typeof value === "number");
+
+  const wrongCount = questions.filter((item) => item.correct === false).length;
+  const uncertainCount = questions.filter((item) => item.uncertain).length;
+  const unfamiliarCount = questions.filter(
+    (item) => learningStates.get(item.questionKey)?.conceptUnfamiliar,
+  ).length;
+  const unansweredCount = questions.filter((item) => !item.answered).length;
+
+  const visibleQuestions = questions.filter((item) => {
+    if (filter === "wrong") return item.correct === false;
+    if (filter === "uncertain") return item.uncertain;
+    if (filter === "unfamiliar") {
+      return learningStates.get(item.questionKey)?.conceptUnfamiliar === true;
+    }
+    return true;
+  });
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar showBack backHref="/study/records?tab=attempts" backLabel="返回作答紀錄" />
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">ATTEMPT DETAIL</div>
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">EXAM REVIEW</div>
           <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
             {freeQuiz
               ? `自由測驗 · ${readyAttempt.year.replace("-", "–")} 年 · ${readyAttempt.subject}`
               : `${readyAttempt.year} 年・第 ${readyAttempt.session} 次・${readyAttempt.subject}`}
           </div>
-          <div className="mt-1 text-xs font-bold text-[#8a9c92]">{formatAttemptDate(readyAttempt.completedAt)}</div>
+          <div className="mt-1 text-xs font-bold text-[#8a9c92]">
+            {formatAttemptDate(readyAttempt.completedAt)}
+          </div>
         </section>
 
         <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="分數" value={`${readyAttempt.score.toFixed(2)}`} />
+          <Stat label="分數" value={readyAttempt.score.toFixed(2)} />
           <Stat label="答對" value={`${readyAttempt.correctCount} 題`} />
-          <Stat label="答錯" value={`${wrongItems.length} 題`} />
+          <Stat label="答錯" value={`${wrongCount} 題`} />
           <Stat label="作答時間" value={formatAttemptDuration(readyAttempt.durationSeconds)} />
         </section>
+
+        {legacyPartial && (
+          <div className="mt-5 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-sm font-bold leading-6 text-[#80651e]">
+            這是新版完整考卷快照上線前的舊作答紀錄，因此只能還原當時有保存的題目。從下一次作答開始，整份考卷都會完整保留。
+          </div>
+        )}
 
         {!freeQuiz && (
           <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-black text-[#315b45]">錯題詳解權限</div>
+                  <div className="text-sm font-black text-[#315b45]">這份考卷的解析權限</div>
                   {purchased && (
                     <span className="rounded-full bg-[#eaf9f0] px-2.5 py-1 text-[11px] font-black text-[#237849]">
-                      ✓ 整份考卷已解鎖
+                      ✓ 已永久解鎖
                     </span>
                   )}
                 </div>
                 <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">
                   {purchased
-                    ? "下面只列這次需要複習的題目；按你需要的題目展開詳解，只有真的打開時才會載入解析。"
-                    : "單次 NT$59 解鎖這份考卷的詳解權限。購買後仍只需要針對自己的錯題按需查看，不會自動產生整份解析。"}
+                    ? "整份考卷每一題都可以按需查看解析；只有你真的展開某題時才會載入，不會一次生成 80 題。"
+                    : "先看完整作答與正解；需要理解哪一題，再展開那題解析。NT$59 是整份考卷一次解鎖，不是逐題購買。"}
                 </div>
               </div>
               {!purchased && (
@@ -217,65 +302,88 @@ export default function AttemptDetailPage() {
           </section>
         )}
 
-        <section className="mt-7">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+        <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">REVIEW</div>
-              <h2 className="mt-1 text-2xl font-black">這次需要複習的題目</h2>
+              <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">QUESTION MAP</div>
+              <div className="mt-1 text-sm font-black text-[#315b45]">點題號直接跳到該題</div>
             </div>
-            <span className="shrink-0 text-sm font-black text-[#789083]">
-              {wrongItems.length} 題答錯{uncertainItems.length > 0 ? ` · ${uncertainItems.length} 題不確定` : ""}
-            </span>
+            <div className="text-xs font-bold text-[#789083]">
+              {wrongCount} 錯 · {uncertainCount} 不確定 · {unfamiliarCount} 觀念不熟 · {unansweredCount} 未作答
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
+            {questions.map((item, index) => (
+              <button
+                key={`${item.questionKey}-${index}`}
+                type="button"
+                onClick={() => jumpToQuestion(item.questionKey)}
+                className={questionMapClass(item, learningStates.get(item.questionKey))}
+                title={questionStatusLabel(item, learningStates.get(item.questionKey))}
+              >
+                {item.questionNumber ?? index + 1}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-[#789083]">
+            <Legend className="bg-[#eaf9f0] border-[#9ed9b5]" label="答對" />
+            <Legend className="bg-[#fff1f1] border-[#e6a2a2]" label="答錯" />
+            <Legend className="bg-[#fff8df] border-[#e7d083]" label="不確定" />
+            <Legend className="bg-[#f3f4f3] border-[#d8dfdb]" label="未作答" />
+            <Legend className="bg-[#f0ebff] border-[#cbbdf5]" label="觀念不熟" />
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>
+              全部 {questions.length}
+            </FilterButton>
+            <FilterButton active={filter === "wrong"} onClick={() => setFilter("wrong")}>
+              答錯 {wrongCount}
+            </FilterButton>
+            <FilterButton active={filter === "uncertain"} onClick={() => setFilter("uncertain")}>
+              不確定 {uncertainCount}
+            </FilterButton>
+            <FilterButton active={filter === "unfamiliar"} onClick={() => setFilter("unfamiliar")}>
+              觀念不熟 {unfamiliarCount}
+            </FilterButton>
           </div>
 
-          {wrongNumbers.length > 0 && (
-            <div className="mt-4 rounded-[20px] border border-[#dce9e1] bg-white p-4">
-              <div className="text-xs font-black text-[#789083]">錯題題號</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {wrongNumbers.map((number) => (
-                  <span
-                    key={number}
-                    className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-[#f0cccc] bg-[#fff6f6] px-2 text-sm font-black text-[#9b5050]"
-                  >
-                    {number}
-                  </span>
-                ))}
-              </div>
+          {learningStateError && (
+            <div className="mt-3 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-xs font-bold leading-5 text-[#9b5050]">
+              {learningStateError}
             </div>
           )}
 
-          {usingFallback && (
-            <div className="mt-4 rounded-2xl border border-[#f0dfaa] bg-[#fff9e8] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
-              這筆紀錄建立於逐題作答快照上線前；以下暫時顯示目前仍收在這份考卷錯題紀錄中的題目。之後的新作答會保存每一次當下的錯題快照。
-            </div>
-          )}
-
-          {readyAttempt.reviewCount === 0 ? (
-            <div className="mt-4 rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
-              ✓ 這次沒有答錯或標記不確定的題目。
-            </div>
-          ) : items.length === 0 ? (
-            <div className="mt-4 rounded-[22px] border border-[#dce9e1] bg-white p-5 text-sm font-bold leading-6 text-[#70877a]">
-              這筆紀錄當時只保存了成績摘要，沒有逐題快照。重新作答後，下一筆紀錄就能直接查看當次錯題。
+          {visibleQuestions.length === 0 ? (
+            <div className="mt-4 rounded-[22px] border border-[#dce9e1] bg-white p-6 text-sm font-bold text-[#70877a]">
+              目前沒有符合這個篩選條件的題目。
             </div>
           ) : (
-            <div className="mt-4 space-y-4">
-              {items.map((item) => (
-                <ReviewCard
-                  key={item.id}
-                  item={item}
-                  freeQuiz={freeQuiz}
-                  year={readyAttempt.year}
-                  session={readyAttempt.session}
-                  subject={readyAttempt.subject}
-                  purchased={purchased}
-                />
-              ))}
+            <div className="mt-4 space-y-5">
+              {visibleQuestions.map((item, index) => {
+                const learning = learningStates.get(item.questionKey) ?? {
+                  questionKey: item.questionKey,
+                  conceptUnfamiliar: false,
+                  note: "",
+                  updatedAt: null,
+                };
+                return (
+                  <QuestionReviewCard
+                    key={`${item.questionKey}-${index}`}
+                    item={item}
+                    purchased={!freeQuiz && purchased}
+                    learning={learning}
+                    onSaveLearning={(next) => updateLearningState(item.questionKey, next)}
+                  />
+                );
+              })}
             </div>
           )}
         </section>
 
-        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Link
             href={
               freeQuiz
@@ -298,52 +406,100 @@ export default function AttemptDetailPage() {
   );
 }
 
-function ReviewCard({
+function QuestionReviewCard({
   item,
-  freeQuiz,
-  year,
-  session,
-  subject,
   purchased,
+  learning,
+  onSaveLearning,
 }: {
-  item: ExamAttemptReviewItem;
-  freeQuiz: boolean;
-  year: string;
-  session: string;
-  subject: string;
+  item: ExamAttemptQuestionItem;
   purchased: boolean;
+  learning: QuestionLearningState;
+  onSaveLearning: (next: { conceptUnfamiliar: boolean; note: string }) => Promise<void>;
 }) {
-  const isWrong =
-    item.correctIndex !== null &&
-    item.userAnswer !== null &&
-    item.userAnswer !== item.correctIndex;
-  const source = freeQuiz ? parseSourceId(item.id) : null;
-  const sourceYear = source?.year ?? year;
-  const sourceSession = source?.session ?? session;
-  const sourceQuestionNumber = source?.questionNumber ?? item.questionNumber;
-  const questionKey = sourceQuestionNumber
-    ? `national-exam:${sourceYear}:${sourceSession}:${subject}:${sourceQuestionNumber}`
-    : item.id;
+  const [showOfficial, setShowOfficial] = useState(false);
+  const [note, setNote] = useState(learning.note);
+  const [saving, setSaving] = useState(false);
+  const [savedLabel, setSavedLabel] = useState("");
+  const noteTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    setNote(learning.note);
+  }, [learning.note]);
+
+  useEffect(() => {
+    return () => {
+      if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
+    };
+  }, []);
+
+  const saveNote = (value: string) => {
+    setNote(value);
+    setSavedLabel("");
+    if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(async () => {
+      setSaving(true);
+      try {
+        await onSaveLearning({
+          conceptUnfamiliar: learning.conceptUnfamiliar,
+          note: value,
+        });
+        setSavedLabel("已儲存");
+      } catch {
+        setSavedLabel("儲存失敗");
+      } finally {
+        setSaving(false);
+      }
+    }, 650);
+  };
+
+  const appendToNote = (text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    const next = note.trim() ? `${note.trim()}\n• ${clean}` : `• ${clean}`;
+    saveNote(next);
+  };
+
+  const toggleUnfamiliar = async () => {
+    setSaving(true);
+    try {
+      await onSaveLearning({
+        conceptUnfamiliar: !learning.conceptUnfamiliar,
+        note,
+      });
+      setSavedLabel("已儲存");
+    } catch {
+      setSavedLabel("儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sourceYear = item.sourceYear ?? parseSourceId(item.questionKey)?.year ?? "";
+  const sourceSession = item.sourceSession ?? parseSourceId(item.questionKey)?.session ?? "";
+  const sourceSubject = item.sourceSubject ?? parseSourceId(item.questionKey)?.subject ?? "";
+  const isWrong = item.correct === false;
+  const isCorrect = item.correct === true;
 
   return (
-    <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+    <article
+      id={questionAnchorId(item.questionKey)}
+      className="scroll-mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.045)] sm:p-6"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <div className="text-sm font-black text-[#2ba962]">
-          {source
-            ? `${source.year} 年・第 ${source.session} 次・第 ${source.questionNumber} 題`
-            : item.questionNumber
-              ? `第 ${item.questionNumber} 題`
-              : "題目"}
+          {sourceYear && sourceSession
+            ? `${sourceYear} 年・第 ${sourceSession} 次・第 ${item.questionNumber ?? "?"} 題`
+            : `第 ${item.questionNumber ?? "?"} 題`}
         </div>
-        {isWrong && (
-          <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">答錯</span>
-        )}
-        {item.uncertain && (
-          <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#80651e]">❓ 不確定</span>
-        )}
+        {isCorrect && <StatusBadge tone="green">答對</StatusBadge>}
+        {isWrong && <StatusBadge tone="red">答錯</StatusBadge>}
+        {!item.answered && <StatusBadge tone="gray">未作答</StatusBadge>}
+        {item.uncertain && <StatusBadge tone="yellow">不確定</StatusBadge>}
+        {learning.conceptUnfamiliar && <StatusBadge tone="purple">觀念不熟</StatusBadge>}
       </div>
 
-      <div className="ms-question-stem mt-3">{item.stem}</div>
+      <div className="ms-question-stem mt-4">{item.stem}</div>
 
       <div className="mt-4 space-y-2">
         {item.options.map((option, index) => {
@@ -351,7 +507,7 @@ function ReviewCard({
           const chosen = item.userAnswer === index;
           return (
             <div
-              key={`${item.id}-${index}`}
+              key={`${item.questionKey}-${index}`}
               className={[
                 "ms-question-option rounded-xl border px-4 py-3",
                 correct
@@ -361,28 +517,69 @@ function ReviewCard({
                     : "border-[#e1e9e4] bg-white text-[#60786c]",
               ].join(" ")}
             >
-              {String.fromCharCode(65 + index)}. {option}
-              {correct && " ✓"}
-              {chosen && !correct && " ← 你的答案"}
+              <span className="font-black">{String.fromCharCode(65 + index)}.</span>{" "}
+              {option}
+              {correct && chosen && "  ← 你的答案 · 正確答案 ✓"}
+              {correct && !chosen && "  ← 正確答案 ✓"}
+              {chosen && !correct && "  ← 你的答案"}
             </div>
           );
         })}
       </div>
 
-      {item.userAnswer === null && item.uncertain && (
-        <div className="mt-4 rounded-xl bg-[#fff8df] px-4 py-3 text-sm font-bold text-[#80651e]">
-          這題沒有正式作答，但你標記了「我不確定」。
+      {!item.answered && (
+        <div className="mt-3 rounded-xl bg-[#f5f7f6] px-4 py-3 text-sm font-bold text-[#70877a]">
+          這題當時沒有作答。
         </div>
       )}
 
-      {item.correctIndex !== null && (
+      <div className="mt-5 flex flex-wrap gap-2 border-t border-[#edf2ef] pt-4">
+        <button
+          type="button"
+          onClick={toggleUnfamiliar}
+          disabled={saving}
+          className={[
+            "rounded-xl border px-4 py-2.5 text-sm font-black transition",
+            learning.conceptUnfamiliar
+              ? "border-[#cbbdf5] bg-[#f0ebff] text-[#6952a5]"
+              : "border-[#d7e7de] bg-white text-[#315b45] hover:bg-[#f5faf7]",
+          ].join(" ")}
+        >
+          {learning.conceptUnfamiliar ? "✓ 觀念不熟" : "＋ 觀念不熟"}
+        </button>
+        {item.officialPdfUrl && item.questionNumber !== null && (
+          <button
+            type="button"
+            onClick={() => setShowOfficial((current) => !current)}
+            className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2.5 text-sm font-black text-[#315b45] hover:bg-[#f5faf7]"
+          >
+            {showOfficial ? "收起官方原題" : "📄 官方原題"}
+          </button>
+        )}
+      </div>
+
+      {showOfficial && item.questionNumber !== null && (
+        <div className="mt-4">
+          <OfficialQuestionCrop
+            pdfUrl={item.officialPdfUrl}
+            questionNumber={item.questionNumber}
+            largePreview
+          />
+        </div>
+      )}
+
+      {item.correctIndex !== null && item.options.length === 4 && (
         <AIExplanationButton
-          directPurchasedAccess={!freeQuiz && purchased}
-          buttonLabel={purchased && !freeQuiz ? "查看這題詳解" : "查看完整詳解"}
+          directPurchasedAccess={purchased}
+          buttonLabel="查看完整解析"
+          onAddToNote={appendToNote}
           payload={{
-            questionKey,
+            questionKey: item.questionKey,
             source: "national-exam",
-            sourceLabel: `${sourceYear} 年 · 第 ${sourceSession} 次 · ${subject}`,
+            sourceLabel:
+              sourceYear && sourceSession
+                ? `${sourceYear} 年 · 第 ${sourceSession} 次 · ${sourceSubject}`
+                : sourceSubject || "國考",
             stem: item.stem,
             options: item.options,
             correctIndex: item.correctIndex,
@@ -391,7 +588,237 @@ function ReviewCard({
           }}
         />
       )}
+
+      <div className="mt-5 rounded-2xl border border-[#dfece4] bg-[#fbfefc] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-black text-[#315b45]">📝 我的筆記</div>
+            <div className="mt-1 text-xs font-bold text-[#8a9c92]">
+              綁定這一題；之後從自由測驗或其他複習入口看到它，筆記都會跟著出現。
+            </div>
+          </div>
+          <div className="shrink-0 text-[11px] font-black text-[#789083]">
+            {saving ? "儲存中…" : savedLabel}
+          </div>
+        </div>
+        <textarea
+          value={note}
+          onChange={(event) => saveNote(event.target.value)}
+          placeholder="只記你真正容易忘的觀念、口訣或混淆點…"
+          rows={4}
+          className="mt-3 w-full resize-y rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-medium leading-7 text-[#315b45] outline-none focus:border-[#65d795]"
+        />
+      </div>
     </article>
+  );
+}
+
+async function hydrateAttemptQuestions(attempt: ExamAttempt): Promise<{
+  questions: ExamAttemptQuestionItem[];
+  legacyPartial: boolean;
+}> {
+  if (attempt.questionItems.length > 0) {
+    return { questions: attempt.questionItems, legacyPartial: false };
+  }
+
+  if (attempt.session !== "自由測驗" && attempt.questionOutcomes.length > 0) {
+    try {
+      const params = new URLSearchParams({
+        year: attempt.year,
+        session: attempt.session,
+        subject: attempt.subject,
+      });
+      const response = await fetch(`/api/national-exam?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+      if (response.ok && Array.isArray(payload?.questions)) {
+        const outcomeByNumber = new Map(
+          attempt.questionOutcomes.map((item) => [item.questionNumber, item]),
+        );
+        const questions = (payload.questions as NationalExamQuestion[]).map((item) => {
+          const outcome = outcomeByNumber.get(item.questionNumber);
+          return {
+            id: item.id,
+            questionKey:
+              outcome?.questionKey ??
+              `national-exam:${attempt.year}:${attempt.session}:${attempt.subject}:${item.questionNumber}`,
+            questionNumber: item.questionNumber,
+            sourceYear: attempt.year,
+            sourceSession: attempt.session,
+            sourceSubject: attempt.subject,
+            stem: item.stem,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            userAnswer: outcome?.userAnswer ?? null,
+            answered: outcome?.answered ?? false,
+            correct: outcome?.correct ?? null,
+            uncertain: outcome?.uncertain ?? false,
+            officialPdfUrl: item.questionPdfUrl,
+          } satisfies ExamAttemptQuestionItem;
+        });
+        return { questions, legacyPartial: false };
+      }
+    } catch {
+      // Fall through to the old review snapshot below.
+    }
+  }
+
+  let reviewItems = attempt.reviewItems;
+  if (reviewItems.length === 0 && attempt.session !== "自由測驗") {
+    try {
+      const mistakes = await readMistakes();
+      reviewItems = mistakes
+        .filter(
+          (item) =>
+            item.source === "national-exam" &&
+            item.year === attempt.year &&
+            item.session === attempt.session &&
+            item.subject === attempt.subject,
+        )
+        .map((item) => ({
+          id: item.id,
+          questionNumber: item.questionNumber ?? null,
+          stem: item.stem,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          userAnswer: item.userAnswer,
+          uncertain: item.uncertain,
+          officialPdfUrl: item.officialPdfUrl ?? null,
+        }));
+    } catch {
+      reviewItems = [];
+    }
+  }
+
+  return {
+    questions: reviewItems.map((item) => reviewItemToQuestion(attempt, item)),
+    legacyPartial: true,
+  };
+}
+
+function reviewItemToQuestion(
+  attempt: ExamAttempt,
+  item: ExamAttemptReviewItem,
+): ExamAttemptQuestionItem {
+  const parsed = parseSourceId(item.id);
+  const year = parsed?.year ?? attempt.year;
+  const session = parsed?.session ?? attempt.session;
+  const subject = parsed?.subject ?? attempt.subject;
+  const questionNumber = parsed?.questionNumber ?? item.questionNumber;
+  const questionKey =
+    parsed && questionNumber !== null
+      ? `national-exam:${year}:${session}:${subject}:${questionNumber}`
+      : item.id;
+  const answered = item.userAnswer !== null;
+  const correct =
+    answered && item.correctIndex !== null ? item.userAnswer === item.correctIndex : null;
+
+  return {
+    id: item.id,
+    questionKey,
+    questionNumber,
+    sourceYear: year,
+    sourceSession: session,
+    sourceSubject: subject,
+    stem: item.stem,
+    options: item.options,
+    correctIndex: item.correctIndex,
+    userAnswer: item.userAnswer,
+    answered,
+    correct,
+    uncertain: item.uncertain,
+    officialPdfUrl: item.officialPdfUrl,
+  };
+}
+
+function jumpToQuestion(questionKey: string) {
+  document
+    .getElementById(questionAnchorId(questionKey))
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function questionAnchorId(questionKey: string) {
+  return `review-${encodeURIComponent(questionKey).replaceAll("%", "-")}`;
+}
+
+function questionStatusLabel(
+  item: ExamAttemptQuestionItem,
+  learning?: QuestionLearningState,
+) {
+  if (learning?.conceptUnfamiliar) return "觀念不熟";
+  if (item.uncertain) return "不確定";
+  if (!item.answered) return "未作答";
+  if (item.correct === false) return "答錯";
+  return "答對";
+}
+
+function questionMapClass(
+  item: ExamAttemptQuestionItem,
+  learning?: QuestionLearningState,
+) {
+  const base = "aspect-square rounded-lg border text-xs font-black transition";
+  if (learning?.conceptUnfamiliar) {
+    return `${base} border-[#cbbdf5] bg-[#f0ebff] text-[#6952a5]`;
+  }
+  if (item.uncertain) return `${base} border-[#e7d083] bg-[#fff8df] text-[#80651e]`;
+  if (!item.answered) return `${base} border-[#d8dfdb] bg-[#f3f4f3] text-[#789083]`;
+  if (item.correct === false) return `${base} border-[#e6a2a2] bg-[#fff1f1] text-[#9b5050]`;
+  return `${base} border-[#9ed9b5] bg-[#eaf9f0] text-[#237849]`;
+}
+
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-full border px-4 py-2 text-sm font-black transition",
+        active
+          ? "border-[#31c978] bg-[#eaf9f0] text-[#237849]"
+          : "border-[#dce9e1] bg-white text-[#60786c] hover:bg-[#f5faf7]",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatusBadge({
+  tone,
+  children,
+}: {
+  tone: "green" | "red" | "yellow" | "gray" | "purple";
+  children: React.ReactNode;
+}) {
+  const tones = {
+    green: "bg-[#eaf9f0] text-[#237849]",
+    red: "bg-[#fff1f1] text-[#9b5050]",
+    yellow: "bg-[#fff8df] text-[#80651e]",
+    gray: "bg-[#f3f4f3] text-[#789083]",
+    purple: "bg-[#f0ebff] text-[#6952a5]",
+  } as const;
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-black ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+function Legend({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-3 w-3 rounded border ${className}`} />
+      {label}
+    </span>
   );
 }
 
@@ -417,6 +844,7 @@ function parseSourceId(value: string) {
   return {
     year: parts[1],
     session: parts[2],
+    subject: parts.slice(3, -1).join(":"),
     questionNumber,
   };
 }
