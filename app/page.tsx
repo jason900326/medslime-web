@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "@/components/top-bar";
 import { getPlayerDisplayName, useGameState } from "@/components/game-state-provider";
-import { SLIME_BY_ID } from "@/lib/slime-data";
+import { SLIME_BY_ID, SLIMES } from "@/lib/slime-data";
 import { SLIME_DIALOGUES } from "@/lib/slime-dialogues";
 import { ACHIEVEMENT_COUNT, getClaimableAchievementIds } from "@/lib/achievement-status";
 import { useAuthUser } from "@/hooks/use-auth-user";
@@ -78,7 +78,7 @@ export default function Home() {
     : { questionsAnswered: 0, mistakesReviewed: 0, focusSeconds: 0 };
 
   const ownedCount = useMemo(
-    () => Object.values(game.slimes).filter((item) => item.owned).length,
+    () => SLIMES.filter((slime) => game.slimes[slime.id]?.owned).length,
     [game.slimes],
   );
 
@@ -118,7 +118,7 @@ export default function Home() {
       label: "完成 5 題",
       progress: `${Math.min(today.questionsAnswered, 5)} / 5 題`,
       complete: today.questionsAnswered >= 5,
-      reward: { type: "coins" as const, amount: 30 },
+      reward: { type: "coins" as const, amount: 20 },
       claimId: `daily:${todayKey ?? "loading"}:questions`,
     },
     {
@@ -134,7 +134,7 @@ export default function Home() {
       label: "專注 20 分鐘",
       progress: `${Math.min(Math.floor(today.focusSeconds / 60), 20)} / 20 分`,
       complete: today.focusSeconds >= 20 * 60,
-      reward: { type: "coins" as const, amount: 40 },
+      reward: { type: "coins" as const, amount: 30 },
       claimId: `daily:${todayKey ?? "loading"}:focus`,
     },
   ];
@@ -267,7 +267,7 @@ export default function Home() {
               title="收藏"
               value={
                 auth.isLoggedIn && game.isReady
-                  ? `${ownedCount} / 17`
+                  ? `${ownedCount} / ${SLIMES.length}`
                   : "登入查看"
               }
             />
