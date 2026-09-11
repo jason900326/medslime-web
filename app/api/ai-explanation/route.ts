@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const EXPLANATION_VERSION = "adaptive-v2";
+
 type ExplanationPayload = {
   questionKey?: string;
   source?: "national-exam" | "material";
@@ -14,14 +16,35 @@ type ExplanationPayload = {
   existingExplanation?: string | null;
 };
 
+type StudyAidFormat =
+  | "none"
+  | "bullets"
+  | "comparison_table"
+  | "steps"
+  | "formula"
+  | "interpretation";
+
+type AdaptiveStudyAid = {
+  format: StudyAidFormat;
+  title: string;
+  bullets: string[];
+  tableHeaders: string[];
+  tableRows: string[][];
+  steps: string[];
+  formulaLines: string[];
+  interpretationClues: string[];
+};
+
 type ExplanationResult = {
+  version: typeof EXPLANATION_VERSION;
   whatItTests: string;
   correctAnswer: string;
   whyCorrect: string;
   optionAnalysis: Array<{ label: string; explanation: string }>;
-  quickSummary: string[];
+  keyTakeaways: string[];
   memoryPoint: string;
   commonTrap: string;
+  studyAid: AdaptiveStudyAid;
 };
 
 type OpenAIResponse = {
@@ -34,10 +57,17 @@ type DailyUseResult =
   | { ok: false; remaining: 0 }
   | { ok: true; remaining: number };
 
+const stringArray = {
+  type: "array",
+  maxItems: 8,
+  items: { type: "string" },
+} as const;
+
 const explanationSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    version: { type: "string", enum: [EXPLANATION_VERSION] },
     whatItTests: { type: "string" },
     correctAnswer: { type: "string" },
     whyCorrect: { type: "string" },
@@ -55,23 +85,71 @@ const explanationSchema = {
         required: ["label", "explanation"],
       },
     },
-    quickSummary: {
+    keyTakeaways: {
       type: "array",
-      minItems: 2,
-      maxItems: 6,
+      minItems: 1,
+      maxItems: 4,
       items: { type: "string" },
     },
     memoryPoint: { type: "string" },
     commonTrap: { type: "string" },
+    studyAid: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        format: {
+          type: "string",
+          enum: [
+            "none",
+            "bullets",
+            "comparison_table",
+            "steps",
+            "formula",
+            "interpretation",
+          ],
+        },
+        title: { type: "string" },
+        bullets: stringArray,
+        tableHeaders: {
+          type: "array",
+          maxItems: 5,
+          items: { type: "string" },
+        },
+        tableRows: {
+          type: "array",
+          maxItems: 7,
+          items: {
+            type: "array",
+            maxItems: 5,
+            items: { type: "string" },
+          },
+        },
+        steps: stringArray,
+        formulaLines: stringArray,
+        interpretationClues: stringArray,
+      },
+      required: [
+        "format",
+        "title",
+        "bullets",
+        "tableHeaders",
+        "tableRows",
+        "steps",
+        "formulaLines",
+        "interpretationClues",
+      ],
+    },
   },
   required: [
+    "version",
     "whatItTests",
     "correctAnswer",
     "whyCorrect",
     "optionAnalysis",
-    "quickSummary",
+    "keyTakeaways",
     "memoryPoint",
     "commonTrap",
+    "studyAid",
   ],
 } as const;
 
@@ -79,7 +157,6 @@ function getOutputText(payload: OpenAIResponse) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text;
   }
-
   for (const item of payload.output ?? []) {
     for (const content of item.content ?? []) {
       if (
@@ -91,7 +168,6 @@ function getOutputText(payload: OpenAIResponse) {
       }
     }
   }
-
   return "";
 }
 
@@ -99,10 +175,13 @@ function normalizeSource(value: unknown): "national-exam" | "material" {
   return value === "material" ? "material" : "national-exam";
 }
 
+function cacheKey(questionKey: string) {
+  return `${questionKey}::${EXPLANATION_VERSION}`;
+}
+
 function nationalExamKeyFromQuestionKey(questionKey: string) {
   const parts = questionKey.split(":");
   if (parts.length < 5 || parts[0] !== "national-exam") return null;
-
   const year = parts[1]?.trim();
   const session = parts[2]?.trim();
   const subject = parts.slice(3, -1).join(":").trim();
@@ -117,7 +196,6 @@ async function hasPurchasedExamExplanation(input: {
 }) {
   const { userId, source, questionKey } = input;
   if (source !== "national-exam") return false;
-
   const examKey = nationalExamKeyFromQuestionKey(questionKey);
   if (!examKey) return false;
 
@@ -135,7 +213,6 @@ async function hasPurchasedExamExplanation(input: {
     }
     throw new Error(`完整詳解權限讀取失敗：${error.message}`);
   }
-
   return Boolean(data);
 }
 
@@ -146,14 +223,14 @@ async function readCachedExplanation(input: {
   questionKey: string;
 }) {
   const { supabase, userId, source, questionKey } = input;
+  const versionedKey = cacheKey(questionKey);
 
   if (source === "national-exam") {
     const { data, error } = await supabase
       .from("shared_ai_explanations")
       .select("explanation")
-      .eq("question_key", questionKey)
+      .eq("question_key", versionedKey)
       .maybeSingle();
-
     if (error) throw new Error(`共用 AI 解析讀取失敗：${error.message}`);
     return (data?.explanation as ExplanationResult | null) ?? null;
   }
@@ -162,9 +239,8 @@ async function readCachedExplanation(input: {
     .from("ai_question_explanations")
     .select("explanation")
     .eq("user_id", userId)
-    .eq("question_key", questionKey)
+    .eq("question_key", versionedKey)
     .maybeSingle();
-
   if (error) throw new Error(`教材 AI 解析讀取失敗：${error.message}`);
   return (data?.explanation as ExplanationResult | null) ?? null;
 }
@@ -179,39 +255,34 @@ async function saveExplanation(input: {
 }) {
   const { supabase, userId, source, sourceLabel, questionKey, explanation } = input;
   const now = new Date().toISOString();
+  const versionedKey = cacheKey(questionKey);
 
   if (source === "national-exam") {
-    const { error } = await supabase
-      .from("shared_ai_explanations")
-      .upsert(
-        {
-          question_key: questionKey,
-          source: "national-exam",
-          source_label: sourceLabel,
-          explanation,
-          updated_at: now,
-        },
-        { onConflict: "question_key" },
-      );
-
-    if (error) throw new Error(`共用 AI 解析儲存失敗：${error.message}`);
-    return;
-  }
-
-  const { error } = await supabase
-    .from("ai_question_explanations")
-    .upsert(
+    const { error } = await supabase.from("shared_ai_explanations").upsert(
       {
-        user_id: userId,
-        question_key: questionKey,
-        source: "material",
+        question_key: versionedKey,
+        source: "national-exam",
         source_label: sourceLabel,
         explanation,
         updated_at: now,
       },
-      { onConflict: "user_id,question_key" },
+      { onConflict: "question_key" },
     );
+    if (error) throw new Error(`共用 AI 解析儲存失敗：${error.message}`);
+    return;
+  }
 
+  const { error } = await supabase.from("ai_question_explanations").upsert(
+    {
+      user_id: userId,
+      question_key: versionedKey,
+      source: "material",
+      source_label: sourceLabel,
+      explanation,
+      updated_at: now,
+    },
+    { onConflict: "user_id,question_key" },
+  );
   if (error) throw new Error(`教材 AI 解析儲存失敗：${error.message}`);
 }
 
@@ -229,7 +300,6 @@ async function recordExplanationEvent(input: {
     source,
     event_type: eventType,
   });
-
   if (error) console.error("AI 解析事件統計寫入失敗：", error);
 }
 
@@ -253,17 +323,14 @@ async function consumeDailyDetailUse(userId: string): Promise<DailyUseResult> {
   const { data, error } = await admin.rpc("consume_ai_detail_daily_use", {
     p_user_id: userId,
   });
-
   if (error) {
     if (error.message.includes("AI_DETAIL_DAILY_LIMIT_REACHED")) {
       return { ok: false, remaining: 0 };
     }
     throw new Error(`完整詳解每日使用次數更新失敗：${error.message}`);
   }
-
   const payload = normalizeRpcPayload(data);
-  const remaining = Math.max(0, Number(payload.remaining ?? 0));
-  return { ok: true, remaining };
+  return { ok: true, remaining: Math.max(0, Number(payload.remaining ?? 0)) };
 }
 
 async function refundDailyDetailUse(userId: string) {
@@ -272,7 +339,6 @@ async function refundDailyDetailUse(userId: string) {
     const { error } = await admin.rpc("refund_ai_detail_daily_use", {
       p_user_id: userId,
     });
-
     if (error) console.error("完整詳解每日使用次數退回失敗：", error);
   } catch (error) {
     console.error("完整詳解每日使用次數退回失敗：", error);
@@ -285,37 +351,25 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
       return NextResponse.json({ error: "請先登入才能查看完整詳解。" }, { status: 401 });
     }
 
-    const questionKey = String(
-      request.nextUrl.searchParams.get("questionKey") ?? "",
-    ).trim();
+    const questionKey = String(request.nextUrl.searchParams.get("questionKey") ?? "").trim();
     const source = normalizeSource(request.nextUrl.searchParams.get("source"));
-
     if (!questionKey) {
       return NextResponse.json({ error: "缺少 questionKey。" }, { status: 400 });
     }
 
     const [cached, purchasedExamAccess] = await Promise.all([
-      readCachedExplanation({
-        supabase,
-        userId: user.id,
-        source,
-        questionKey,
-      }),
-      hasPurchasedExamExplanation({
-        userId: user.id,
-        source,
-        questionKey,
-      }),
+      readCachedExplanation({ supabase, userId: user.id, source, questionKey }),
+      hasPurchasedExamExplanation({ userId: user.id, source, questionKey }),
     ]);
 
     return NextResponse.json({
       available: Boolean(cached),
       purchasedExamAccess,
+      explanationVersion: EXPLANATION_VERSION,
     });
   } catch (error) {
     return NextResponse.json(
@@ -333,23 +387,19 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
       return NextResponse.json({ error: "請先登入才能查看完整詳解。" }, { status: 401 });
     }
 
     const body = (await request.json()) as ExplanationPayload;
     const source = normalizeSource(body.source);
-    const questionKey =
-      typeof body.questionKey === "string" ? body.questionKey.trim() : "";
-    const sourceLabel =
-      typeof body.sourceLabel === "string" ? body.sourceLabel.trim() : "";
+    const questionKey = typeof body.questionKey === "string" ? body.questionKey.trim() : "";
+    const sourceLabel = typeof body.sourceLabel === "string" ? body.sourceLabel.trim() : "";
     const stem = typeof body.stem === "string" ? body.stem.trim() : "";
     const options = Array.isArray(body.options)
       ? body.options.map((item) => String(item ?? "").trim())
       : [];
-    const correctIndex =
-      typeof body.correctIndex === "number" ? body.correctIndex : null;
+    const correctIndex = typeof body.correctIndex === "number" ? body.correctIndex : null;
 
     if (
       !questionKey ||
@@ -360,10 +410,7 @@ export async function POST(request: Request) {
       correctIndex > 3
     ) {
       return NextResponse.json(
-        {
-          error:
-            "這題缺少完整題幹、四個選項或單一正確答案，暫時無法提供完整詳解。",
-        },
+        { error: "這題缺少完整題幹、四個選項或單一正確答案，暫時無法提供完整詳解。" },
         { status: 400 },
       );
     }
@@ -396,7 +443,6 @@ export async function POST(request: Request) {
       source,
       questionKey,
     });
-
     if (cached) {
       await recordExplanationEvent({
         supabase,
@@ -411,6 +457,7 @@ export async function POST(request: Request) {
         explanation: cached,
         accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
         aiDetailRemaining: dailyRemaining,
+        explanationVersion: EXPLANATION_VERSION,
       });
     }
 
@@ -418,10 +465,7 @@ export async function POST(request: Request) {
     if (!apiKey) {
       if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
-      return NextResponse.json(
-        { error: "伺服器尚未設定 OPENAI_API_KEY。" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "伺服器尚未設定 OPENAI_API_KEY。" }, { status: 500 });
     }
 
     const userAnswer = typeof body.userAnswer === "number" ? body.userAnswer : null;
@@ -431,68 +475,49 @@ export async function POST(request: Request) {
         ? "未作答"
         : `${String.fromCharCode(65 + userAnswer)}. ${options[userAnswer]}`;
     const existingExplanation =
-      typeof body.existingExplanation === "string"
-        ? body.existingExplanation.trim()
-        : "";
+      typeof body.existingExplanation === "string" ? body.existingExplanation.trim() : "";
 
     const instructions = [
-      "你是 MedSlime 的醫檢師國考學習解析助手。",
-      "你的任務不是只告訴學生答案，而是幫他理解這題在考什麼、為什麼正解成立、其他選項錯在哪，以及下次遇到類似題型怎麼辨認。",
+      "你是 MedSlime 的醫檢師國考詳解編輯。你的目標是讓考生不必來回翻教科書，也能理解題目、辨認陷阱並留下可複習的重點。",
+      "使用自然繁體中文；常用英文專有名詞保留原文。語氣冷靜、直接、專業，不裝可愛、不灌水。",
       "",
-      "【語氣】",
-      "冷靜、清楚、直接，像很會教人的學長姐。",
-      "專業但不要僵硬。",
-      "避免過度鼓勵、裝可愛、責備使用者、空泛稱讚。",
-      "不要把每一題都寫成教科書長文。",
+      "【固定骨架】",
+      "1. whatItTests：指出核心考點，不重抄題幹。",
+      "2. correctAnswer：直接指出官方正解與一句核心概念。",
+      "3. whyCorrect：解釋判斷依據、機轉或計算邏輯。能短就短，需要才展開。",
+      "4. optionAnalysis：A、B、C、D 四個選項都要交代為什麼對或錯，但禁止為了對稱硬寫等長。明顯錯誤選項一句話就可以；真正容易混淆的才多解釋。",
+      "5. keyTakeaways：1–4 個真正值得帶走的重點，不要重複前文。",
+      "6. memoryPoint：給一個下次遇到類似題型可直接使用的辨認點。",
+      "7. commonTrap：只有真的有陷阱才寫；沒有就回空字串。",
       "",
-      "【專有名詞】",
-      "一般敘述使用自然繁體中文。",
-      "教材或國考常用的英文專有名詞請保留原文，不要擅自漢化或翻成不常見中文。",
-      "例如 Beta-lactam 應保留 Beta-lactam。",
-      "",
-      "【固定解析結構】",
-      "1. 這題在考什麼：一句到數句指出核心考點。",
-      "2. 正確答案：直接指出正確選項與核心概念。",
-      "3. 為什麼：用 2–4 句左右說清楚因果或判斷依據；若需要更長才能說清楚，可以適度增加。",
-      "4. 其他選項為什麼錯：A、B、C、D 都要逐一處理，不要只寫『錯』；正確選項可簡短補充。",
-      "5. 快速整理：整理 2–6 個最值得帶走的 bullet points。",
-      "6. 國考記憶點：給一個能幫助下次辨認類似題目的重點。",
-      "7. 常見陷阱：只有真的存在明顯陷阱才寫；如果沒有，commonTrap 必須回傳空字串，不准回 null、不准寫『無』。",
-      "",
-      "【排版與內容原則】",
-      "單一概念、機轉、流程優先用短句與 bullet points，不要硬塞成長段落。",
-      "比較型內容如果沒有必要，不要硬做表格。",
-      "不要重複題幹。",
-      "不要用沒有資訊量的句子湊篇幅。",
+      "【自適應教學 studyAid】",
+      "你必須先判斷這題是否真的需要額外整理。不要每題都硬做表格或筆記。",
+      "format=none：固定骨架已足夠時使用，其他 studyAid 陣列全部回空陣列，title 回空字串。",
+      "format=bullets：適合多個平行事實、分類或記憶點；使用 bullets。",
+      "format=comparison_table：只有比較兩個以上容易混淆概念時使用。tableHeaders 2–5 欄，tableRows 每列欄數要與 headers 相同。",
+      "format=steps：適合機轉、流程、判讀順序；使用 steps，按先後順序寫。",
+      "format=formula：適合計算或公式題；formulaLines 依序放公式、代入、單位與常見錯法。",
+      "format=interpretation：適合 ECG、圖表、影像或檢驗判讀；interpretationClues 放真正可辨識的線索與排除方式。",
+      "未使用的 studyAid 欄位必須回空陣列。禁止把同樣內容同時塞進多種格式。",
       "",
       "【正確性】",
-      "題目提供的 correctIndex 是本系統的官方答案，必須以它為正解，不要自行改答案。",
-      "若題目資訊本身不足以支持某個延伸細節，請保守表述，不要猜。",
-      "不要捏造題目沒有提供的檢驗數值、機轉、疾病特徵或其他背景。",
+      "correctIndex 是系統官方答案，必須以它為正解，不自行翻案。",
+      "題目不足以支持的延伸細節不要猜；不要捏造檢驗數值、疾病特徵、機轉或影像發現。",
+      "如果使用者答錯，可以指出其選項最可能混淆的概念，但只能基於題目與標準醫學知識，不做心理猜測。",
       "",
-      "【optionAnalysis】",
-      "必須依序回傳 A、B、C、D 四項。",
-      "label 請使用『A.』『B.』『C.』『D.』。",
-      "explanation 說明該選項為何符合或不符合題目。",
-      "",
-      "【commonTrap】",
-      "沒有明顯陷阱時一律回傳空字串 \"\"。",
+      "version 必須回傳 adaptive-v2。optionAnalysis label 必須依序為 A.、B.、C.、D.。",
     ].join("\n");
 
     const prompt = [
       `來源：${sourceLabel || source}`,
       `題目：${stem}`,
-      "",
       "選項：",
-      ...options.map(
-        (option, index) => `${String.fromCharCode(65 + index)}. ${option}`,
-      ),
-      "",
+      ...options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`),
       `官方正確答案：${correctLabel}`,
       `使用者答案：${userAnswerLabel}`,
-      `使用者是否標記不確定：${body.uncertain ? "是" : "否"}`,
+      `使用者當時是否標記不確定：${body.uncertain ? "是" : "否"}`,
       existingExplanation
-        ? `教材產題時的簡短解析（僅供參考，不要原句照抄）：${existingExplanation}`
+        ? `既有簡短解析（僅供參考，不要照抄）：${existingExplanation}`
         : "",
     ]
       .filter(Boolean)
@@ -515,7 +540,7 @@ export async function POST(request: Request) {
         text: {
           format: {
             type: "json_schema",
-            name: "medslime_ai_explanation",
+            name: "medslime_adaptive_explanation_v2",
             strict: true,
             schema: explanationSchema,
           },
@@ -524,7 +549,6 @@ export async function POST(request: Request) {
     });
 
     const openAIPayload = (await openAIResponse.json()) as OpenAIResponse;
-
     if (!openAIResponse.ok) {
       console.error("OpenAI explanation failed:", openAIPayload);
       if (reservedDailyUse) await refundDailyDetailUse(user.id);
@@ -555,10 +579,7 @@ export async function POST(request: Request) {
     } catch {
       if (reservedDailyUse) await refundDailyDetailUse(user.id);
       reservedDailyUse = null;
-      return NextResponse.json(
-        { error: "AI 詳解格式異常，請再試一次。" },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: "AI 詳解格式異常，請再試一次。" }, { status: 502 });
     }
 
     await saveExplanation({
@@ -569,7 +590,6 @@ export async function POST(request: Request) {
       questionKey,
       explanation,
     });
-
     await recordExplanationEvent({
       supabase,
       userId: user.id,
@@ -584,18 +604,13 @@ export async function POST(request: Request) {
       explanation,
       accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
       aiDetailRemaining: dailyRemaining,
+      explanationVersion: EXPLANATION_VERSION,
     });
   } catch (error) {
-    if (reservedDailyUse) {
-      await refundDailyDetailUse(reservedDailyUse.userId);
-    }
-
+    if (reservedDailyUse) await refundDailyDetailUse(reservedDailyUse.userId);
     console.error("AI explanation route failed:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "AI 詳解發生未知錯誤。",
-      },
+      { error: error instanceof Error ? error.message : "AI 詳解發生未知錯誤。" },
       { status: 500 },
     );
   }
