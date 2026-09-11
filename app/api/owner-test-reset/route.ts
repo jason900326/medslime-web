@@ -6,6 +6,16 @@ const OWNER_RESET_VERSION = 1;
 const OWNER_TEST_COINS = 100_000;
 const OWNER_TEST_TICKETS = 500;
 
+function isOwnerTestResetEnabled() {
+  const deploymentAllowsReset = process.env.VERCEL_ENV
+    ? process.env.VERCEL_ENV === "preview"
+    : process.env.NODE_ENV !== "production";
+
+  return (
+    deploymentAllowsReset && process.env.OWNER_TEST_RESET_ENABLED === "true"
+  );
+}
+
 function ownerTestState() {
   return {
     coins: OWNER_TEST_COINS,
@@ -32,6 +42,14 @@ function ownerTestState() {
 }
 
 export async function POST() {
+  if (!isOwnerTestResetEnabled()) {
+    return NextResponse.json({
+      ok: true,
+      applied: false,
+      disabled: true,
+    });
+  }
+
   try {
     const supabase = await createClient();
     const {
