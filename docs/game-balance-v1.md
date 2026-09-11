@@ -1,6 +1,10 @@
 # MedSlime 抽卡／金幣平衡 v1
 
+Last audited: 2026-09-11
+
 > 本文件記錄目前正式程式實際採用的遊戲規則。調整機率、保底或重複回饋時，必須同步更新程式與本文件。
+>
+> Implementation source of truth: `components/game-state-provider.tsx`；使用者可見機率與成本應與 `app/gacha/page.tsx` 同步。
 
 ## 角色池
 
