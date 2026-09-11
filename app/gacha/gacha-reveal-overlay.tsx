@@ -71,18 +71,22 @@ export default function GachaRevealOverlay({
   const [singleRevealed, setSingleRevealed] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [tenCardRevealed, setTenCardRevealed] = useState(false);
+  const [tenCardExiting, setTenCardExiting] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
   const lockTimer = useRef<number | null>(null);
+  const advanceTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setSingleRevealed(false);
     setCurrentIndex(0);
     setTenCardRevealed(false);
+    setTenCardExiting(false);
     setShowSummary(false);
     setInteractionLocked(false);
     if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+    if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
   }, [open]);
 
   useEffect(() => {
@@ -97,6 +101,7 @@ export default function GachaRevealOverlay({
   useEffect(() => {
     return () => {
       if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+      if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
     };
   }, []);
 
@@ -131,14 +136,20 @@ export default function GachaRevealOverlay({
       return;
     }
 
-    if (currentIndex >= results.length - 1) {
-      setShowSummary(true);
-      return;
-    }
-
-    setCurrentIndex((index) => index + 1);
-    setTenCardRevealed(false);
-    lockInteraction(180);
+    setTenCardExiting(true);
+    setInteractionLocked(true);
+    if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
+    advanceTimer.current = window.setTimeout(() => {
+      if (currentIndex >= results.length - 1) {
+        setShowSummary(true);
+      } else {
+        setCurrentIndex((index) => index + 1);
+      }
+      setTenCardRevealed(false);
+      setTenCardExiting(false);
+      setInteractionLocked(false);
+      advanceTimer.current = null;
+    }, 280);
   };
 
   return (
@@ -196,6 +207,7 @@ export default function GachaRevealOverlay({
               results={results}
               currentIndex={currentIndex}
               revealed={tenCardRevealed}
+              exiting={tenCardExiting}
               remaining={remaining}
               locked={interactionLocked}
               onCardTap={revealOrAdvance}
@@ -248,7 +260,7 @@ function SingleReveal({
   return (
     <div className="flex w-full min-h-0 flex-col items-center justify-center text-center">
       <div className={`relative rounded-[30px] ${theme.glow}`}>
-        <div className="aspect-[278/430] h-[min(45dvh,377px)] [perspective:1200px] sm:h-[min(58dvh,460px)]">
+        <div className="aspect-[278/430] h-[min(49dvh,400px)] [perspective:1200px] sm:h-[min(60dvh,480px)]">
           <button
             type="button"
             onClick={() => !revealed && onReveal()}
@@ -275,6 +287,7 @@ function TenPullStack({
   results,
   currentIndex,
   revealed,
+  exiting,
   remaining,
   locked,
   onCardTap,
@@ -283,6 +296,7 @@ function TenPullStack({
   results: GachaResult[];
   currentIndex: number;
   revealed: boolean;
+  exiting: boolean;
   remaining: number;
   locked: boolean;
   onCardTap: () => void;
@@ -295,13 +309,13 @@ function TenPullStack({
 
   return (
     <div className="flex w-full min-h-0 flex-col items-center justify-center">
-      <div className="mb-2.5 flex w-full max-w-[300px] items-center justify-between px-1 text-xs font-black text-[#668173] sm:mb-4 sm:max-w-md sm:text-sm">
+      <div className="mb-2.5 flex w-full max-w-[330px] items-center justify-between px-1 text-xs font-black text-[#668173] sm:mb-4 sm:max-w-md sm:text-sm">
         <span>{currentIndex + 1} / {results.length}</span>
         <span>剩下 {remaining} 張</span>
       </div>
 
       <div
-        className={`relative aspect-[278/430] h-[min(42dvh,350px)] rounded-[28px] sm:h-[min(55dvh,440px)] ${theme.glow}`}
+        className={`relative aspect-[278/430] h-[min(48dvh,400px)] rounded-[28px] sm:h-[min(60dvh,480px)] ${theme.glow}`}
       >
         {visibleStack
           .slice(1)
@@ -336,7 +350,10 @@ function TenPullStack({
                 : "前往下一張卡片"
               : `翻開第 ${currentIndex + 1} 張卡片`
           }
-          className="absolute inset-0 z-20 rounded-[28px] [perspective:1200px] disabled:cursor-default"
+          className={[
+            "absolute inset-0 z-20 rounded-[28px] [perspective:1200px] transition-[opacity,transform] duration-300 disabled:cursor-default",
+            exiting ? "-translate-y-7 scale-[0.94] opacity-0" : "translate-y-0 scale-100 opacity-100",
+          ].join(" ")}
         >
           <span
             className={[
@@ -354,7 +371,8 @@ function TenPullStack({
         <button
           type="button"
           onClick={onShowAll}
-          className="rounded-xl border border-[#cfe1d6] bg-white/80 px-4 py-2.5 text-xs font-black text-[#4b6859] transition hover:bg-white"
+          disabled={locked}
+          className="rounded-xl border border-[#cfe1d6] bg-white/80 px-4 py-2.5 text-xs font-black text-[#4b6859] transition hover:bg-white disabled:opacity-60"
         >
           全部揭曉
         </button>
