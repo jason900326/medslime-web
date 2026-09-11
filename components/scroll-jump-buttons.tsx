@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 
-type VisibleButton = "top" | "bottom" | null;
+type ScrollState = {
+  scrollable: boolean;
+  atTop: boolean;
+  atBottom: boolean;
+};
 
 export default function ScrollJumpButtons() {
-  const [visibleButton, setVisibleButton] = useState<VisibleButton>(null);
+  const [state, setState] = useState<ScrollState>({
+    scrollable: false,
+    atTop: true,
+    atBottom: false,
+  });
 
   useEffect(() => {
     const update = () => {
@@ -14,36 +22,21 @@ export default function ScrollJumpButtons() {
         document.documentElement.scrollTop ||
         document.body.scrollTop ||
         0;
-
       const viewportHeight = window.innerHeight;
       const pageHeight = Math.max(
         document.documentElement.scrollHeight,
         document.body.scrollHeight,
       );
-
       const maxScroll = Math.max(0, pageHeight - viewportHeight);
 
-      // 頁面短到根本不需要捲動時，兩顆都不顯示。
-      if (maxScroll < 120) {
-        setVisibleButton(null);
-        return;
-      }
-
-      const distanceToBottom = Math.max(0, maxScroll - scrollTop);
-
-      // 邏輯：
-      // - 只要還沒真正抵達頁面底部，就顯示「到底部」
-      // - 抵達底部附近後，才切換成「到頂部」
-      // - 永遠不會同時出現
-      if (distanceToBottom <= 80) {
-        setVisibleButton("top");
-      } else {
-        setVisibleButton("bottom");
-      }
+      setState({
+        scrollable: maxScroll >= 120,
+        atTop: scrollTop <= 80,
+        atBottom: maxScroll - scrollTop <= 80,
+      });
     };
 
     update();
-
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
 
@@ -57,39 +50,44 @@ export default function ScrollJumpButtons() {
     };
   }, []);
 
-  if (!visibleButton) return null;
+  if (!state.scrollable) return null;
 
   const goTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const goBottom = () => {
     window.scrollTo({
-      top: document.documentElement.scrollHeight,
+      top: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
       behavior: "smooth",
     });
   };
 
+  const buttonClass =
+    "flex h-12 w-12 items-center justify-center rounded-full border border-[#d5e5dc] bg-white/95 text-xl font-black text-[#315b45] shadow-[0_10px_28px_rgba(31,83,53,0.16)] backdrop-blur transition enabled:hover:-translate-y-0.5 enabled:hover:bg-[#f5faf7] disabled:cursor-default disabled:opacity-35";
+
   return (
-    <button
-      type="button"
-      onClick={visibleButton === "top" ? goTop : goBottom}
-      aria-label={
-        visibleButton === "top"
-          ? "一鍵到頂部"
-          : "一鍵到底部"
-      }
-      title={
-        visibleButton === "top"
-          ? "一鍵到頂部"
-          : "一鍵到底部"
-      }
-      className="fixed bottom-5 right-5 z-[90] flex h-12 w-12 items-center justify-center rounded-full border border-[#d5e5dc] bg-white/95 text-xl font-black text-[#315b45] shadow-[0_10px_28px_rgba(31,83,53,0.16)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#f5faf7] md:bottom-7 md:right-7"
-    >
-      {visibleButton === "top" ? "↑" : "↓"}
-    </button>
+    <div className="fixed bottom-5 right-5 z-[90] flex flex-col gap-2 md:bottom-7 md:right-7">
+      <button
+        type="button"
+        onClick={goTop}
+        disabled={state.atTop}
+        aria-label="一鍵到頂部"
+        title="一鍵到頂部"
+        className={buttonClass}
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        onClick={goBottom}
+        disabled={state.atBottom}
+        aria-label="一鍵到底部"
+        title="一鍵到底部"
+        className={buttonClass}
+      >
+        ↓
+      </button>
+    </div>
   );
 }
