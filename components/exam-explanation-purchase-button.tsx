@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getCachedExamExplanationAccess,
+  loadExamExplanationAccessKeys,
+} from "@/lib/exam-explanation-access-cache";
 
 const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
 const checkoutEnabled =
@@ -11,39 +15,49 @@ export default function ExamExplanationPurchaseButton({
   session,
   subject,
   compact = false,
+  knownPurchased,
 }: {
   year: string;
   session: string;
   subject: string;
   compact?: boolean;
+  knownPurchased?: boolean;
 }) {
-  const [purchased, setPurchased] = useState<boolean | null>(null);
+  const examKey = useMemo(() => `${year}-${session}-${subject}`, [year, session, subject]);
+  const [purchased, setPurchased] = useState<boolean | null>(() =>
+    typeof knownPurchased === "boolean"
+      ? knownPurchased
+      : getCachedExamExplanationAccess(examKey),
+  );
   const baseClass = compact
     ? "rounded-xl px-4 py-2.5 text-sm font-black"
     : "w-full rounded-xl px-4 py-3 text-sm font-black";
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadAccess() {
-      try {
-        const params = new URLSearchParams({ year, session, subject });
-        const response = await fetch(
-          `/api/exam-explanation-access?${params.toString()}`,
-          { cache: "no-store", signal: controller.signal },
-        );
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? "讀取權限失敗。");
-        setPurchased(Boolean(payload?.purchased));
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setPurchased(false);
-      }
+    if (typeof knownPurchased === "boolean") {
+      setPurchased(knownPurchased);
+      return;
     }
 
-    void loadAccess();
-    return () => controller.abort();
-  }, [year, session, subject]);
+    const cached = getCachedExamExplanationAccess(examKey);
+    if (cached !== null) {
+      setPurchased(cached);
+      return;
+    }
+
+    let cancelled = false;
+    void loadExamExplanationAccessKeys()
+      .then((keys) => {
+        if (!cancelled) setPurchased(keys.has(examKey));
+      })
+      .catch(() => {
+        if (!cancelled) setPurchased(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [examKey, knownPurchased]);
 
   if (purchased) {
     return (
