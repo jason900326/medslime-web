@@ -20,9 +20,11 @@ function splitYearRange(value: string) {
 export default function AttemptCard({
   attempt,
   previous,
+  explanationUnlocked = false,
 }: {
   attempt: ExamAttempt;
   previous: ExamAttempt | null;
+  explanationUnlocked?: boolean;
 }) {
   const freeQuiz = isFreeQuizAttempt(attempt);
   const yearRange = freeQuiz ? splitYearRange(attempt.year) : null;
@@ -107,13 +109,16 @@ export default function AttemptCard({
       {!freeQuiz && (
         <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-[#f8fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs font-bold leading-5 text-[#789083]">
-            整份考卷詳解權限：進入作答紀錄後，只在需要的錯題上展開解析。
+            {explanationUnlocked
+              ? "這份考卷的詳解權限已永久解鎖。"
+              : "整份考卷詳解權限：進入作答紀錄後，只在需要的題目上展開解析。"}
           </div>
           <ExamExplanationPurchaseButton
             year={attempt.year}
             session={attempt.session}
             subject={attempt.subject}
             compact
+            knownPurchased={explanationUnlocked}
           />
         </div>
       )}

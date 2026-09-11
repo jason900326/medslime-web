@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
@@ -21,6 +21,10 @@ import {
   saveQuestionLearningState,
   type QuestionLearningState,
 } from "@/lib/question-learning-state";
+import {
+  getCachedExamExplanationAccess,
+  loadExamExplanationAccessKeys,
+} from "@/lib/exam-explanation-access-cache";
 
 type Filter = "all" | "wrong" | "uncertain" | "unfamiliar";
 
@@ -96,28 +100,24 @@ export default function AttemptDetailPage() {
       return;
     }
 
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const params = new URLSearchParams({
-          year: attempt.year,
-          session: attempt.session,
-          subject: attempt.subject,
-        });
-        const response = await fetch(`/api/exam-explanation-access?${params.toString()}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? "讀取詳解權限失敗。");
-        setPurchased(Boolean(payload?.purchased));
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setPurchased(false);
-      }
-    })();
+    const cached = getCachedExamExplanationAccess(attempt.examKey);
+    if (cached !== null) {
+      setPurchased(cached);
+      return;
+    }
 
-    return () => controller.abort();
+    let cancelled = false;
+    void loadExamExplanationAccessKeys()
+      .then((keys) => {
+        if (!cancelled) setPurchased(keys.has(attempt.examKey));
+      })
+      .catch(() => {
+        if (!cancelled) setPurchased(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [attempt]);
 
   useEffect(() => {
@@ -150,13 +150,16 @@ export default function AttemptDetailPage() {
 
   const updateLearningState = async (
     questionKey: string,
-    next: { conceptUnfamiliar: boolean; note: string },
+    next: { conceptUnfamiliar: boolean; note: string; resetMastery?: boolean },
   ) => {
     const previous = learningStates.get(questionKey);
     const optimistic: QuestionLearningState = {
       questionKey,
       conceptUnfamiliar: next.conceptUnfamiliar,
       note: next.note,
+      masteryStreak: next.resetMastery ? 0 : previous?.masteryStreak ?? 0,
+      masteredAt: next.resetMastery ? null : previous?.masteredAt ?? null,
+      lastPracticedAt: previous?.lastPracticedAt ?? null,
       updatedAt: new Date().toISOString(),
     };
     setLearningStates((current) => {
@@ -367,6 +370,9 @@ export default function AttemptDetailPage() {
                   questionKey: item.questionKey,
                   conceptUnfamiliar: false,
                   note: "",
+                  masteryStreak: 0,
+                  masteredAt: null,
+                  lastPracticedAt: null,
                   updatedAt: null,
                 };
                 return (
@@ -415,7 +421,11 @@ function QuestionReviewCard({
   item: ExamAttemptQuestionItem;
   purchased: boolean;
   learning: QuestionLearningState;
-  onSaveLearning: (next: { conceptUnfamiliar: boolean; note: string }) => Promise<void>;
+  onSaveLearning: (next: {
+    conceptUnfamiliar: boolean;
+    note: string;
+    resetMastery?: boolean;
+  }) => Promise<void>;
 }) {
   const [showOfficial, setShowOfficial] = useState(false);
   const [note, setNote] = useState(learning.note);
@@ -466,6 +476,7 @@ function QuestionReviewCard({
       await onSaveLearning({
         conceptUnfamiliar: !learning.conceptUnfamiliar,
         note,
+        resetMastery: true,
       });
       setSavedLabel("已儲存");
     } catch {
@@ -497,6 +508,11 @@ function QuestionReviewCard({
         {!item.answered && <StatusBadge tone="gray">未作答</StatusBadge>}
         {item.uncertain && <StatusBadge tone="yellow">不確定</StatusBadge>}
         {learning.conceptUnfamiliar && <StatusBadge tone="purple">觀念不熟</StatusBadge>}
+        {learning.conceptUnfamiliar && (
+          <span className="rounded-full bg-[#f7f4ff] px-3 py-1 text-xs font-black text-[#806db1]">
+            連續答對 {learning.masteryStreak} / 3
+          </span>
+        )}
       </div>
 
       <div className="ms-question-stem mt-4">{item.stem}</div>

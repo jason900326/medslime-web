@@ -124,6 +124,23 @@ function markProAnalysisStale() {
   }
 }
 
+async function applyMasteryOutcomes(
+  supabase: ReturnType<typeof createClient>,
+  outcomes: ExamQuestionOutcome[],
+) {
+  if (outcomes.length === 0) return;
+  try {
+    const { error } = await supabase.rpc("apply_question_mastery_outcomes", {
+      p_outcomes: outcomes,
+    });
+    if (error && !/apply_question_mastery_outcomes|schema cache|does not exist/i.test(error.message)) {
+      console.warn("更新觀念掌握進度失敗：", error);
+    }
+  } catch (error) {
+    console.warn("更新觀念掌握進度失敗：", error);
+  }
+}
+
 function finiteIndex(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -397,6 +414,7 @@ export async function saveNationalExamAttempt(
     throw new Error("作答紀錄儲存失敗，請稍後再試。");
   }
 
+  await applyMasteryOutcomes(supabase, input.questionOutcomes);
   markProAnalysisStale();
   const row = result.data as { id?: string } | null;
   return typeof row?.id === "string" ? row.id : null;
