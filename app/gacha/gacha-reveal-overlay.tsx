@@ -229,7 +229,6 @@ function LoadingStage() {
         <Sparkles className="relative text-[#31c978]" size={40} strokeWidth={1.7} />
       </div>
       <div className="mt-6 text-xl font-black text-[#17372a]">史萊姆生成中...</div>
-      <div className="mt-2 text-sm font-bold text-[#789083]">正在決定這次會遇見誰</div>
     </div>
   );
 }
@@ -267,23 +266,6 @@ function SingleReveal({
             />
           </button>
         </div>
-      </div>
-
-      <div className="mt-4 min-h-10 sm:mt-5">
-        {revealed ? (
-          <div className="text-sm font-black text-[#4a6a59]">已加入這次抽卡結果</div>
-        ) : (
-          <>
-            <div className={`text-sm font-black ${theme.text}`}>
-              {slime.rarity === "SSR"
-                ? "這張卡的氣息不太一樣..."
-                : slime.rarity === "SR"
-                  ? "卡片周圍泛著強烈的光"
-                  : "點擊卡片翻開"}
-            </div>
-            <div className="mt-1 text-xs font-bold text-[#8aa095]">點一下看看是誰</div>
-          </>
-        )}
       </div>
     </div>
   );
@@ -366,28 +348,6 @@ function TenPullStack({
             <CardFront result={current} className="[transform:rotateY(180deg)]" />
           </span>
         </button>
-      </div>
-
-      <div className="mt-4 text-center sm:mt-6">
-        {revealed ? (
-          <>
-            <div className={`text-sm font-black ${theme.text}`}>
-              {slime.rarity === "SSR"
-                ? `SSR · ${slime.defaultName}`
-                : `${slime.rarity} · ${slime.defaultName}`}
-            </div>
-            <div className="mt-1 text-xs font-bold text-[#84988d]">
-              {currentIndex === results.length - 1
-                ? "再點卡片查看十連結果"
-                : "再點一下卡片，看下一張"}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className={`text-sm font-black ${theme.text}`}>點擊卡片翻開</div>
-            <div className="mt-1 text-xs font-bold text-[#84988d]">不用滑動，點一下就會揭曉</div>
-          </>
-        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4">

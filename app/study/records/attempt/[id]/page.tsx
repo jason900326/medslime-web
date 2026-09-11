@@ -234,7 +234,6 @@ export default function AttemptDetailPage() {
   const unfamiliarCount = questions.filter(
     (item) => learningStates.get(item.questionKey)?.conceptUnfamiliar,
   ).length;
-  const unansweredCount = questions.filter((item) => !item.answered).length;
 
   const visibleQuestions = questions.filter((item) => {
     if (filter === "wrong") return item.correct === false;
@@ -289,9 +288,7 @@ export default function AttemptDetailPage() {
                   )}
                 </div>
                 <div className="mt-1 text-xs font-bold leading-5 text-[#789083]">
-                  {purchased
-                    ? "整份考卷每一題都可以按需查看解析；只有你真的展開某題時才會載入，不會一次生成 80 題。"
-                    : "先看完整作答與正解；需要理解哪一題，再展開那題解析。NT$59 是整份考卷一次解鎖，不是逐題購買。"}
+                  解鎖後可查看本卷全部題目解析
                 </div>
               </div>
               {!purchased && (
@@ -307,14 +304,12 @@ export default function AttemptDetailPage() {
         )}
 
         <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">QUESTION MAP</div>
-              <div className="mt-1 text-sm font-black text-[#315b45]">點史萊姆直接跳到該題</div>
-            </div>
-            <div className="text-xs font-bold text-[#789083]">
-              {wrongCount} 錯 · {uncertainCount} 不確定 · {unfamiliarCount} 觀念不熟 · {unansweredCount} 未作答
-            </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-[#789083]">
+            <Legend className="bg-[#eaf9f0] border-[#9ed9b5]" label="答對" />
+            <Legend className="bg-[#fff1f1] border-[#e6a2a2]" label="答錯" />
+            <Legend className="bg-[#fff8df] border-[#e7d083]" label="不確定" />
+            <Legend className="bg-[#f3f4f3] border-[#d8dfdb]" label="未作答" />
+            <Legend className="bg-[#f0ebff] border-[#cbbdf5]" label="觀念不熟" />
           </div>
 
           <QuestionSlimeMap
@@ -322,14 +317,6 @@ export default function AttemptDetailPage() {
             learningStates={learningStates}
             onJump={jumpToQuestion}
           />
-
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-[#789083]">
-            <Legend className="bg-[#eaf9f0] border-[#9ed9b5]" label="答對" />
-            <Legend className="bg-[#fff1f1] border-[#e6a2a2]" label="答錯" />
-            <Legend className="bg-[#fff8df] border-[#e7d083]" label="不確定" />
-            <Legend className="bg-[#f3f4f3] border-[#d8dfdb]" label="未作答" />
-            <Legend className="bg-[#f0ebff] border-[#cbbdf5]" label="觀念不熟" />
-          </div>
         </section>
 
         <section className="mt-6">
@@ -602,12 +589,7 @@ function QuestionReviewCard({
 
       <div className="mt-5 rounded-2xl border border-[#dfece4] bg-[#fbfefc] p-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-black text-[#315b45]">📝 我的筆記</div>
-            <div className="mt-1 text-xs font-bold text-[#8a9c92]">
-              綁定這一題；之後從自由測驗或其他複習入口看到它，筆記都會跟著出現。
-            </div>
-          </div>
+          <div className="text-sm font-black text-[#315b45]">📝 我的筆記</div>
           <div className="shrink-0 text-[11px] font-black text-[#789083]">
             {saving ? "儲存中…" : savedLabel}
           </div>

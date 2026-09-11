@@ -251,11 +251,6 @@ export default function AIExplanationButton({
             : idleLabel}
       </button>
 
-      {noticeMessage && (
-        <div className="mt-3 rounded-xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-bold leading-6 text-[#315b45]">
-          {noticeMessage}
-        </div>
-      )}
       {errorMessage && (
         <div className="mt-3 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
           {errorMessage}
