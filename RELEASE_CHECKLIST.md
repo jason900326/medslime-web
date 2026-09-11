@@ -10,6 +10,21 @@ Use this checklist before treating `main` as a release candidate, enabling produ
 - [ ] README, `supabase/README.md`, `supabase/SCHEMA_MAP.md`, and `docs/game-balance-v1.md` match the code that is being released.
 - [ ] No new code references retired slime fields: `fragments`, `accessoryUnlocked`, `accessoryEquipped`, `accessory`, `accessoryImage`.
 
+### CI baseline installed
+
+The repository now has `.github/workflows/ci.yml` as the minimum release CI layer.
+
+- [x] Runs automatically on pushes to `main`.
+- [x] Runs automatically on pull requests targeting `main`.
+- [x] Uses Node 22 and reproducible `npm ci` installation.
+- [x] Runs `npm run lint`.
+- [x] Runs `npm run typecheck` (`tsc --noEmit`).
+- [x] Runs `npm run build`.
+- [x] ECPay stage readiness validation is wired as a manual workflow-dispatch job and requires the `PAYMENT_SECRET` GitHub Actions secret before it can run.
+- [ ] Add Playwright end-to-end smoke tests as a later hardening layer; this is not part of the minimum CI release gate.
+
+Generated PDF.js assets copied into `public/` during `postinstall` are intentionally excluded from ESLint because they are third-party vendor files. Localized pre-existing lint debt remains warning-level only in explicitly scoped files; new lint errors elsewhere still fail CI.
+
 ## 2. Database / Supabase
 
 - [ ] Read `supabase/README.md` before running SQL.
