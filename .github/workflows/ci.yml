@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_payment_stage:
+        description: "Run ECPay stage readiness validation"
+        required: false
+        default: false
+        type: boolean
+      payment_base_url:
+        description: "Base URL for payment readiness validation"
+        required: false
+        default: "https://medslime.vercel.app"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Install, lint, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_ECPAY_ENABLED: "false"
+      NEXT_PUBLIC_SHOP_CHECKOUT_ENABLED: "false"
+      SHOP_CHECKOUT_ENABLED: "false"
+      OWNER_TEST_RESET_ENABLED: "false"
+      ECPAY_MODE: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  payment-stage-readiness:
+    name: ECPay stage readiness
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_payment_stage }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PAYMENT_SECRET: ${{ secrets.PAYMENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Require payment validation secret
+        shell: bash
+        run: |
+          if [ -z "$PAYMENT_SECRET" ]; then
+            echo "PAYMENT_SECRET repository secret is required for payment-stage validation."
+            exit 1
+          fi
+
+      - name: Validate payment stage
+        run: npm run validate:payment-stage -- --base-url="${{ inputs.payment_base_url }}"
