@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -7,6 +8,10 @@ import { cookies } from "next/headers";
  * it.
  */
 export async function createClient() {
+  // Auth depends on the incoming request cookie jar. Explicitly wait for a
+  // request so Next.js does not try to prerender authenticated API handlers at
+  // build time and then reject cookies() after prerendering has completed.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient(
