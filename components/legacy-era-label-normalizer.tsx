@@ -2,15 +2,22 @@
 
 import { useEffect } from "react";
 
+const DECORATIVE_ENGLISH_LABELS = new Set([
+  "TODAY'S STUDY",
+  "MY ROOM",
+  "WELCOME TO MEDSLIME",
+  "EXAM REVIEW",
+  "RESULT",
+  "OFFICIAL QUESTION",
+  "MEDSLIME PRO",
+  "30-DAY ACCESS",
+  "ONE-TIME PURCHASE",
+]);
+
 /*
- * New UI copy omits the redundant 「民國」 prefix. A few older records and
- * legacy screen fragments may still contain labels such as
- * 「民國 115 年・第 1 次」. Keep those historical values intact in storage,
- * but normalize their rendered label until every old record has been rewritten.
- *
- * This deliberately only touches text that STARTS with a ROC exam-year label,
- * so source question content that merely mentions a historical year in prose is
- * left alone.
+ * Keep historical stored labels intact while cleaning a few legacy UI fragments
+ * at render time. This component is intentionally conservative: it only touches
+ * exact decorative labels or text that starts with an old ROC-era prefix.
  */
 export default function LegacyEraLabelNormalizer() {
   useEffect(() => {
@@ -30,6 +37,34 @@ export default function LegacyEraLabelNormalizer() {
         "$1",
       );
       if (next !== current) node.nodeValue = next;
+
+      if (DECORATIVE_ENGLISH_LABELS.has((node.nodeValue ?? "").trim())) {
+        parent.hidden = true;
+      }
+
+      if ((node.nodeValue ?? "").includes("✓ 已永久解鎖")) {
+        const panel = parent.closest("section");
+        if (
+          panel instanceof HTMLElement &&
+          panel.textContent?.includes("這份考卷的解析權限") &&
+          panel.dataset.transientUnlockedProcessed !== "1"
+        ) {
+          panel.dataset.transientUnlockedProcessed = "1";
+          panel.style.display = "none";
+
+          const notice = document.createElement("div");
+          notice.setAttribute("role", "status");
+          notice.className =
+            "mt-5 rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-3 text-sm font-black leading-6 text-[#237849] shadow-[0_6px_18px_rgba(31,83,53,0.04)] transition-opacity duration-300";
+          notice.textContent = "✓ 本卷詳解已解鎖，可以直接查看需要的題目。";
+          panel.before(notice);
+
+          window.setTimeout(() => {
+            notice.style.opacity = "0";
+            window.setTimeout(() => notice.remove(), 320);
+          }, 4200);
+        }
+      }
     };
 
     const normalizeTree = (root: Node) => {
