@@ -10,6 +10,8 @@ type Props = {
   onJump: (questionKey: string) => void;
 };
 
+type SlimeStatus = "green" | "yellow" | "red" | "gray" | "purple";
+
 export default function QuestionSlimeMap({
   questions,
   learningStates,
@@ -45,6 +47,7 @@ export default function QuestionSlimeMap({
             const startNumber = first?.questionNumber ?? fallbackStart;
             const endNumber = last?.questionNumber ?? fallbackEnd;
             const active = selectedGroup === groupIndex;
+            const status = groupStatus(items, learningStates);
 
             return (
               <button
@@ -53,32 +56,33 @@ export default function QuestionSlimeMap({
                 onClick={() => setSelectedGroup(groupIndex)}
                 aria-pressed={active}
                 className={[
-                  "flex h-12 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-black transition",
+                  "flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 transition",
                   active
-                    ? "border-[#8fd8ad] bg-[#effaf3] text-[#237849] shadow-[0_4px_14px_rgba(49,201,120,0.10)]"
-                    : "border-[#dce5df] bg-white text-[#70877a] hover:bg-[#f7faf8]",
+                    ? "border-[#8fd9aa] bg-[#eefaf2]"
+                    : "border-[#e0e9e3] bg-white",
                 ].join(" ")}
+                title={`第 ${startNumber}–${endNumber} 題`}
               >
+                <SimpleSlime status={status} size="segment" active={active} />
                 <span
                   className={[
-                    "grid h-8 w-10 place-items-center rounded-full",
-                    active ? "bg-[#dff5e8]" : "bg-[#f0f5f2]",
+                    "text-[11px] font-black",
+                    active ? "text-[#237849]" : "text-[#789083]",
                   ].join(" ")}
                 >
-                  <DefaultSlimeIcon active={active} />
+                  {startNumber}–{endNumber}
                 </span>
-                <span>{startNumber}–{endNumber}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-10 gap-1 sm:gap-2">
+      <div className="mt-3 grid grid-cols-10 gap-1">
         {group.map((item, itemIndex) => {
           const absoluteIndex = selectedGroup * 10 + itemIndex;
           const learning = learningStates.get(item.questionKey);
-          const status = questionStatus(item, learning);
+          const visual = questionVisual(item, learning);
           const number = item.questionNumber ?? absoluteIndex + 1;
 
           return (
@@ -86,19 +90,12 @@ export default function QuestionSlimeMap({
               key={`${item.questionKey}-${absoluteIndex}`}
               type="button"
               onClick={() => onJump(item.questionKey)}
-              title={`第 ${number} 題 · ${status.label}`}
-              aria-label={`跳到第 ${number} 題，${status.label}`}
-              className="group flex min-w-0 flex-col items-center rounded-xl py-1 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#31c978] focus-visible:ring-offset-2"
+              title={`第 ${number} 題 · ${visual.label}`}
+              aria-label={`跳到第 ${number} 題，${visual.label}`}
+              className="flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#31c978] focus-visible:ring-offset-2"
             >
-              <span
-                className={[
-                  "grid aspect-[1.25/1] w-full max-w-[48px] place-items-center rounded-full border transition group-hover:shadow-sm",
-                  status.shellClassName,
-                ].join(" ")}
-              >
-                <DefaultSlimeIcon />
-              </span>
-              <span className={`mt-1 text-[10px] font-black leading-none sm:text-xs ${status.numberClassName}`}>
+              <SimpleSlime status={visual.status} size="question" active={false} />
+              <span className={`text-[10px] font-black leading-none ${visual.numberClassName}`}>
                 {number}
               </span>
             </button>
@@ -109,68 +106,124 @@ export default function QuestionSlimeMap({
   );
 }
 
-function DefaultSlimeIcon({ active = false }: { active?: boolean }) {
+function groupStatus(
+  items: ExamAttemptQuestionItem[],
+  learningStates: Map<string, QuestionLearningState>,
+): SlimeStatus {
+  const statuses = items.map(
+    (item) => questionVisual(item, learningStates.get(item.questionKey)).status,
+  );
+
+  if (statuses.some((status) => status === "purple")) return "purple";
+  if (statuses.some((status) => status === "red")) return "red";
+  if (statuses.some((status) => status === "yellow")) return "yellow";
+  if (statuses.length > 0 && statuses.every((status) => status === "green")) return "green";
+  return "gray";
+}
+
+function SimpleSlime({
+  status,
+  size,
+  active,
+}: {
+  status: SlimeStatus;
+  size: "segment" | "question";
+  active: boolean;
+}) {
+  const colors = {
+    green: { body: "#b9efd1", border: "#55b97b", face: "#315b45" },
+    yellow: { body: "#ffe8a3", border: "#e2b94f", face: "#6f5a1d" },
+    red: { body: "#ffc9cf", border: "#de7777", face: "#7c3d46" },
+    gray: { body: "#eef6f1", border: "#d6e5dc", face: "#759184" },
+    purple: { body: "#e7ddff", border: "#a992e8", face: "#6952a5" },
+  }[status];
+
+  const segment = size === "segment";
+  const width = segment ? 26 : 20;
+  const height = segment ? 19 : 15;
+
   return (
-    <svg
-      viewBox="0 0 64 48"
-      aria-hidden="true"
-      className="h-7 w-9 transition-transform duration-200 group-hover:scale-105"
+    <div
+      className="relative shrink-0 transition"
+      style={{
+        width,
+        height,
+        borderRadius: "48% 48% 42% 42% / 56% 56% 42% 42%",
+        background: colors.body,
+        border: `1.5px solid ${colors.border}`,
+        boxShadow: active ? "0 0 0 3px rgba(49,201,120,0.12)" : "none",
+      }}
     >
-      <path
-        d="M9 36c-3-2-4-6-3-10 2-8 9-14 18-16 2-5 5-8 8-8 3 1 4 4 4 8 10 1 18 7 21 15 2 5 0 9-4 12-8 5-35 5-44-1Z"
-        fill={active ? "#d9f2e3" : "#edf5f0"}
-        stroke={active ? "#7bcf9d" : "#b8d2c3"}
-        strokeWidth="2"
-        strokeLinejoin="round"
+      <span
+        className="absolute rounded-full"
+        style={{
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          left: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
+        }}
       />
-      <ellipse cx="25" cy="27" rx="2.3" ry="3" fill="#70877a" />
-      <ellipse cx="39" cy="27" rx="2.3" ry="3" fill="#70877a" />
-      <path
-        d="M27 34c3 2 7 2 10 0"
-        fill="none"
-        stroke="#70877a"
-        strokeWidth="2"
-        strokeLinecap="round"
+      <span
+        className="absolute rounded-full"
+        style={{
+          width: segment ? 2.5 : 2,
+          height: segment ? 3.5 : 3,
+          background: colors.face,
+          right: segment ? 7.5 : 5.5,
+          top: segment ? 6 : 4.5,
+        }}
       />
-    </svg>
+      <span
+        className="absolute rounded-b-full border-b"
+        style={{
+          width: segment ? 5.5 : 4.5,
+          height: segment ? 3 : 2.5,
+          borderColor: colors.face,
+          left: "50%",
+          bottom: segment ? 3.5 : 2.5,
+          transform: "translateX(-50%)",
+        }}
+      />
+    </div>
   );
 }
 
-function questionStatus(
+function questionVisual(
   item: ExamAttemptQuestionItem,
   learning?: QuestionLearningState,
-) {
+): { status: SlimeStatus; label: string; numberClassName: string } {
   if (learning?.conceptUnfamiliar) {
     return {
+      status: "purple",
       label: "觀念不熟",
-      shellClassName: "border-[#cbbdf5] bg-[#f3efff] shadow-[0_0_0_4px_rgba(203,189,245,0.16)]",
       numberClassName: "text-[#6952a5]",
     };
   }
   if (item.uncertain) {
     return {
+      status: "yellow",
       label: "不確定",
-      shellClassName: "border-[#e7d083] bg-[#fff8df] shadow-[0_0_0_4px_rgba(231,208,131,0.14)]",
       numberClassName: "text-[#80651e]",
     };
   }
   if (!item.answered) {
     return {
+      status: "gray",
       label: "未作答",
-      shellClassName: "border-[#d8dfdb] bg-[#f3f4f3] opacity-75",
       numberClassName: "text-[#789083]",
     };
   }
   if (item.correct === false) {
     return {
+      status: "red",
       label: "答錯",
-      shellClassName: "border-[#e6a2a2] bg-[#fff1f1] shadow-[0_0_0_4px_rgba(230,162,162,0.12)]",
       numberClassName: "text-[#9b5050]",
     };
   }
   return {
+    status: "green",
     label: "答對",
-    shellClassName: "border-[#9ed9b5] bg-[#eaf9f0] shadow-[0_0_0_4px_rgba(158,217,181,0.14)]",
     numberClassName: "text-[#237849]",
   };
 }
