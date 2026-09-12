@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
 import {
   formatAttemptDate,
@@ -40,6 +41,17 @@ export default function AttemptCard({
   });
   const sameExamPrevious = previous?.examKey === attempt.examKey ? previous : null;
   const delta = sameExamPrevious ? attempt.score - sameExamPrevious.score : null;
+  const [showUnlockedNotice, setShowUnlockedNotice] = useState(explanationUnlocked);
+
+  useEffect(() => {
+    if (!explanationUnlocked) {
+      setShowUnlockedNotice(false);
+      return;
+    }
+    setShowUnlockedNotice(true);
+    const timer = window.setTimeout(() => setShowUnlockedNotice(false), 4200);
+    return () => window.clearTimeout(timer);
+  }, [attempt.examKey, explanationUnlocked]);
 
   return (
     <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
@@ -106,20 +118,27 @@ export default function AttemptCard({
         </Link>
       </div>
 
-      {!freeQuiz && (
+      {!freeQuiz && !explanationUnlocked && (
         <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-[#f8fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs font-bold leading-5 text-[#789083]">
-            {explanationUnlocked
-              ? "這份考卷的詳解權限已永久解鎖。"
-              : "整份考卷詳解權限：進入作答紀錄後，只在需要的題目上展開解析。"}
+            整份考卷詳解：進入作答紀錄後，只在需要的題目上展開解析。
           </div>
           <ExamExplanationPurchaseButton
             year={attempt.year}
             session={attempt.session}
             subject={attempt.subject}
             compact
-            knownPurchased={explanationUnlocked}
+            knownPurchased={false}
           />
+        </div>
+      )}
+
+      {!freeQuiz && explanationUnlocked && showUnlockedNotice && (
+        <div
+          role="status"
+          className="mt-4 rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-3 text-xs font-black leading-5 text-[#237849]"
+        >
+          ✓ 本卷詳解已解鎖，可以直接查看需要的題目。
         </div>
       )}
     </article>
