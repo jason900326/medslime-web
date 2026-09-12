@@ -29,6 +29,9 @@ export default function ExamExplanationPurchaseButton({
       ? knownPurchased
       : getCachedExamExplanationAccess(examKey),
   );
+  const [showPurchasedNotice, setShowPurchasedNotice] = useState(
+    knownPurchased === true,
+  );
   const baseClass = compact
     ? "rounded-xl px-4 py-2.5 text-sm font-black"
     : "w-full rounded-xl px-4 py-3 text-sm font-black";
@@ -59,12 +62,25 @@ export default function ExamExplanationPurchaseButton({
     };
   }, [examKey, knownPurchased]);
 
+  useEffect(() => {
+    if (!purchased) {
+      setShowPurchasedNotice(false);
+      return;
+    }
+
+    setShowPurchasedNotice(true);
+    const timer = window.setTimeout(() => setShowPurchasedNotice(false), 4200);
+    return () => window.clearTimeout(timer);
+  }, [examKey, purchased]);
+
   if (purchased) {
+    if (!showPurchasedNotice) return null;
     return (
       <span
+        role="status"
         className={`${baseClass} inline-flex cursor-default items-center justify-center border border-[#bfe1cb] bg-[#eaf9f0] text-[#237849]`}
       >
-        ✓ 詳解權限已解鎖
+        ✓ 本卷詳解已解鎖
       </span>
     );
   }
