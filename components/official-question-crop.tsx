@@ -219,10 +219,48 @@ function canvasToDataUrl(
   return output.toDataURL("image/png", 0.94);
 }
 
+async function findPreRenderedImage(
+  pdfUrl: string,
+  questionNumber: number,
+) {
+  try {
+    const params = new URLSearchParams({
+      pdfUrl,
+      questionNumber: String(questionNumber),
+    });
+    const response = await fetch(
+      `/api/official-question-image?${params.toString()}`,
+      { cache: "no-store" },
+    );
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as {
+      imageUrl?: unknown;
+    };
+    return typeof payload.imageUrl === "string" && payload.imageUrl.trim()
+      ? payload.imageUrl.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 async function renderQuestionCrops(
   pdfUrl: string,
   questionNumber: number,
 ) {
+  // Static pre-rendered crops are the primary path. They are generated once by
+  // the GitHub Action with MuPDF, so phones no longer need to decode every odd
+  // embedded image format in MOEX PDFs. PDF.js remains only as a fallback.
+  const preRenderedImage = await findPreRenderedImage(
+    pdfUrl,
+    questionNumber,
+  );
+  if (preRenderedImage) {
+    return [preRenderedImage];
+  }
+
   const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
 
   const response = await fetch(proxyUrl, {
