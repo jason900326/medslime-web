@@ -214,7 +214,7 @@ export default function ProAnalysisPanel() {
       <section className="mt-5 rounded-[24px] border border-[#f0dddd] bg-[#fff8f8] p-5">
         <div className="text-sm font-black text-[#9b5050]">Pro 分析暫時讀取失敗</div>
         <div className="mt-2 text-sm font-bold leading-6 text-[#8a6868]">
-          {state.message}
+          請稍後再試一次。
         </div>
       </section>
     );
@@ -288,26 +288,15 @@ export default function ProAnalysisPanel() {
 
         <Disclosure
           title="弱主題與細分弱點"
-          subtitle="依每一題實際作答結果 × 題庫主題分類統計"
-          badge={
-            data.topicCoverage.mappedAnsweredCount > 0
-              ? `${data.topicCoverage.mappedAnsweredCount} 題樣本`
-              : "累積中"
-          }
           open={topicsOpen}
           onToggle={() => setTopicsOpen((current) => !current)}
         >
           {!data.topicAnalyticsAvailable || data.topicCoverage.mappedAnsweredCount === 0 ? (
             <div className="rounded-xl bg-[#f7faf8] px-3 py-3 text-xs font-bold leading-5 text-[#789083]">
-              {data.topicAnalyticsMessage ??
-                "完成新版國考或自由測驗後，這裡會開始累積逐題主題表現。"}
+              再完成幾次國考或自由測驗後，這裡會開始整理你的弱主題。
             </div>
           ) : (
             <div className="space-y-5">
-              <div className="rounded-xl bg-[#f3fbf6] px-3 py-3 text-xs font-bold leading-5 text-[#668276]">
-                最近 {data.topicCoverage.attemptsWithOutcomes} 次有逐題資料的作答中，已把 {data.topicCoverage.mappedAnsweredCount} / {data.topicCoverage.answeredOutcomeCount} 題有效作答對應到已確認主題分類（{data.topicCoverage.coverageRate.toFixed(1)}%）。
-              </div>
-
               <div>
                 <div className="mb-2 text-xs font-black text-[#315b45]">優先補強主題</div>
                 <div className="space-y-2">
@@ -327,10 +316,6 @@ export default function ProAnalysisPanel() {
                   </div>
                 </div>
               )}
-
-              <div className="text-[11px] font-bold leading-5 text-[#8a9c92]">
-                排序會同時考慮錯誤率、作答樣本量與「不確定」標記；樣本很少的主題不會直接被當成最弱主題。
-              </div>
             </div>
           )}
         </Disclosure>
@@ -374,7 +359,7 @@ export default function ProAnalysisPanel() {
 
           <Disclosure
             title="今日複習優先清單"
-            subtitle="依弱主題、弱科、不確定標記與未複習錯題排序"
+            subtitle="今天最值得先回頭看的題目"
             badge={`${data.reviewPriorities.length} 題`}
             open={priorityOpen}
             onToggle={() => setPriorityOpen((current) => !current)}
@@ -507,7 +492,6 @@ function TopicStatRow({ stat, showSubtopic = false }: { stat: TopicStat; showSub
             {stat.delta.toFixed(1)}%
           </span>
         )}
-        {stat.answeredCount < 5 && <span>樣本仍少</span>}
       </div>
     </div>
   );
