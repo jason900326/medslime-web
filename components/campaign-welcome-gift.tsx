@@ -30,7 +30,7 @@ export default function CampaignWelcomeGift() {
     game.hasSeenOnboarding;
 
   useEffect(() => {
-    if (!canCheck || dismissed || state.status !== "idle") return;
+    if (!canCheck || dismissed) return;
 
     const controller = new AbortController();
     setState({ status: "loading" });
@@ -60,7 +60,7 @@ export default function CampaignWelcomeGift() {
     })();
 
     return () => controller.abort();
-  }, [canCheck, dismissed, state.status]);
+  }, [auth.userId, canCheck, dismissed]);
 
   const claim = async () => {
     if (claiming) return;
