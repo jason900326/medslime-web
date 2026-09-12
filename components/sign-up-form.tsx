@@ -83,7 +83,7 @@ export function SignUpForm() {
       </h1>
 
       <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        建立帳號後，史萊姆收藏、學習紀錄與任務進度都會跟著你保存。
+        建立帳號即可免費使用 MedSlime Pro 14 天，不綁信用卡。
       </p>
 
       <button
@@ -141,7 +141,7 @@ export function SignUpForm() {
           disabled={isLoading || googleLoading}
           className="w-full rounded-2xl bg-[#31c978] px-5 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? "建立帳號中..." : "建立帳號"}
+          {isLoading ? "建立帳號中..." : "建立帳號 · 免費試用 14 天"}
         </button>
       </form>
 
