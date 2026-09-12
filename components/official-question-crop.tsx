@@ -239,30 +239,44 @@ async function renderQuestionCrops(
 
   const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
 
-  // 使用 PDF.js 4.10.38：這是 OpenJPEG decoder 外部化成獨立 WASM
-  // 之前的穩定版本。worker 仍交給 Next.js bundler，避免固定 public URL
-  // 在 Vercel 觸發 fake-worker import 問題。
+  // worker 交給 Next.js bundler，避免固定 public URL 在 Vercel
+  // 觸發 fake-worker import 問題。
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url,
   ).toString();
 
   const pdfjsAssetBase = `${window.location.origin}/pdfjs`;
+  const pdfjsMajor = Number.parseInt(
+    String((pdfjs as { version?: string }).version ?? "5").split(".")[0],
+    10,
+  );
 
-  const loadingTask = pdfjs.getDocument({
+  const documentOptions: Record<string, unknown> = {
     data: pdfBytes,
     isEvalSupported: false,
 
-    // 不再傳 PDF.js v5 的 wasmUrl/useWasm/iccUrl 組態。
-    // 4.10.38 的 JPEG2000 解碼器隨 build 提供，避免載入 repo 中
-    // 與 v5 綁定的 OpenJPEG WASM，正面避開目前的 JPX 白圖 regression。
+    // 考選部部分 PDF 內嵌圖片是 JPEG2000 / JPX。
+    // 關閉瀏覽器原生 ImageDecoder，避免 Safari / Chromium 對特定 JPX
+    // 解碼成功但畫面仍是白圖的情況。
     isImageDecoderSupported: false,
 
     cMapUrl: `${pdfjsAssetBase}/cmaps/`,
     cMapPacked: true,
     standardFontDataUrl: `${pdfjsAssetBase}/standard_fonts/`,
-  });
+  };
 
+  // 目前正式環境實際安裝的是 PDF.js v5。v5 把 JPEG2000 decoder
+  // 外部化成 OpenJPEG WASM；若沒有明確提供 wasmUrl，頁面文字仍會 render，
+  // 但像 115-2 臨床生理學及病理學 Q26 這種肺活量圖會整塊空白。
+  // 若未來真的降回 v4，則不要傳 v5-only 選項，避免再次產生版本錯配。
+  if (Number.isFinite(pdfjsMajor) && pdfjsMajor >= 5) {
+    documentOptions.wasmUrl = `${pdfjsAssetBase}/wasm/`;
+    documentOptions.useWasm = true;
+    documentOptions.iccUrl = `${pdfjsAssetBase}/iccs/`;
+  }
+
+  const loadingTask = pdfjs.getDocument(documentOptions as any);
   const pdf = await loadingTask.promise;
 
   try {
