@@ -22,10 +22,11 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     price: 149,
     priceSuffix: "/ 30 天",
     itemName: "MedSlime Pro 30 天方案",
-    note: "適合國考備考期間持續刷題、追蹤成績與安排複習",
+    note: "適合國考備考期間持續刷題、看詳解、追蹤成績與安排複習",
     description:
-      "一次付款開通 30 天進階學習分析。系統會依你的歷史作答、逐題結果與錯題紀錄整理趨勢，幫你看出弱科、弱主題與複習優先順序。",
+      "一次付款開通 30 天 MedSlime Pro。期間內 AI 題目詳解不限次數，並解鎖進階學習分析，系統會依你的歷史作答、逐題結果與錯題紀錄整理趨勢，幫你看出弱科、弱主題與複習優先順序。",
     features: [
+      "30 天內 AI 題目詳解不限次數",
       "跨考卷科目成績與弱科排序",
       "依逐題作答統計 Topic / Subtopic 弱點",
       "最近作答成績與主題改善趨勢",
@@ -43,7 +44,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     price: 59,
     priceSuffix: "/ 份",
     itemName: "MedSlime 單份國考完整詳解",
-    note: "只想完整檢討指定一份考卷時使用",
+    note: "不想開通 Pro，只想完整檢討指定一份考卷時使用",
     description:
       "單次購買指定國考考卷的完整數位詳解，購買後永久保留該份考卷的完整詳解存取權。",
     features: [
