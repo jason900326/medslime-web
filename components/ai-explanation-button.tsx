@@ -46,7 +46,7 @@ type ExplanationResult = {
 type GenerateResponse = {
   cached: boolean;
   explanation?: ExplanationResult;
-  accessSource?: "exam_entitlement" | "daily_limit";
+  accessSource?: "exam_entitlement" | "pro" | "daily_limit";
   aiDetailRemaining?: number | null;
   code?: string;
   error?: string;
@@ -55,17 +55,19 @@ type GenerateResponse = {
 type AvailabilityResponse = {
   available?: boolean;
   purchasedExamAccess?: boolean;
+  proAccess?: boolean;
   error?: string;
 };
 
 type EntitlementResponse = {
   aiDetailFreeRemaining?: number;
   aiDetailFreeDailyLimit?: number;
+  isPro?: boolean;
   error?: string;
 };
 
 type FeedbackValue = "helpful" | "not_helpful";
-type DailyUsage = { remaining: number; limit: number };
+type DailyUsage = { remaining: number; limit: number; isPro: boolean };
 
 export default function AIExplanationButton({
   payload,
@@ -105,6 +107,7 @@ export default function AIExplanationButton({
     const next = {
       remaining: Math.max(0, Number(data.aiDetailFreeRemaining ?? 0)),
       limit: Math.max(0, Number(data.aiDetailFreeDailyLimit ?? 5)),
+      isPro: Boolean(data.isPro),
     };
     setUsage(next);
     return next;
@@ -160,6 +163,8 @@ export default function AIExplanationButton({
         if (!directPurchasedAccess) {
           setNoticeMessage("這份來源考卷已解鎖，本題不計入每日 5 次使用上限。");
         }
+      } else if (data.accessSource === "pro") {
+        setNoticeMessage("MedSlime Pro 已啟用，AI 詳解不限次數。");
       } else {
         const current = await loadUsage();
         setNoticeMessage(`今日完整解析還可使用 ${current.remaining} / ${current.limit} 次。`);
@@ -196,6 +201,11 @@ export default function AIExplanationButton({
         return;
       }
       const current = await loadUsage();
+      if (current.isPro) {
+        setDetailLoading(false);
+        await generateDetailedExplanation();
+        return;
+      }
       if (current.remaining <= 0) {
         setShowDailyLimitReached(true);
         return;
@@ -254,6 +264,12 @@ export default function AIExplanationButton({
       {errorMessage && (
         <div className="mt-3 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">
           {errorMessage}
+        </div>
+      )}
+
+      {noticeMessage && (
+        <div className="mt-3 rounded-xl border border-[#d7e7de] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#315b45]">
+          {noticeMessage}
         </div>
       )}
 
@@ -339,7 +355,7 @@ export default function AIExplanationButton({
         </div>
       )}
 
-      {showConfirm && usage && (
+      {showConfirm && usage && !usage.isPro && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 px-5">
           <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
             <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">MEDSLIME DETAIL</div>
@@ -375,7 +391,7 @@ export default function AIExplanationButton({
           <div className="w-full max-w-md rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
             <div className="text-2xl font-black text-[#17372a]">今天的免費解析次數已用完</div>
             <p className="mt-3 text-sm font-bold leading-7 text-[#70877a]">
-              免費額度每天重新計算且不累積。若這題屬於你已購買的國考詳解，重新整理後仍會依購買權限開放。
+              免費額度每天重新計算且不累積。MedSlime Pro 期間 AI 詳解不限次數；若這題屬於你已購買的國考詳解，也會依購買權限開放。
             </p>
             <button
               type="button"
