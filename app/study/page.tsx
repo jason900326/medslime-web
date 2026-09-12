@@ -23,17 +23,17 @@ export default function StudyPage() {
           </p>
         </section>
 
-        <section className="mt-6 grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        <section className="mt-6 grid grid-cols-2 gap-3 md:gap-4">
           {studyItems.map((item) => (
             <Link
               key={item.title}
               href={item.href}
-              className="group flex min-h-[118px] flex-col items-center justify-center rounded-[20px] border border-[#dceae2] bg-white px-2.5 py-4 text-center shadow-[0_8px_22px_rgba(30,78,50,0.045)] transition hover:-translate-y-0.5 hover:border-[#bfe1cb] hover:shadow-[0_12px_28px_rgba(30,78,50,0.07)] active:scale-[0.98] sm:min-h-[132px] sm:rounded-[22px] sm:px-4"
+              className="group flex min-h-[126px] flex-col items-center justify-center rounded-[20px] border border-[#dceae2] bg-white px-3 py-4 text-center shadow-[0_8px_22px_rgba(30,78,50,0.045)] transition hover:-translate-y-0.5 hover:border-[#bfe1cb] hover:shadow-[0_12px_28px_rgba(30,78,50,0.07)] active:scale-[0.98] sm:min-h-[138px] sm:rounded-[22px] sm:px-4"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-2xl sm:h-12 sm:w-12">
                 {item.icon}
               </div>
-              <div className="mt-3 text-[13px] font-black leading-tight sm:text-base">
+              <div className="mt-3 text-sm font-black leading-tight sm:text-base">
                 {item.title}
               </div>
             </Link>
