@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isSignupTrialCampaignOpen } from "@/lib/campaign";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const campaignActive = isSignupTrialCampaignOpen();
 
   const handleGoogleSignUp = async () => {
     setGoogleLoading(true);
@@ -74,16 +76,14 @@ export function SignUpForm() {
 
   return (
     <div className="w-full max-w-md rounded-[30px] border border-[#dce9e1] bg-white p-7 text-[#17372a] shadow-[0_18px_44px_rgba(40,106,69,0.08)] md:p-8">
-      <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-        CREATE ACCOUNT
-      </div>
-
-      <h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">
+      <h1 className="text-3xl font-black tracking-[-0.04em]">
         建立 MedSlime 帳號
       </h1>
 
       <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        建立帳號即可免費使用 MedSlime Pro 14 天，不綁信用卡。
+        {campaignActive
+          ? "9/12–9/25 活動期間註冊，可免費使用 MedSlime Pro 14 天，不綁信用卡，另外送 10 張抽卡券。"
+          : "建立帳號後，史萊姆收藏、學習紀錄與任務進度都會跟著你保存。"}
       </p>
 
       <button
@@ -141,7 +141,11 @@ export function SignUpForm() {
           disabled={isLoading || googleLoading}
           className="w-full rounded-2xl bg-[#31c978] px-5 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? "建立帳號中..." : "建立帳號 · 免費試用 14 天"}
+          {isLoading
+            ? "建立帳號中..."
+            : campaignActive
+              ? "建立帳號 · 免費試用 14 天"
+              : "建立帳號"}
         </button>
       </form>
 

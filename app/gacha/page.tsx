@@ -24,6 +24,7 @@ export default function GachaPage() {
   const [pulling, setPulling] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [pullCount, setPullCount] = useState<1 | 10>(1);
+  const [showGestureHint, setShowGestureHint] = useState(false);
   const [ownerResetChecking, setOwnerResetChecking] = useState(false);
   const [ownerResetError, setOwnerResetError] = useState("");
 
@@ -106,6 +107,7 @@ export default function GachaPage() {
 
     if (payment === "tickets" && !game.spendTickets(count)) return;
 
+    setShowGestureHint(game.totalPulls === 0);
     setPullCount(count);
     setResults([]);
     setPulling(true);
@@ -138,6 +140,7 @@ export default function GachaPage() {
     if (pulling) return;
     setOverlayOpen(false);
     setResults([]);
+    setShowGestureHint(false);
   };
 
   return (
@@ -156,11 +159,7 @@ export default function GachaPage() {
         )}
 
         <section className="mt-6 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.06)] md:p-7">
-          <div className="text-xs font-black tracking-[0.1em] text-[#c58a2d]">
-            GACHA
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <h1 className="text-2xl font-black tracking-[-0.04em] sm:text-3xl md:text-4xl">
               抽一隻新的史萊姆。
             </h1>
@@ -215,6 +214,7 @@ export default function GachaPage() {
         loading={pulling}
         results={results}
         pullCount={pullCount}
+        showGestureHint={showGestureHint}
         onClose={closeOverlay}
       />
     </main>

@@ -4,6 +4,7 @@ import "./globals.css";
 import { GameStateProvider } from "@/components/game-state-provider";
 import ScrollJumpButtons from "@/components/scroll-jump-buttons";
 import FirstLoginOnboarding from "@/components/first-login-onboarding";
+import CampaignWelcomeGift from "@/components/campaign-welcome-gift";
 import RouteUtilities from "@/components/route-utilities";
 import SiteFooter from "@/components/site-footer";
 import LegacyEraLabelNormalizer from "@/components/legacy-era-label-normalizer";
@@ -26,6 +27,7 @@ export default function RootLayout({
             {children}
             <SiteFooter />
             <FirstLoginOnboarding />
+            <CampaignWelcomeGift />
             <ScrollJumpButtons />
             <RouteUtilities />
             <LegacyEraLabelNormalizer />
