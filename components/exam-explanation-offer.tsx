@@ -23,6 +23,7 @@ export default function ExamExplanationOffer({
   reviewCount: number;
 }) {
   const [access, setAccess] = useState<AccessState>({ status: "loading" });
+  const [showPurchasedNotice, setShowPurchasedNotice] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,36 +56,42 @@ export default function ExamExplanationOffer({
 
   const purchased = access.status === "ready" && access.purchased;
 
+  useEffect(() => {
+    if (!purchased) {
+      setShowPurchasedNotice(false);
+      return;
+    }
+    setShowPurchasedNotice(true);
+    const timer = window.setTimeout(() => setShowPurchasedNotice(false), 4200);
+    return () => window.clearTimeout(timer);
+  }, [purchased, year, session, subject]);
+
+  if (purchased) {
+    if (!showPurchasedNotice) return null;
+    return (
+      <div
+        role="status"
+        className="mx-auto mt-5 max-w-3xl rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-3 text-sm font-black leading-6 text-[#237849] shadow-[0_6px_18px_rgba(31,83,53,0.04)]"
+      >
+        ✓ 本卷詳解已解鎖，需要哪一題就直接展開查看。
+      </div>
+    );
+  }
+
   return (
     <section className="mx-auto mt-7 max-w-3xl rounded-[24px] border border-[#bfe1cb] bg-gradient-to-br from-[#f1fbf5] via-white to-[#fff9ec] p-5 text-left shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">EXAM EXPLANATION ACCESS</div>
-          <h2 className="mt-1 text-xl font-black text-[#17372a]">
-            {purchased ? "這份考卷的詳解權限已解鎖" : "解鎖這份考卷的詳解權限"}
-          </h2>
+          <h2 className="text-xl font-black text-[#17372a]">解鎖這份考卷的詳解</h2>
         </div>
 
         <div className="shrink-0 text-right">
-          {purchased ? (
-            <>
-              <div className="rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">已解鎖</div>
-              <div className="mt-2 text-xs font-black text-[#789083]">永久存取</div>
-            </>
-          ) : (
-            <>
-              <div className="text-3xl font-black tracking-[-0.04em] text-[#17372a]">NT$59</div>
-              <div className="text-xs font-black text-[#789083]">一次解鎖整份考卷</div>
-            </>
-          )}
+          <div className="text-3xl font-black tracking-[-0.04em] text-[#17372a]">NT$59</div>
+          <div className="text-xs font-black text-[#789083]">一次解鎖整份考卷</div>
         </div>
       </div>
 
-      {purchased ? (
-        <div className="mt-4 rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-4 text-sm font-black leading-6 text-[#315b45]">
-          ✓ 這份考卷的詳解權限已永久開放。建議先看這次的錯題，需要哪題再展開哪題；不會因為購買就一次產生全部題目的解析。
-        </div>
-      ) : access.status === "loading" ? (
+      {access.status === "loading" ? (
         <div className="mt-4 rounded-xl border border-[#e4e9e6] bg-[#f7faf8] px-4 py-3 text-center text-sm font-black text-[#91a298]">
           正在確認詳解權限…
         </div>
@@ -115,9 +122,7 @@ export default function ExamExplanationOffer({
       )}
 
       <p className="mt-4 text-sm font-bold leading-6 text-[#70877a]">
-        {purchased
-          ? `你這次有 ${reviewCount} 題需要優先檢討。回到作答紀錄後，每一題都可以按需要展開詳解。`
-          : `這次有 ${reviewCount} 題需要優先檢討。購買的是整份考卷的詳解權限，不是逐題購買；之後只在你真正需要的錯題上載入解析。`}
+        這次有 {reviewCount} 題需要優先檢討。購買的是整份考卷的詳解權限，不是逐題購買；之後只在你真正需要的錯題上載入解析。
       </p>
 
       <div className="mt-3 rounded-2xl border border-[#dce9e1] bg-white/80 px-4 py-3 text-xs font-bold leading-5 text-[#668276]">
