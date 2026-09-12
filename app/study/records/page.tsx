@@ -128,25 +128,48 @@ function RecordsContent() {
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar showBack backHref="/study" backLabel="返回學習" />
 
-        <section className="mt-6">
-          <h1 className="ms-page-title">學習紀錄</h1>
-          <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            看看最近讀得怎麼樣，下一步該補哪裡。
-          </p>
-        </section>
+        {tab === "pro" ? (
+          <section className="mt-6">
+            <Link
+              href="/study/records?tab=attempts"
+              className="text-sm font-black text-[#237849]"
+            >
+              ← 回到作答紀錄
+            </Link>
+            <h1 className="ms-page-title mt-4">Pro 學習分析</h1>
+            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+              把作答紀錄整理成真正的弱點趨勢與複習順序。
+            </p>
+          </section>
+        ) : (
+          <section className="mt-6">
+            <h1 className="ms-page-title">學習紀錄</h1>
+            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+              看看最近讀得怎麼樣，下一步該補哪裡。
+            </p>
+          </section>
+        )}
 
         {loading ? (
           <LoadingCard />
+        ) : tab === "pro" ? (
+          <section id="pro-analysis" className="scroll-mt-4">
+            <ProAnalysisPanel />
+            <WeakTopicPracticeCard />
+          </section>
         ) : (
           <>
             <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <SummaryCard label="作答次數" value={`${attempts.length} 次`} />
               <SummaryCard label="待複習錯題" value={`${pendingMistakes.length} 題`} />
               <SummaryCard label="我的筆記" value={`${noteCount} 題`} />
-              <SummaryCard label="最近平均" value={recentAverage === "—" ? "—" : `${recentAverage} 分`} />
+              <SummaryCard
+                label="最近平均"
+                value={recentAverage === "—" ? "—" : `${recentAverage} 分`}
+              />
             </section>
 
-            <ProAnalysisCta active={tab === "pro"} attemptCount={attempts.length} />
+            <ProAnalysisCta attemptCount={attempts.length} />
 
             <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <RecordTab href="/study/records?tab=attempts" active={tab === "attempts"}>
@@ -228,13 +251,6 @@ function RecordsContent() {
                 attempts={attempts}
               />
             )}
-
-            {tab === "pro" && (
-              <section id="pro-analysis" className="mt-1 scroll-mt-4">
-                <ProAnalysisPanel />
-                <WeakTopicPracticeCard />
-              </section>
-            )}
           </>
         )}
       </div>
@@ -242,45 +258,26 @@ function RecordsContent() {
   );
 }
 
-function ProAnalysisCta({
-  active,
-  attemptCount,
-}: {
-  active: boolean;
-  attemptCount: number;
-}) {
+function ProAnalysisCta({ attemptCount }: { attemptCount: number }) {
   return (
     <Link
       href="/study/records?tab=pro#pro-analysis"
-      className={[
-        "group mt-5 block overflow-hidden rounded-[24px] border p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] transition hover:-translate-y-0.5 sm:p-6",
-        active
-          ? "border-[#65d795] bg-gradient-to-br from-[#e9f9ef] via-white to-[#fff8e8]"
-          : "border-[#cfe7d8] bg-gradient-to-br from-[#f1fbf5] via-white to-[#fffaf0] hover:border-[#9ed9b5]",
-      ].join(" ")}
+      className="group mt-5 block overflow-hidden rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#f1fbf5] via-white to-[#fffaf0] p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] transition hover:-translate-y-0.5 hover:border-[#9ed9b5] sm:p-6"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-black text-[#237849]">
-            <span aria-hidden="true">✨</span>
-            <span>Pro 學習分析</span>
-          </div>
-          <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-[#17372a] sm:text-2xl">
-            找出弱科、弱主題與複習優先順序
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
-            {attemptCount > 0
-              ? `你已累積 ${attemptCount} 次作答，讓 MedSlime 幫你把分散的紀錄整理成下一步。`
-              : "完成幾次國考或自由測驗後，這裡會開始整理你的學習弱點與趨勢。"}
-          </p>
-        </div>
-        <span className="shrink-0 rounded-full border border-[#cfe7d8] bg-white/85 px-3 py-1.5 text-xs font-black text-[#237849]">
-          {active ? "分析中" : "Pro"}
-        </span>
+      <div className="flex items-center gap-2 text-sm font-black text-[#237849]">
+        <span aria-hidden="true">✨</span>
+        <span>Pro 學習分析</span>
       </div>
-
+      <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-[#17372a] sm:text-2xl">
+        找出弱科、弱主題與複習優先順序
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
+        {attemptCount > 0
+          ? `你已累積 ${attemptCount} 次作答，讓 MedSlime 幫你把分散的紀錄整理成下一步。`
+          : "完成幾次國考或自由測驗後，這裡會開始整理你的學習弱點與趨勢。"}
+      </p>
       <div className="mt-4 text-sm font-black text-[#237849] group-hover:underline group-hover:decoration-[#9ed9b5] group-hover:underline-offset-4">
-        {active ? "繼續看分析 ↓" : "查看我的分析 →"}
+        查看我的分析 →
       </div>
     </Link>
   );
