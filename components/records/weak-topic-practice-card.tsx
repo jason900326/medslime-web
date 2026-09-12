@@ -101,7 +101,7 @@ export default function WeakTopicPracticeCard() {
         <div className="text-xs font-black text-[#2ba962]">下一步：針對弱點練習</div>
         <div className="mt-1 text-base font-black text-[#237849]">{label}</div>
         <div className="mt-1 text-xs font-bold leading-5 text-[#668276]">
-          {target.topic}{target.subtopic && target.subtopic !== "其他" ? ` · ${target.subtopic}` : ""} · 目前正確率 {target.accuracy.toFixed(1)}%（{target.answeredCount} 題樣本）
+          {target.topic}{target.subtopic && target.subtopic !== "其他" ? ` · ${target.subtopic}` : ""} · 目前正確率 {target.accuracy.toFixed(1)}% · 已作答 {target.answeredCount} 題
         </div>
       </div>
       <Link
