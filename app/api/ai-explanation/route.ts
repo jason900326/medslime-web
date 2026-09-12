@@ -57,6 +57,8 @@ type DailyUseResult =
   | { ok: false; remaining: 0 }
   | { ok: true; remaining: number };
 
+type ExplanationAccessSource = "exam_entitlement" | "pro" | "daily_limit";
+
 const stringArray = {
   type: "array",
   maxItems: 8,
@@ -216,6 +218,33 @@ async function hasPurchasedExamExplanation(input: {
   return Boolean(data);
 }
 
+async function hasActivePro(userId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("player_entitlements")
+    .select("pro_expires_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Pro 權限讀取失敗：${error.message}`);
+  }
+
+  const proExpiresAt = data?.pro_expires_at ?? null;
+  return Boolean(
+    proExpiresAt && new Date(proExpiresAt).getTime() > Date.now(),
+  );
+}
+
+function resolveAccessSource(input: {
+  purchasedExamAccess: boolean;
+  proAccess: boolean;
+}): ExplanationAccessSource {
+  if (input.purchasedExamAccess) return "exam_entitlement";
+  if (input.proAccess) return "pro";
+  return "daily_limit";
+}
+
 async function readCachedExplanation(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
@@ -361,14 +390,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "缺少 questionKey。" }, { status: 400 });
     }
 
-    const [cached, purchasedExamAccess] = await Promise.all([
+    const [cached, purchasedExamAccess, proAccess] = await Promise.all([
       readCachedExplanation({ supabase, userId: user.id, source, questionKey }),
       hasPurchasedExamExplanation({ userId: user.id, source, questionKey }),
+      hasActivePro(user.id),
     ]);
 
     return NextResponse.json({
       available: Boolean(cached),
       purchasedExamAccess,
+      proAccess,
       explanationVersion: EXPLANATION_VERSION,
     });
   } catch (error) {
@@ -415,14 +446,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const purchasedExamAccess = await hasPurchasedExamExplanation({
-      userId: user.id,
-      source,
-      questionKey,
-    });
+    const [purchasedExamAccess, proAccess] = await Promise.all([
+      hasPurchasedExamExplanation({
+        userId: user.id,
+        source,
+        questionKey,
+      }),
+      hasActivePro(user.id),
+    ]);
+    const accessSource = resolveAccessSource({ purchasedExamAccess, proAccess });
 
     let dailyRemaining: number | null = null;
-    if (!purchasedExamAccess) {
+    if (accessSource === "daily_limit") {
       const dailyUse = await consumeDailyDetailUse(user.id);
       if (!dailyUse.ok) {
         return NextResponse.json(
@@ -455,7 +490,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         cached: true,
         explanation: cached,
-        accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
+        accessSource,
         aiDetailRemaining: dailyRemaining,
         explanationVersion: EXPLANATION_VERSION,
       });
@@ -602,7 +637,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       cached: false,
       explanation,
-      accessSource: purchasedExamAccess ? "exam_entitlement" : "daily_limit",
+      accessSource,
       aiDetailRemaining: dailyRemaining,
       explanationVersion: EXPLANATION_VERSION,
     });
