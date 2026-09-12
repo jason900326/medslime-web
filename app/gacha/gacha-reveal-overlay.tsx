@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Sparkles, X } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
+import { Sparkles, X } from "lucide-react";
 import { SLIME_BY_ID, type SlimeRarity } from "@/lib/slime-data";
 
 type GachaResult = {
@@ -18,6 +25,7 @@ type Props = {
   loading: boolean;
   results: GachaResult[];
   pullCount: 1 | 10;
+  showGestureHint?: boolean;
   onClose: () => void;
 };
 
@@ -28,7 +36,6 @@ const RARITY_THEME: Record<
     border: string;
     badge: string;
     soft: string;
-    text: string;
   }
 > = {
   N: {
@@ -36,28 +43,24 @@ const RARITY_THEME: Record<
     border: "border-slate-300",
     badge: "bg-slate-100 text-slate-600",
     soft: "from-slate-50 via-white to-slate-100",
-    text: "text-slate-500",
   },
   R: {
     glow: "shadow-[0_0_58px_rgba(34,211,238,0.48)]",
     border: "border-cyan-300",
     badge: "bg-cyan-100 text-cyan-700",
     soft: "from-cyan-50 via-white to-sky-100",
-    text: "text-cyan-600",
   },
   SR: {
     glow: "shadow-[0_0_70px_rgba(168,85,247,0.58)]",
     border: "border-violet-400",
     badge: "bg-violet-100 text-violet-700",
     soft: "from-violet-100 via-white to-fuchsia-100",
-    text: "text-violet-600",
   },
   SSR: {
     glow: "shadow-[0_0_82px_rgba(251,191,36,0.68)]",
     border: "border-amber-400",
     badge: "bg-amber-100 text-amber-800",
     soft: "from-amber-100 via-white to-rose-100",
-    text: "text-amber-600",
   },
 };
 
@@ -66,6 +69,7 @@ export default function GachaRevealOverlay({
   loading,
   results,
   pullCount,
+  showGestureHint = false,
   onClose,
 }: Props) {
   const [singleRevealed, setSingleRevealed] = useState(false);
@@ -74,7 +78,7 @@ export default function GachaRevealOverlay({
   const [tenCardExiting, setTenCardExiting] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [interactionLocked, setInteractionLocked] = useState(false);
-  const lockTimer = useRef<number | null>(null);
+  const revealTimer = useRef<number | null>(null);
   const advanceTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -85,7 +89,7 @@ export default function GachaRevealOverlay({
     setTenCardExiting(false);
     setShowSummary(false);
     setInteractionLocked(false);
-    if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
     if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
   }, [open]);
 
@@ -98,12 +102,13 @@ export default function GachaRevealOverlay({
     };
   }, [open]);
 
-  useEffect(() => {
-    return () => {
-      if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+  useEffect(
+    () => () => {
+      if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
       if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
-    };
-  }, []);
+    },
+    [],
+  );
 
   const currentResult = results[currentIndex];
   const remaining = useMemo(
@@ -118,38 +123,28 @@ export default function GachaRevealOverlay({
     onClose();
   };
 
-  const lockInteraction = (duration: number) => {
-    if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+  const revealTenCard = () => {
+    if (!currentResult || interactionLocked || tenCardRevealed) return;
+
+    setTenCardRevealed(true);
     setInteractionLocked(true);
-    lockTimer.current = window.setTimeout(() => {
-      setInteractionLocked(false);
-      lockTimer.current = null;
-    }, duration);
-  };
 
-  const revealOrAdvance = () => {
-    if (!currentResult || interactionLocked) return;
+    revealTimer.current = window.setTimeout(() => {
+      setTenCardExiting(true);
+      revealTimer.current = null;
 
-    if (!tenCardRevealed) {
-      setTenCardRevealed(true);
-      lockInteraction(520);
-      return;
-    }
-
-    setTenCardExiting(true);
-    setInteractionLocked(true);
-    if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
-    advanceTimer.current = window.setTimeout(() => {
-      if (currentIndex >= results.length - 1) {
-        setShowSummary(true);
-      } else {
-        setCurrentIndex((index) => index + 1);
-      }
-      setTenCardRevealed(false);
-      setTenCardExiting(false);
-      setInteractionLocked(false);
-      advanceTimer.current = null;
-    }, 280);
+      advanceTimer.current = window.setTimeout(() => {
+        if (currentIndex >= results.length - 1) {
+          setShowSummary(true);
+        } else {
+          setCurrentIndex((index) => index + 1);
+        }
+        setTenCardRevealed(false);
+        setTenCardExiting(false);
+        setInteractionLocked(false);
+        advanceTimer.current = null;
+      }, 320);
+    }, 620);
   };
 
   return (
@@ -164,13 +159,8 @@ export default function GachaRevealOverlay({
         <div className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-[#89dfaf]/30 blur-3xl" />
 
         <header className="relative z-20 flex shrink-0 items-center justify-between px-5 py-3.5 sm:px-7 sm:py-4">
-          <div>
-            <div className="text-[11px] font-black tracking-[0.22em] text-[#55a777]">
-              MEDSLIME GACHA
-            </div>
-            <div className="mt-1 text-lg font-black text-[#17372a] sm:text-xl">
-              {pullCount === 1 ? "召喚結果" : "十連召喚"}
-            </div>
+          <div className="text-lg font-black text-[#17372a] sm:text-xl">
+            {pullCount === 1 ? "召喚結果" : "十連召喚"}
           </div>
 
           <button
@@ -198,6 +188,7 @@ export default function GachaRevealOverlay({
             <SingleReveal
               result={results[0]}
               revealed={singleRevealed}
+              showHint={showGestureHint && !singleRevealed}
               onReveal={() => setSingleRevealed(true)}
             />
           ) : showSummary ? (
@@ -210,13 +201,13 @@ export default function GachaRevealOverlay({
               exiting={tenCardExiting}
               remaining={remaining}
               locked={interactionLocked}
-              onCardTap={revealOrAdvance}
-              onShowAll={() => setShowSummary(true)}
+              showHint={showGestureHint && currentIndex === 0 && !tenCardRevealed}
+              onReveal={revealTenCard}
             />
           )}
         </div>
 
-        {!loading && pullCount === 1 && results.length > 0 && (
+        {!loading && pullCount === 1 && results.length > 0 && singleRevealed && (
           <footer className="relative z-20 flex shrink-0 justify-center px-5 pb-5 sm:pb-7">
             <button
               type="button"
@@ -248,10 +239,12 @@ function LoadingStage() {
 function SingleReveal({
   result,
   revealed,
+  showHint,
   onReveal,
 }: {
   result: GachaResult;
   revealed: boolean;
+  showHint: boolean;
   onReveal: () => void;
 }) {
   const slime = SLIME_BY_ID[result.slimeId];
@@ -260,24 +253,15 @@ function SingleReveal({
   return (
     <div className="flex w-full min-h-0 flex-col items-center justify-center text-center">
       <div className={`relative rounded-[30px] ${theme.glow}`}>
-        <div className="aspect-[278/430] h-[min(49dvh,400px)] [perspective:1200px] sm:h-[min(60dvh,480px)]">
-          <button
-            type="button"
-            onClick={() => !revealed && onReveal()}
-            aria-label={revealed ? `${slime.defaultName}，${slime.rarity}` : "翻開卡片"}
-            className={[
-              "relative h-full w-full rounded-[28px] transition-transform duration-700 [transform-style:preserve-3d]",
-              revealed ? "[transform:rotateY(180deg)]" : "hover:-translate-y-1",
-            ].join(" ")}
-          >
-            <CardBack rarity={slime.rarity} />
-            <CardFront
-              result={result}
-              showReward
-              className="[transform:rotateY(180deg)]"
-            />
-          </button>
-        </div>
+        <GestureSurface
+          disabled={revealed}
+          onReveal={onReveal}
+          ariaLabel={revealed ? `${slime.defaultName}，${slime.rarity}` : "揭開卡片"}
+          className="relative aspect-[278/430] h-[min(49dvh,400px)] rounded-[28px] sm:h-[min(60dvh,480px)]"
+        >
+          {revealed ? <CardFront result={result} showReward /> : <CardBack rarity={slime.rarity} />}
+          {showHint && <TapHint />}
+        </GestureSurface>
       </div>
     </div>
   );
@@ -290,8 +274,8 @@ function TenPullStack({
   exiting,
   remaining,
   locked,
-  onCardTap,
-  onShowAll,
+  showHint,
+  onReveal,
 }: {
   results: GachaResult[];
   currentIndex: number;
@@ -299,8 +283,8 @@ function TenPullStack({
   exiting: boolean;
   remaining: number;
   locked: boolean;
-  onCardTap: () => void;
-  onShowAll: () => void;
+  showHint: boolean;
+  onReveal: () => void;
 }) {
   const current = results[currentIndex];
   const slime = SLIME_BY_ID[current.slimeId];
@@ -330,7 +314,7 @@ function TenPullStack({
                 className="pointer-events-none absolute inset-0 rounded-[28px] transition-transform duration-300"
                 style={{
                   zIndex: visibleStack.length - originalOffset,
-                  transform: `translateY(${visibleOffset * 3}px) scale(${1 - visibleOffset * 0.009})`,
+                  transform: `translateY(${visibleOffset * 4}px) scale(${1 - visibleOffset * 0.009})`,
                   transformOrigin: "center bottom",
                 }}
               >
@@ -339,56 +323,94 @@ function TenPullStack({
             );
           })}
 
-        <button
-          type="button"
-          onClick={onCardTap}
-          disabled={locked}
-          aria-label={
-            revealed
-              ? currentIndex === results.length - 1
-                ? "查看十連抽總覽"
-                : "前往下一張卡片"
-              : `翻開第 ${currentIndex + 1} 張卡片`
-          }
+        <GestureSurface
+          disabled={locked || revealed}
+          onReveal={onReveal}
+          ariaLabel={`揭開第 ${currentIndex + 1} 張卡片`}
           className={[
-            "absolute inset-0 z-20 rounded-[28px] [perspective:1200px] transition-[opacity,transform] duration-300 disabled:cursor-default",
-            exiting ? "-translate-y-7 scale-[0.94] opacity-0" : "translate-y-0 scale-100 opacity-100",
+            "absolute inset-0 z-20 rounded-[28px] transition-[opacity,transform] duration-300",
+            exiting
+              ? "translate-y-12 scale-[0.94] opacity-20"
+              : "translate-y-0 scale-100 opacity-100",
           ].join(" ")}
         >
-          <span
-            className={[
-              "relative block h-full w-full rounded-[28px] transition-transform duration-500 [transform-style:preserve-3d]",
-              revealed ? "[transform:rotateY(180deg)]" : "hover:-translate-y-1",
-            ].join(" ")}
-          >
-            <CardBack rarity={slime.rarity} />
-            <CardFront result={current} className="[transform:rotateY(180deg)]" />
-          </span>
-        </button>
+          {revealed ? <CardFront result={current} /> : <CardBack rarity={slime.rarity} />}
+          {showHint && <TapHint />}
+        </GestureSurface>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4">
-        <button
-          type="button"
-          onClick={onShowAll}
-          disabled={locked}
-          className="rounded-xl border border-[#cfe1d6] bg-white/80 px-4 py-2.5 text-xs font-black text-[#4b6859] transition hover:bg-white disabled:opacity-60"
-        >
-          全部揭曉
-        </button>
-        <button
-          type="button"
-          onClick={onCardTap}
-          disabled={locked}
-          className="flex items-center gap-1 rounded-xl bg-[#17372a] px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 disabled:opacity-60"
-        >
-          {!revealed
-            ? "翻開"
-            : currentIndex === results.length - 1
-              ? "查看總覽"
-              : "下一張"}
-          <ChevronRight size={15} strokeWidth={3} />
-        </button>
+function GestureSurface({
+  disabled,
+  onReveal,
+  ariaLabel,
+  className,
+  children,
+}: {
+  disabled: boolean;
+  onReveal: () => void;
+  ariaLabel: string;
+  className: string;
+  children: ReactNode;
+}) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    start.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled || !start.current) return;
+    const dx = event.clientX - start.current.x;
+    const dy = event.clientY - start.current.y;
+    start.current = null;
+
+    const distance = Math.hypot(dx, dy);
+    const swipe = Math.max(Math.abs(dx), Math.abs(dy)) >= 34;
+    const tap = distance <= 14;
+    if (tap || swipe) onReveal();
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={ariaLabel}
+      aria-disabled={disabled}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        start.current = null;
+      }}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onReveal();
+        }
+      }}
+      className={`${className} touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-[#65d795] focus-visible:ring-offset-2`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TapHint() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2 opacity-25">
+        <div className="relative grid h-14 w-14 place-items-center">
+          <span className="absolute inset-1 animate-ping rounded-full border-2 border-white/80" />
+          <span className="relative text-3xl drop-shadow-sm">👆</span>
+        </div>
+        <span className="rounded-full bg-[#17372a]/70 px-3 py-1 text-[11px] font-black text-white">
+          點一下或滑動
+        </span>
       </div>
     </div>
   );
@@ -427,8 +449,8 @@ function TenPullSummary({
               className={`relative overflow-hidden rounded-[18px] border-2 bg-gradient-to-br p-2 shadow-sm sm:rounded-[20px] sm:p-2.5 ${theme.border} ${theme.soft}`}
             >
               {result.isNew && (
-                <div className="absolute left-2 top-2 z-10 rounded-full bg-[#17372a] px-2 py-1 text-[9px] font-black tracking-wide text-white">
-                  NEW
+                <div className="absolute left-2 top-2 z-10 rounded-full bg-[#17372a] px-2 py-1 text-[9px] font-black text-white">
+                  新角色
                 </div>
               )}
               <div className="flex min-h-[82px] items-center justify-center sm:min-h-[120px]">
@@ -470,7 +492,7 @@ function CardBack({ rarity }: { rarity: SlimeRarity }) {
   return (
     <div
       className={[
-        "absolute inset-0 overflow-hidden rounded-[28px] border-2 bg-[#17372a] [backface-visibility:hidden]",
+        "absolute inset-0 overflow-hidden rounded-[28px] border-2 bg-[#17372a]",
         theme.border,
       ].join(" ")}
     >
@@ -488,11 +510,9 @@ function CardBack({ rarity }: { rarity: SlimeRarity }) {
 function CardFront({
   result,
   showReward = false,
-  className = "",
 }: {
   result: GachaResult;
   showReward?: boolean;
-  className?: string;
 }) {
   const slime = SLIME_BY_ID[result.slimeId];
   const theme = RARITY_THEME[slime.rarity];
@@ -500,10 +520,9 @@ function CardFront({
   return (
     <div
       className={[
-        "absolute inset-0 overflow-hidden rounded-[28px] border-2 bg-gradient-to-br p-2.5 shadow-xl [backface-visibility:hidden] sm:p-3",
+        "absolute inset-0 overflow-hidden rounded-[28px] border-2 bg-gradient-to-br p-2.5 shadow-xl sm:p-3",
         theme.border,
         theme.soft,
-        className,
       ].join(" ")}
     >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[22px] border border-white/80 bg-white/65 p-3 sm:rounded-[24px] sm:p-4">
@@ -513,8 +532,8 @@ function CardFront({
             {slime.rarity}
           </span>
           {result.isNew && (
-            <span className="rounded-full bg-[#17372a] px-2.5 py-1 text-[9px] font-black tracking-wide text-white sm:px-3 sm:text-[10px]">
-              NEW
+            <span className="rounded-full bg-[#17372a] px-2.5 py-1 text-[9px] font-black text-white sm:px-3 sm:text-[10px]">
+              新角色
             </span>
           )}
         </div>
@@ -527,10 +546,7 @@ function CardFront({
           />
         </div>
         <div className="relative z-10 text-center">
-          <div className={`text-[10px] font-black tracking-[0.14em] sm:text-[11px] sm:tracking-[0.16em] ${theme.text}`}>
-            {slime.rarity} SLIME
-          </div>
-          <div className="mt-0.5 text-lg font-black text-[#17372a] sm:mt-1 sm:text-2xl">
+          <div className="text-lg font-black text-[#17372a] sm:text-2xl">
             {slime.defaultName}
           </div>
           {showReward && <RewardBadge result={result} />}
@@ -552,7 +568,7 @@ function RewardBadge({
     : "mx-auto mt-2 max-w-[220px] rounded-xl px-3 py-1.5 text-[11px] font-black sm:mt-3 sm:py-2 sm:text-xs";
 
   if (result.isNew) {
-    return <div className={`${base} bg-[#eaf9f0] text-[#28754b]`}>NEW · 已加入圖鑑</div>;
+    return <div className={`${base} bg-[#eaf9f0] text-[#28754b]`}>新角色 · 已加入圖鑑</div>;
   }
 
   if (!result.duplicateReward) return null;
