@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { GameStateProvider } from "@/components/game-state-provider";
+import { FocusTimerProvider } from "@/components/focus-timer-provider";
 import ScrollJumpButtons from "@/components/scroll-jump-buttons";
 import FirstLoginOnboarding from "@/components/first-login-onboarding";
 import CampaignWelcomeGift from "@/components/campaign-welcome-gift";
@@ -24,13 +25,15 @@ export default function RootLayout({
       <body>
         <Suspense fallback={null}>
           <GameStateProvider>
-            {children}
-            <SiteFooter />
-            <FirstLoginOnboarding />
-            <CampaignWelcomeGift />
-            <ScrollJumpButtons />
-            <RouteUtilities />
-            <LegacyEraLabelNormalizer />
+            <FocusTimerProvider>
+              {children}
+              <SiteFooter />
+              <FirstLoginOnboarding />
+              <CampaignWelcomeGift />
+              <ScrollJumpButtons />
+              <RouteUtilities />
+              <LegacyEraLabelNormalizer />
+            </FocusTimerProvider>
           </GameStateProvider>
         </Suspense>
       </body>
