@@ -79,6 +79,14 @@ jobs:
 
           python -m scripts.run_preprocess_official_question_images "${args[@]}"
 
+          # The first pass intentionally uses conservative wording heuristics.
+          # A full run follows it with a PDF-level audit that catches image-only
+          # questions and phrases such as "下列心電圖的判讀", while clearing
+          # keyword false positives that contain no actual visual material.
+          if [ "${{ inputs.mode }}" = "all" ] && [ -z "${{ inputs.question_id }}" ]; then
+            python -m scripts.finish_official_question_images
+          fi
+
       - name: Upload processing report
         if: always()
         uses: actions/upload-artifact@v4
