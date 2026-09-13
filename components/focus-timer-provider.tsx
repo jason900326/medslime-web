@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   createContext,
   useContext,
@@ -110,7 +108,6 @@ const FocusTimerContext = createContext<FocusTimerContextValue | null>(null);
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const game = useGameState();
-  const pathname = usePathname();
   const [timer, setTimer] = useState<StoredFocusTimer>(initialTimerState);
   const [now, setNow] = useState(() => Date.now());
   const [isReady, setIsReady] = useState(false);
@@ -321,33 +318,9 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     [timer, isReady, secondsLeft, elapsedSeconds, progress, displayTime],
   );
 
-  const showFloatingTimer =
-    isReady &&
-    pathname !== "/study/focus" &&
-    (timer.mode === "running" || timer.mode === "paused");
-
   return (
     <FocusTimerContext.Provider value={value}>
       {children}
-      {showFloatingTimer && (
-        <Link
-          href="/study/focus"
-          aria-label="回到專注計時器"
-          className="fixed bottom-24 left-4 z-[75] flex items-center gap-2 rounded-full border border-[#cfe6d8] bg-white/95 px-4 py-2.5 text-sm font-black text-[#315b45] shadow-[0_10px_30px_rgba(23,55,42,0.16)] backdrop-blur md:bottom-6"
-        >
-          <span
-            className={
-              timer.mode === "running"
-                ? "h-2.5 w-2.5 animate-pulse rounded-full bg-[#31c978]"
-                : "h-2.5 w-2.5 rounded-full bg-[#d4a83e]"
-            }
-          />
-          <span className="tabular-nums">{displayTime}</span>
-          <span className="text-xs text-[#789083]">
-            {timer.mode === "running" ? "專注中" : "已暫停"}
-          </span>
-        </Link>
-      )}
     </FocusTimerContext.Provider>
   );
 }
