@@ -37,79 +37,86 @@ export default function TopBar({
   };
 
   return (
-    <header className="relative z-50 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
-        {showBack && (
-          <button
-            type="button"
-            onClick={() => router.push(backHref)}
-            className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)] px-3 py-2 text-sm font-bold text-[var(--brand-text-secondary)] transition hover:bg-[#f5faf7]"
-          >
-            ← {backLabel}
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="relative z-50 border-0 bg-transparent p-0 text-2xl font-black tracking-[-0.04em] text-[var(--brand-text)] md:text-3xl"
-          aria-label="回到 MedSlime 首頁"
-        >
-          MedSlime.
-        </button>
-
-        {!showBack && pro.isPro && (
-          <GoldenProBadge proExpiresAt={pro.proExpiresAt} />
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {showFocusTimer && (
-          <Link
-            href="/study/focus"
-            aria-label={`回到專注計時器，剩餘 ${focus.displayTime}`}
-            title="回到專注計時器"
-            className="flex items-center gap-1.5 rounded-full border border-[#cfe6d8] bg-[#f7fbf8] px-3 py-2 text-xs font-black text-[#315b45] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#eef8f2]"
-          >
-            <span
-              className={
-                focus.mode === "running"
-                  ? "h-2 w-2 animate-pulse rounded-full bg-[#31c978]"
-                  : "h-2 w-2 rounded-full bg-[#d4a83e]"
-              }
-            />
-            <span className="tabular-nums">{focus.displayTime}</span>
-            <span className="hidden text-[11px] text-[#789083] sm:inline">
-              {focus.mode === "running" ? "專注中" : "已暫停"}
-            </span>
-          </Link>
-        )}
-
-        {!pro.loading && pro.isLoggedIn && (
-          <>
-            <ResourcePill label={`🔥 ${game.streak} 天`} />
-            <ResourcePill label={`🪙 ${game.coins}`} href="/shop" ariaLabel="前往資源頁" />
-            <ResourcePill label={`🎫 ${game.tickets}`} href="/shop" ariaLabel="前往資源頁" />
-
+    <header className="relative z-50 flex w-full flex-col gap-3">
+      <div className="flex w-full items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          {showBack && (
             <button
               type="button"
-              onClick={logout}
-              className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-3 py-2 text-xs font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7] md:text-sm"
+              onClick={() => router.push(backHref)}
+              className="shrink-0 rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)] px-2.5 py-2 text-xs font-bold text-[var(--brand-text-secondary)] transition hover:bg-[#f5faf7] sm:px-3 sm:text-sm"
             >
-              登出
+              ← {backLabel}
             </button>
-          </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="relative z-50 shrink-0 border-0 bg-transparent p-0 text-2xl font-black tracking-[-0.04em] text-[var(--brand-text)] md:text-3xl"
+            aria-label="回到 MedSlime 首頁"
+          >
+            MedSlime.
+          </button>
+
+          {!showBack && pro.isPro && (
+            <GoldenProBadge proExpiresAt={pro.proExpiresAt} />
+          )}
+        </div>
+
+        {!pro.loading && pro.isLoggedIn && (
+          <button
+            type="button"
+            onClick={logout}
+            className="h-10 shrink-0 rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-3 text-xs font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7] md:px-4 md:text-sm"
+          >
+            登出
+          </button>
         )}
 
         {!pro.loading && !pro.isLoggedIn && (
           <Link
             href="/auth/login"
-            className="rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 py-2 text-sm font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7]"
+            className="flex h-10 shrink-0 items-center rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-4 text-sm font-black text-[var(--brand-text-secondary)] shadow-sm transition hover:bg-[#f5faf7]"
           >
             登入
           </Link>
         )}
       </div>
+
+      {!pro.loading && pro.isLoggedIn && (
+        <div className="flex w-full items-center gap-2">
+          {showFocusTimer && (
+            <div className="min-w-0 flex-1">
+              <Link
+                href="/study/focus"
+                aria-label={`回到專注計時器，剩餘 ${focus.displayTime}`}
+                title="回到專注計時器"
+                className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-full border border-[#cfe6d8] bg-[#f7fbf8] px-2 text-xs font-black text-[#315b45] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#eef8f2] md:px-4 md:text-sm"
+              >
+                <span
+                  className={
+                    focus.mode === "running"
+                      ? "h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#31c978]"
+                      : "h-2 w-2 shrink-0 rounded-full bg-[#d4a83e]"
+                  }
+                />
+                <span className="truncate tabular-nums">{focus.displayTime}</span>
+              </Link>
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <ResourcePill label={`🔥 ${game.streak} 天`} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <ResourcePill label={`🪙 ${game.coins}`} href="/shop" ariaLabel="前往資源頁" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <ResourcePill label={`🎫 ${game.tickets}`} href="/shop" ariaLabel="前往資源頁" />
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -151,11 +158,11 @@ function GoldenProBadge({ proExpiresAt }: { proExpiresAt: string | null }) {
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative min-w-0 shrink">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex items-center gap-1.5 rounded-full border border-[#efd78a] bg-gradient-to-r from-[#fff6cf] to-[#fffaf0] px-2.5 py-1 shadow-sm transition hover:-translate-y-0.5"
+        className="flex h-10 max-w-full items-center gap-1.5 rounded-full border border-[#efd78a] bg-gradient-to-r from-[#fff6cf] to-[#fffaf0] px-2.5 shadow-sm transition hover:-translate-y-0.5"
         aria-label={dateLabel ? `MedSlime Pro，${dateLabel}` : "MedSlime Pro 已開通"}
         aria-expanded={open}
       >
@@ -164,9 +171,9 @@ function GoldenProBadge({ proExpiresAt }: { proExpiresAt: string | null }) {
           <span className="absolute right-[6px] top-[6px] h-[2px] w-[2px] rounded-full bg-[#694d16]" />
           <span className="absolute bottom-[4px] left-1/2 h-[2px] w-[5px] -translate-x-1/2 rounded-b-full border-b border-[#694d16]" />
         </span>
-        <span className="text-[11px] font-black tracking-[0.02em] text-[#94660f]">PRO</span>
+        <span className="shrink-0 text-[11px] font-black tracking-[0.02em] text-[#94660f]">PRO</span>
         {dateLabel && (
-          <span className="text-[10px] font-black text-[#a47722]">{dateLabel}</span>
+          <span className="truncate text-[10px] font-black text-[#a47722]">{dateLabel}</span>
         )}
       </button>
 
@@ -192,7 +199,7 @@ function ResourcePill({
   ariaLabel?: string;
 }) {
   const className =
-    "rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-3 py-2 text-xs font-black text-[var(--brand-text)] shadow-sm transition md:px-4 md:text-sm";
+    "flex h-11 w-full min-w-0 items-center justify-center rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-2 text-xs font-black text-[var(--brand-text)] shadow-sm transition md:px-4 md:text-sm";
 
   if (href) {
     return (
@@ -202,10 +209,14 @@ function ResourcePill({
         title="查看可購買資源"
         className={`${className} hover:-translate-y-0.5 hover:bg-[#f5faf7]`}
       >
-        {label}
+        <span className="truncate">{label}</span>
       </Link>
     );
   }
 
-  return <div className={className}>{label}</div>;
+  return (
+    <div className={className}>
+      <span className="truncate">{label}</span>
+    </div>
+  );
 }
