@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Compatibility entrypoint for the official-question image backfill.
 
-Supabase's new ``sb_secret_`` API keys are opaque API keys rather than JWTs.
-The hosted API gateway expects them in the ``apikey`` header and mints the
-short-lived service-role JWT forwarded to PostgREST/Storage. Sending the
-opaque key itself as ``Authorization: Bearer ...`` can make downstream
-services reject it as an invalid JWT, so remove that header for new keys.
-Legacy JWT service-role keys keep the old behavior.
+Supabase's hosted API gateway accepts both legacy service-role JWTs and the
+new ``sb_secret_...`` API keys. For the new opaque secret keys, hosted
+Supabase expects the request to carry both the ``apikey`` header and
+``Authorization: Bearer sb_secret_...``. The gateway recognizes that opaque
+Bearer value and replaces it with an internal service-role JWT before
+forwarding the request to PostgREST / Storage.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from __future__ import annotations
 try:
     from scripts import preprocess_official_question_images as impl
 except ModuleNotFoundError:
-    # When this file is executed directly (``python scripts/....py``), Python
-    # adds ``scripts/`` rather than the repository root to sys.path.
+    # When this file is executed directly, Python adds scripts/ rather than the
+    # repository root to sys.path.
     import preprocess_official_question_images as impl
 
 
@@ -29,12 +29,12 @@ def _compatible_init(self, base_url: str, service_key: str, bucket: str) -> None
             "中的 sb_secret_...，不要使用 Storage / S3 的 Secret access key。"
         )
 
+    # The base client already sets both:
+    #   apikey: <secret>
+    #   Authorization: Bearer <secret>
+    # Keep both headers for hosted Supabase. This is correct for both legacy
+    # service-role JWTs and the new sb_secret_ opaque API keys.
     _original_init(self, base_url, service_key, bucket)
-
-    if service_key.startswith("sb_secret_"):
-        # Opaque API keys are authenticated via `apikey`. Let Supabase's
-        # hosted gateway synthesize the internal service-role Authorization JWT.
-        self.session.headers.pop("Authorization", None)
 
 
 impl.SupabaseClient.__init__ = _compatible_init
