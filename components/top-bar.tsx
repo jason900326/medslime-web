@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useFocusTimer } from "@/components/focus-timer-provider";
 import { useGameState } from "@/components/game-state-provider";
 import { useProStatus } from "@/hooks/use-pro-status";
 
@@ -19,8 +20,14 @@ export default function TopBar({
   backLabel = "返回首頁",
 }: TopBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const game = useGameState();
+  const focus = useFocusTimer();
   const pro = useProStatus();
+  const showFocusTimer =
+    focus.isReady &&
+    pathname !== "/study/focus" &&
+    (focus.mode === "running" || focus.mode === "paused");
 
   const logout = async () => {
     const supabase = createClient();
@@ -57,6 +64,27 @@ export default function TopBar({
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {showFocusTimer && (
+          <Link
+            href="/study/focus"
+            aria-label={`回到專注計時器，剩餘 ${focus.displayTime}`}
+            title="回到專注計時器"
+            className="flex items-center gap-1.5 rounded-full border border-[#cfe6d8] bg-[#f7fbf8] px-3 py-2 text-xs font-black text-[#315b45] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#eef8f2]"
+          >
+            <span
+              className={
+                focus.mode === "running"
+                  ? "h-2 w-2 animate-pulse rounded-full bg-[#31c978]"
+                  : "h-2 w-2 rounded-full bg-[#d4a83e]"
+              }
+            />
+            <span className="tabular-nums">{focus.displayTime}</span>
+            <span className="hidden text-[11px] text-[#789083] sm:inline">
+              {focus.mode === "running" ? "專注中" : "已暫停"}
+            </span>
+          </Link>
+        )}
+
         {!pro.loading && pro.isLoggedIn && (
           <>
             <ResourcePill label={`🔥 ${game.streak} 天`} />
