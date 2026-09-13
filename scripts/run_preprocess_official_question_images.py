@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """Compatibility entrypoint for the official-question image backfill.
 
-Supabase's new ``sb_secret_...`` keys are backend-only API keys. They must be
-sent in the ``apikey`` header, and Supabase rejects them when the request looks
-like browser traffic. The renderer previously reused a Chrome-like User-Agent
-intended for downloading MOEX PDFs, which caused every Supabase REST request
-to be rejected with HTTP 401 even though the key and project were correct.
-
-This wrapper keeps the browser-like User-Agent only for MOEX PDF downloads and
-uses a backend User-Agent for Supabase. Legacy service-role JWTs keep their
-Authorization header; new opaque secret keys use ``apikey`` only.
+Database reads/writes keep using the lightweight REST client in the renderer,
+while Storage uploads go through the official Supabase Python SDK. This avoids
+subtle differences in opaque ``sb_secret_...`` authentication between
+PostgREST and Storage and gives us much better upload errors.
 """
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
+from supabase import create_client
+
 try:
     from scripts import preprocess_official_question_images as impl
 except ModuleNotFoundError:
-    # When this file is executed directly, Python adds scripts/ rather than the
-    # repository root to sys.path.
     import preprocess_official_question_images as impl
 
 
@@ -35,24 +32,50 @@ def _compatible_init(self, base_url: str, service_key: str, bucket: str) -> None
 
     _original_init(self, base_url, service_key, bucket)
 
-    # Supabase secret keys are explicitly blocked when they are used from a
-    # browser-like User-Agent. The base renderer uses a Chrome UA for MOEX PDF
-    # downloads, but Supabase requests must identify as a backend worker.
+    # Supabase secret keys are blocked when used from a browser-like User-Agent.
     self.session.headers["User-Agent"] = "MedSlimeImageBackfill/1.0 (GitHub Actions backend)"
 
     if service_key.startswith("sb_secret_"):
-        # New API keys are opaque, not JWTs. Supabase's Data/Storage APIs expect
-        # them in `apikey`; sending them as Bearer tokens can trigger JWT auth
-        # handling and 401 responses.
+        # Opaque secret keys belong in apikey for direct PostgREST calls.
         self.session.headers["apikey"] = service_key
         self.session.headers.pop("Authorization", None)
     else:
-        # Legacy service_role keys are JWTs and continue to work as Bearer JWTs.
         self.session.headers["apikey"] = service_key
         self.session.headers["Authorization"] = f"Bearer {service_key}"
 
+    # Let the official SDK handle Storage authentication for both key types.
+    self.storage_sdk = create_client(base_url, service_key)
+
+
+def _sdk_upload_png(self, object_path: str, png_bytes: bytes) -> str:
+    # Keep object paths ASCII-only. The row id is globally unique, so this is
+    # deterministic without relying on URL-encoded Chinese subject/round names.
+    try:
+        self.storage_sdk.storage.from_(self.bucket).upload(
+            path=object_path,
+            file=png_bytes,
+            file_options={
+                "content-type": "image/png",
+                "cache-control": "31536000",
+                "upsert": "true",
+            },
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Supabase Storage 上傳失敗：{type(exc).__name__}: {exc}") from exc
+
+    encoded_path = "/".join(quote(part, safe="") for part in object_path.split("/"))
+    return f"{self.base_url}/storage/v1/object/public/{self.bucket}/{encoded_path}"
+
+
+def _ascii_object_path(row: dict) -> str:
+    row_id = int(row["id"])
+    q = int(row.get("question_number") or 0)
+    return f"questions/{row_id}/q{q:02d}.png"
+
 
 impl.SupabaseClient.__init__ = _compatible_init
+impl.SupabaseClient.upload_png = _sdk_upload_png
+impl.object_path = _ascii_object_path
 
 if __name__ == "__main__":
     raise SystemExit(impl.main())
