@@ -77,7 +77,7 @@ jobs:
             args+=(--force)
           fi
 
-          python scripts/run_preprocess_official_question_images.py "${args[@]}"
+          python -m scripts.run_preprocess_official_question_images "${args[@]}"
 
       - name: Upload processing report
         if: always()
