@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 const SITE_URL = "https://medslime.vercel.app";
@@ -54,6 +53,144 @@ const steps = [
   "把錯題與不確定題留下來",
   "回頭看弱點分析，決定下一輪複習",
 ];
+
+function QuestionPreview() {
+  return (
+    <div className="h-full min-h-[560px] rounded-[18px] bg-[#fbfefc] p-4 text-[#17372a] sm:p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black tracking-[0.14em] text-[#36aa69]">民國 115 年・第 2 次</p>
+          <h3 className="mt-2 text-xl font-black leading-snug tracking-[-0.03em] sm:text-2xl">
+            微生物學與臨床微生物學
+            <br />
+            （細菌與黴菌）
+          </h3>
+        </div>
+        <div className="shrink-0 rounded-2xl border border-[#dbe9e1] bg-white px-3 py-2 text-center shadow-sm">
+          <p className="text-[10px] font-black text-[#7d9488]">作答時間</p>
+          <p className="mt-1 font-mono text-lg font-black text-[#246b47]">00:48</p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#dbe9e1] bg-white p-3.5">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-black text-[#6d8177] sm:text-xs">
+          <span>🟢 已作答</span>
+          <span>🟡 作答＋不確定</span>
+          <span>🔴 只有不確定</span>
+        </div>
+        <div className="mt-3 flex gap-2 overflow-hidden text-[10px] font-black sm:text-xs">
+          <span className="rounded-full border border-[#d9e7df] px-3 py-1.5">🙂 1–10</span>
+          <span className="rounded-full border border-[#6fd69a] bg-[#ecfaf1] px-3 py-1.5 text-[#237849]">🙂 11–20</span>
+          <span className="rounded-full border border-[#d9e7df] px-3 py-1.5">🙂 21–30</span>
+        </div>
+        <div className="mt-3 flex items-end justify-between gap-1">
+          {[11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((n) => (
+            <div key={n} className="flex flex-col items-center gap-1 text-[9px] font-black text-[#6f8579]">
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                  n === 15
+                    ? "border-[#50c985] bg-[#dff7e8] text-[#1f7548] ring-4 ring-[#edf9f1]"
+                    : n < 18
+                      ? "border-[#62cf8e] bg-[#e9f9ef] text-[#2b7b50]"
+                      : "border-[#dbe9e1] bg-[#f6faf7]"
+                }`}
+              >
+                🙂
+              </span>
+              {n}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#dbe9e1] bg-white p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-black text-[#768c80]">Q15 / 80</span>
+          <span className="rounded-xl border border-[#edd7d7] px-3 py-2 text-xs font-black text-[#a34e4e]">結束測驗</span>
+        </div>
+        <p className="mt-5 text-base font-black leading-8 sm:text-lg">
+          Multidrug-resistant（MDR）tuberculosis 是指至少對下列那兩種抗生素具抗藥性？
+        </p>
+        <span className="mt-4 inline-flex rounded-xl border border-[#dbe9e1] px-3 py-2 text-xs font-black text-[#4f6f5e]">📄 官方原題</span>
+        <div className="mt-4 space-y-2.5">
+          {["A. rifampin 及 amikacin", "B. rifampin 及 isoniazid"].map((option) => (
+            <div key={option} className="flex items-center gap-3 rounded-xl border border-[#dfeae4] px-3 py-3 text-xs font-black text-[#496a59] sm:text-sm">
+              <span className="h-6 w-6 shrink-0 rounded-full border-2 border-[#b9cec2]" />
+              {option}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewPreview() {
+  return (
+    <div className="h-full rounded-[18px] bg-[#fbfefc] p-4 text-[#17372a] sm:p-5">
+      <p className="text-[10px] font-black tracking-[0.15em] text-[#748b80] sm:text-xs">SMART REVIEW</p>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <h3 className="text-base font-black leading-snug text-[#2ba962] sm:text-lg">IS 與 transposon 的區分</h3>
+        <span className="shrink-0 rounded-xl border border-[#dbe9e1] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#668074]">＋ 加到筆記</span>
+      </div>
+      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dbe9e1] bg-white text-[10px] font-bold leading-5 text-[#5c7468] sm:text-xs">
+        <div className="grid grid-cols-[70px_1fr_1fr] bg-[#f0f8f3] font-black text-[#315b45]">
+          <div className="p-2.5">特徵</div>
+          <div className="p-2.5">Insertion sequence (IS)</div>
+          <div className="p-2.5">Transposon</div>
+        </div>
+        {[
+          ["基本組成", "轉位相關序列，通常含 transposase 與兩端 repeats", "轉位序列外，還可攜帶抗藥性或其他功能基因"],
+          ["主要功能", "移動自身，可能造成插入突變", "移動自身並散播額外功能基因"],
+          ["抗藥性基因", "通常不攜帶多種抗藥性基因", "可攜帶一個或多個抗藥性基因"],
+        ].map(([label, a, b]) => (
+          <div key={label} className="grid grid-cols-[70px_1fr_1fr] border-t border-[#e4eee8]">
+            <div className="p-2.5 font-black text-[#496a59]">{label}</div>
+            <div className="p-2.5">{a}</div>
+            <div className="p-2.5">{b}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WeaknessPreview() {
+  return (
+    <div className="h-full rounded-[18px] bg-[#fbfefc] p-4 text-[#17372a] sm:p-5">
+      <div className="rounded-2xl border border-[#dbe9e1] bg-white p-3.5">
+        <p className="text-sm font-black">今天建議先做什麼</p>
+        <p className="mt-3 text-xs font-bold leading-6 text-[#61796d]">
+          目前最需要補的是「革蘭氏陽性菌」，6 題作答正確率 16.7%。先處理尚未完成的錯題複習。
+        </p>
+      </div>
+      <div className="mt-3 rounded-2xl border border-[#dbe9e1] bg-white p-3.5">
+        <p className="text-sm font-black">弱主題與細分弱點</p>
+        <p className="mt-3 text-[10px] font-black text-[#5a7466]">優先補強主題</p>
+        {[
+          ["革蘭氏陽性菌", "16.7%", "1/6 題", "w-[17%]"],
+          ["革蘭氏陰性菌", "0.0%", "0/3 題", "w-[4%]"],
+        ].map(([label, pct, count, width]) => (
+          <div key={label} className="mt-2.5 rounded-xl border border-[#e1ece6] p-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold text-[#809389]">微生物 / 臨床微生物學</p>
+                <p className="mt-1 text-xs font-black sm:text-sm">{label}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-base font-black text-[#237849]">{pct}</p>
+                <p className="text-[10px] font-bold text-[#91a098]">{count}</p>
+              </div>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf4ef]">
+              <div className={`h-full ${width} rounded-full bg-[#6bd89a]`} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function MedtechExamPage() {
   const structuredData = {
@@ -141,18 +278,9 @@ export default function MedtechExamPage() {
             </p>
           </div>
 
-          <div className="mt-7 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="mt-7 grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
             <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.16)] sm:p-3">
-              <div className="max-h-[620px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
-                <Image
-                  src="/seo/medtech-question.webp"
-                  alt="MedSlime 醫檢師國考歷屆試題線上刷題畫面"
-                  width={520}
-                  height={853}
-                  className="h-auto w-full"
-                  priority
-                />
-              </div>
+              <QuestionPreview />
               <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
                 歷屆國考題直接線上作答
               </figcaption>
@@ -160,30 +288,14 @@ export default function MedtechExamPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.14)] sm:p-3">
-                <div className="max-h-[300px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
-                  <Image
-                    src="/seo/medtech-review.webp"
-                    alt="MedSlime AI 詳解 Smart Review 考點整理畫面"
-                    width={520}
-                    height={758}
-                    className="h-auto w-full"
-                  />
-                </div>
+                <ReviewPreview />
                 <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
                   AI 詳解與 Smart Review
                 </figcaption>
               </figure>
 
               <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.14)] sm:p-3">
-                <div className="max-h-[300px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
-                  <Image
-                    src="/seo/medtech-weakness.webp"
-                    alt="MedSlime 醫檢師國考弱點分析畫面"
-                    width={520}
-                    height={791}
-                    className="h-auto w-full"
-                  />
-                </div>
+                <WeaknessPreview />
                 <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
                   從作答紀錄找出弱主題
                 </figcaption>
