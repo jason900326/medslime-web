@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 const SITE_URL = "https://medslime.vercel.app";
@@ -21,20 +22,20 @@ export const metadata: Metadata = {
 
 const features = [
   {
-    title: "歷屆國考題線上刷題",
-    body: "直接練習醫事檢驗師歷屆國考題，省去在不同 PDF 與答案頁之間來回切換。",
+    title: "歷屆試題直接刷，不用 PDF 來回切",
+    body: "選年度、梯次與科目就能開始作答，寫過的考卷會留下成績與錯題紀錄。",
   },
   {
-    title: "AI 詳解與考點整理",
-    body: "需要時可以查看 AI 協助整理的解題思路、正確答案理由與其他選項差異。",
+    title: "AI 詳解不是只丟答案",
+    body: "需要時再打開詳解，整理考點、正確答案理由、常見陷阱與選項差異。",
   },
   {
-    title: "錯題複習與弱點分析",
-    body: "把答錯或不確定的題目集中整理，從作答紀錄回頭看自己比較不熟的主題。",
+    title: "把錯在哪裡留下來",
+    body: "錯題、不確定題與作答紀錄會集中整理，之後回來複習不用重新翻整份考卷。",
   },
   {
-    title: "讀書計時與史萊姆收藏",
-    body: "刷題、訂正與專注讀書可以累積遊戲進度，讓準備國考不只剩下題目和分數。",
+    title: "知道下一步先補什麼",
+    body: "從作答紀錄看弱主題與細分弱點，讓複習順序不只靠感覺。",
   },
 ];
 
@@ -45,6 +46,13 @@ const subjects = [
   "臨床生理學與病理學",
   "醫學分子檢驗學與鏡檢學",
   "臨床血清免疫學",
+];
+
+const steps = [
+  "選一份歷屆國考題開始作答",
+  "需要時打開 AI 詳解釐清考點",
+  "把錯題與不確定題留下來",
+  "回頭看弱點分析，決定下一輪複習",
 ];
 
 export default function MedtechExamPage() {
@@ -58,6 +66,11 @@ export default function MedtechExamPage() {
     inLanguage: "zh-Hant",
     description:
       "醫事檢驗師國考刷題與學習網站，提供歷屆試題、AI 詳解、錯題複習、弱點分析與讀書計時。",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "TWD",
+    },
   };
 
   return (
@@ -67,16 +80,16 @@ export default function MedtechExamPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-5 md:px-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5 md:px-8 md:py-12">
         <nav className="flex items-center justify-between gap-4">
           <Link href="/" className="text-lg font-black tracking-[-0.03em] text-[#17372a]">
             MedSlime 🟢
           </Link>
           <Link
-            href="/study"
+            href="/"
             className="rounded-xl bg-[#31c978] px-4 py-2.5 text-sm font-black text-white transition hover:bg-[#2dbc70]"
           >
-            開始刷題
+            回到首頁
           </Link>
         </nav>
 
@@ -84,20 +97,29 @@ export default function MedtechExamPage() {
           <div className="text-xs font-black tracking-[0.12em] text-[#2ba962]">
             醫事檢驗師國考學習工具
           </div>
-          <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight tracking-[-0.045em] sm:text-5xl md:text-6xl">
+          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight tracking-[-0.045em] sm:text-5xl md:text-6xl">
             醫檢師國考刷題，
             <br className="hidden sm:block" />
             不用只剩下一堆 PDF。
           </h1>
           <p className="mt-5 max-w-3xl text-base font-bold leading-8 text-[#60796c] sm:text-lg">
-            MedSlime 是給醫技系與醫事檢驗師國考考生使用的線上刷題網站。可以練習歷屆國考題、查看 AI 詳解、整理錯題、分析弱點，還有讀書計時與史萊姆收藏。
+            MedSlime 把歷屆國考題、AI 詳解、錯題複習與弱點分析放在同一個地方。寫完不是看過答案就算了，而是把你錯在哪裡留下來。
           </p>
+
+          <div className="mt-5 flex flex-wrap gap-2 text-xs font-black text-[#2b6848] sm:text-sm">
+            {["免安裝", "目前可免費使用", "可直接開始使用", "登入後保存作答與學習紀錄"].map((item) => (
+              <span key={item} className="rounded-full border border-[#cfe7d8] bg-white/85 px-3 py-2">
+                ✓ {item}
+              </span>
+            ))}
+          </div>
+
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/study"
+              href="/"
               className="rounded-2xl bg-[#31c978] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#2dbc70] sm:text-base"
             >
-              免費開始刷題 →
+              前往 MedSlime 首頁 →
             </Link>
             <Link
               href="/about"
@@ -108,18 +130,108 @@ export default function MedtechExamPage() {
           </div>
         </section>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2">
-          {features.map((feature) => (
-            <article
-              key={feature.title}
-              className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6"
-            >
-              <h2 className="text-xl font-black tracking-[-0.02em]">{feature.title}</h2>
-              <p className="mt-3 text-sm font-bold leading-7 text-[#687f73] sm:text-base">
-                {feature.body}
-              </p>
-            </article>
-          ))}
+        <section className="mt-8 overflow-hidden rounded-[30px] border border-[#dfece4] bg-[#17372a] p-5 text-white shadow-[0_18px_45px_rgba(28,70,48,0.12)] sm:p-7 md:p-8">
+          <div className="max-w-3xl">
+            <p className="text-xs font-black tracking-[0.14em] text-[#7ce0a8]">REAL PRODUCT</p>
+            <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
+              真的就是這樣刷。
+            </h2>
+            <p className="mt-3 text-sm font-bold leading-7 text-[#c9ddd2] sm:text-base">
+              從歷屆試題作答、AI 考點整理，到最後回頭看弱點，整段流程都留在同一個網站裡。
+            </p>
+          </div>
+
+          <div className="mt-7 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.16)] sm:p-3">
+              <div className="max-h-[620px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
+                <Image
+                  src="/seo/medtech-question.webp"
+                  alt="MedSlime 醫檢師國考歷屆試題線上刷題畫面"
+                  width={520}
+                  height={853}
+                  className="h-auto w-full"
+                  priority
+                />
+              </div>
+              <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
+                歷屆國考題直接線上作答
+              </figcaption>
+            </figure>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.14)] sm:p-3">
+                <div className="max-h-[300px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
+                  <Image
+                    src="/seo/medtech-review.webp"
+                    alt="MedSlime AI 詳解 Smart Review 考點整理畫面"
+                    width={520}
+                    height={758}
+                    className="h-auto w-full"
+                  />
+                </div>
+                <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
+                  AI 詳解與 Smart Review
+                </figcaption>
+              </figure>
+
+              <figure className="overflow-hidden rounded-[24px] border border-white/15 bg-white p-2 shadow-[0_14px_36px_rgba(0,0,0,0.14)] sm:p-3">
+                <div className="max-h-[300px] overflow-hidden rounded-[18px] bg-[#f8fcf9]">
+                  <Image
+                    src="/seo/medtech-weakness.webp"
+                    alt="MedSlime 醫檢師國考弱點分析畫面"
+                    width={520}
+                    height={791}
+                    className="h-auto w-full"
+                  />
+                </div>
+                <figcaption className="px-2 pb-1 pt-3 text-sm font-black text-[#17372a]">
+                  從作答紀錄找出弱主題
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <div className="max-w-3xl">
+            <p className="text-xs font-black tracking-[0.14em] text-[#2ba962]">WHY MEDSLIME</p>
+            <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
+              不只是看答案，而是把你錯在哪裡留下來。
+            </h2>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {features.map((feature) => (
+              <article
+                key={feature.title}
+                className="rounded-[24px] border border-[#dfece4] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6"
+              >
+                <h3 className="text-xl font-black tracking-[-0.02em]">{feature.title}</h3>
+                <p className="mt-3 text-sm font-bold leading-7 text-[#687f73] sm:text-base">
+                  {feature.body}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-[26px] border border-[#dfece4] bg-white p-6 sm:p-8">
+          <p className="text-xs font-black tracking-[0.14em] text-[#2ba962]">HOW IT WORKS</p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
+            準備醫檢師國考時，可以這樣用 MedSlime
+          </h2>
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
+            {steps.map((step, index) => (
+              <div key={step} className="rounded-2xl border border-[#e1eee6] bg-[#f8fcf9] p-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#31c978] text-sm font-black text-white">
+                  {index + 1}
+                </div>
+                <p className="mt-3 text-sm font-black leading-6 text-[#315b45]">{step}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-5 max-w-3xl text-sm font-bold leading-7 text-[#687f73] sm:text-base">
+            如果你以前是開著考題 PDF、答案檔和自己的錯題筆記來回切，MedSlime 想做的就是把這些流程放在同一個地方，讓每次作答都能接到下一次複習。
+          </p>
         </section>
 
         <section className="mt-8 rounded-[26px] border border-[#dfece4] bg-white p-6 sm:p-8">
@@ -127,7 +239,7 @@ export default function MedtechExamPage() {
             醫檢師國考常見科目
           </h2>
           <p className="mt-3 text-sm font-bold leading-7 text-[#687f73] sm:text-base">
-            準備醫事檢驗師國考時，可以依科目刷歷屆試題，再搭配錯題紀錄與弱點分析安排複習順序。
+            可以依科目刷歷屆試題，再搭配錯題紀錄與弱點分析安排複習順序。
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {subjects.map((subject) => (
@@ -141,24 +253,21 @@ export default function MedtechExamPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[26px] border border-[#dfece4] bg-white p-6 sm:p-8">
-          <h2 className="text-2xl font-black tracking-[-0.03em] sm:text-3xl">
-            MedSlime 適合什麼時候用？
-          </h2>
-          <div className="mt-4 space-y-4 text-sm font-bold leading-7 text-[#687f73] sm:text-base">
-            <p>
-              如果你正在找「醫檢師國考刷題」、「醫檢師國考題庫」、「醫檢師歷屆試題」或「醫技國考刷題」，MedSlime 的目的就是把這些練習流程集中在同一個網站裡。
-            </p>
-            <p>
-              題目與標準答案以考選部公開資料為基礎；AI 內容用來協助理解，不取代官方標準答案。詳細來源與使用說明可以在資料來源頁查看。
+        <section className="mt-8 rounded-[28px] bg-[#17372a] p-6 text-white sm:p-8 md:flex md:items-center md:justify-between md:gap-8">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-black tracking-[-0.03em] sm:text-3xl">
+              想刷題，就從首頁開始。
+            </h2>
+            <p className="mt-3 text-sm font-bold leading-7 text-[#c9ddd2] sm:text-base">
+              MedSlime 免安裝，目前可免費使用；登入後可以保存作答紀錄、錯題與學習進度。題目與標準答案以考選部公開資料為基礎，AI 內容用來協助理解，不取代官方標準答案。
             </p>
           </div>
-          <div className="mt-6">
+          <div className="mt-6 shrink-0 md:mt-0">
             <Link
-              href="/study"
-              className="inline-flex rounded-2xl bg-[#17372a] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#244a39] sm:text-base"
+              href="/"
+              className="inline-flex rounded-2xl bg-[#31c978] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#2dbc70] sm:text-base"
             >
-              進入 MedSlime 開始學習 →
+              前往 MedSlime 首頁 →
             </Link>
           </div>
         </section>
