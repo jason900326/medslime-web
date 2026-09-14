@@ -35,6 +35,9 @@ export const metadata: Metadata = {
     "AI 詳解",
     "錯題複習",
   ],
+  verification: {
+    google: "D8CeE1MidMYtQ3Fgv3B9-joH0qQXtTKBuIsMe-FurEI",
+  },
   alternates: {
     canonical: "/",
   },
