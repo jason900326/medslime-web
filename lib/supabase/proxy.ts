@@ -51,13 +51,19 @@ export async function updateSession(request: NextRequest) {
     pathname === "/terms" ||
     pathname === "/feedback";
 
+  const isPublicSeoRoute =
+    pathname === "/medtech-exam" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt";
+
   const isPublicRoute =
     pathname === "/" ||
     pathname === "/shop" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
     isPublicInfoRoute ||
-    isPublicStudyRoute;
+    isPublicStudyRoute ||
+    isPublicSeoRoute;
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
