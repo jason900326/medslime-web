@@ -39,6 +39,7 @@ export default function SiteFooter() {
             </a>
           </div>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-black text-[#557768]">
+            <Link href="/medtech-exam" className="hover:text-[#2a9d5e]">醫檢師國考刷題</Link>
             <Link href="/about" className="hover:text-[#2a9d5e]">資料來源與 AI 說明</Link>
             <Link href="/privacy" className="hover:text-[#2a9d5e]">隱私權政策</Link>
             <Link href="/terms" className="hover:text-[#2a9d5e]">服務條款與著作權</Link>
