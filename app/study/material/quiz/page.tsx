@@ -644,19 +644,20 @@ function QuestionProgress({
 }) {
   return (
     <section className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-4">
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="grid grid-cols-10 gap-1">
         {questions.map((item, questionIndex) => (
           <button
             key={item.id}
             type="button"
             onClick={() => onJump(questionIndex)}
-            className="flex flex-col items-center gap-1"
+            aria-current={questionIndex === currentIndex ? "step" : undefined}
+            className="flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#31c978] focus-visible:ring-offset-2"
           >
             <SimpleSlime
               status={getStatus(item.id)}
               active={questionIndex === currentIndex}
             />
-            <span className="text-[10px] font-black text-[#789083]">
+            <span className="text-[10px] font-black leading-none text-[#789083]">
               {questionIndex + 1}
             </span>
           </button>
@@ -682,30 +683,34 @@ function SimpleSlime({
 
   return (
     <div
-      className={[
-        "relative flex h-[29px] w-[38px] items-center justify-center transition",
-        active ? "scale-110" : "",
-      ].join(" ")}
+      className="relative shrink-0 transition"
       style={{
+        width: 20,
+        height: 15,
         borderRadius: "48% 48% 42% 42% / 56% 56% 42% 42%",
         background: colors.body,
-        border: `2px solid ${colors.border}`,
-        boxShadow: active
-          ? "0 0 0 4px rgba(49,201,120,0.13)"
-          : "0 2px 6px rgba(31,83,53,0.06)",
+        border: `1.5px solid ${colors.border}`,
+        boxShadow: active ? "0 0 0 3px rgba(49,201,120,0.12)" : "none",
       }}
     >
       <span
-        className="absolute h-[5px] w-[3.5px] rounded-full"
-        style={{ background: colors.face, left: 11, top: 10 }}
+        className="absolute rounded-full"
+        style={{ width: 2, height: 3, background: colors.face, left: 5.5, top: 4.5 }}
       />
       <span
-        className="absolute h-[5px] w-[3.5px] rounded-full"
-        style={{ background: colors.face, right: 11, top: 10 }}
+        className="absolute rounded-full"
+        style={{ width: 2, height: 3, background: colors.face, right: 5.5, top: 4.5 }}
       />
       <span
-        className="absolute bottom-[6px] h-[4px] w-[8px] rounded-b-full border-b-2"
-        style={{ borderColor: colors.face }}
+        className="absolute rounded-b-full border-b"
+        style={{
+          width: 4.5,
+          height: 2.5,
+          borderColor: colors.face,
+          left: "50%",
+          bottom: 2.5,
+          transform: "translateX(-50%)",
+        }}
       />
     </div>
   );
