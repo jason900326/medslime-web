@@ -344,7 +344,7 @@ export default function MaterialPage() {
                 </div>
               )}
             </>
-          ) : (
+          ) : analysisState === "idle" ? (
             <>
               <div className="flex flex-col gap-5 rounded-[24px] border border-[#dfeae3] bg-[#f9fcfa] p-5 sm:flex-row sm:items-center">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">📄</div>
@@ -357,52 +357,39 @@ export default function MaterialPage() {
                 <button
                   type="button"
                   onClick={resetFile}
-                  disabled={busy}
-                  className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#60786c] transition hover:bg-[#f5faf7] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#60786c] transition hover:bg-[#f5faf7]"
                 >
                   更換檔案
                 </button>
               </div>
 
-              {analysisState === "idle" && (
-                <button
-                  type="button"
-                  onClick={analyzeFile}
-                  disabled={remaining <= 0}
-                  className="mt-5 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  AI 分析教材
-                </button>
-              )}
-
-              {busy && <AnalysisLoading fileName={file.name} stage={analysisState} />}
-
-              {analysisState === "error" && (
-                <div className="mt-5 rounded-[22px] border border-[#f0dddd] bg-[#fff8f8] p-5">
-                  <div className="font-black text-[#9b5050]">教材分析失敗</div>
-                  <div className="mt-2 text-sm font-bold leading-6 text-[#9b5050]">{errorMessage}</div>
-                  <button
-                    type="button"
-                    onClick={analyzeFile}
-                    disabled={remaining <= 0}
-                    className="mt-4 rounded-xl bg-[#31c978] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    再試一次
-                  </button>
-                </div>
-              )}
-
-              {analysisState === "ready" && result && (
-                <button
-                  type="button"
-                  onClick={startQuiz}
-                  className="mt-5 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
-                >
-                  開始 10 題測驗 →
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={analyzeFile}
+                disabled={remaining <= 0}
+                className="mt-5 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                AI 分析教材
+              </button>
             </>
-          )}
+          ) : busy ? (
+            <AnalysisLoading fileName={file.name} stage={analysisState} />
+          ) : analysisState === "error" ? (
+            <div className="rounded-[22px] border border-[#f0dddd] bg-[#fff8f8] p-5">
+              <div className="font-black text-[#9b5050]">教材分析失敗</div>
+              <div className="mt-2 text-sm font-bold leading-6 text-[#9b5050]">{errorMessage}</div>
+              <button
+                type="button"
+                onClick={analyzeFile}
+                disabled={remaining <= 0}
+                className="mt-4 rounded-xl bg-[#31c978] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                再試一次
+              </button>
+            </div>
+          ) : analysisState === "ready" && result ? (
+            <AnalysisReady onStart={startQuiz} />
+          ) : null}
         </section>
 
         <section className="mt-6 rounded-[22px] border border-[#dfece4] bg-white p-5">
@@ -424,7 +411,7 @@ function AnalysisLoading({
   stage: "reading" | "analyzing";
 }) {
   return (
-    <div className="mt-5 overflow-hidden rounded-[24px] border border-[#dce9e1] bg-[#fbfefc] p-6">
+    <div className="overflow-hidden rounded-[24px] border border-[#dce9e1] bg-[#fbfefc] p-6">
       <div className="flex flex-col items-center text-center">
         <div className="slime-float relative h-24 w-24">
           <img
@@ -488,6 +475,29 @@ function AnalysisLoading({
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+function AnalysisReady({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-[#dce9e1] bg-[#fbfefc] p-6 text-center">
+      <div className="mx-auto h-24 w-24">
+        <img
+          src="/slimes/n-green.png"
+          alt="史萊姆已完成教材分析"
+          className="h-full w-full object-contain"
+        />
+      </div>
+      <div className="mt-2 text-lg font-black text-[#245a3e]">史萊姆吃完了！</div>
+      <div className="mt-1 text-sm font-bold text-[#789083]">10 題教材測驗已經準備好了</div>
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-6 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white transition hover:bg-[#2dbc70]"
+      >
+        開始 10 題測驗 →
+      </button>
     </div>
   );
 }
