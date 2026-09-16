@@ -7,18 +7,39 @@ const errors = [];
 const packageJson = JSON.parse(
   readFileSync(path.join(root, "package.json"), "utf8"),
 );
+const packageLock = JSON.parse(
+  readFileSync(path.join(root, "package-lock.json"), "utf8"),
+);
 
-for (const section of [
+const dependencySections = [
   "dependencies",
   "devDependencies",
   "optionalDependencies",
   "peerDependencies",
-]) {
+];
+const exactVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+for (const section of dependencySections) {
   const dependencies = packageJson[section] ?? {};
 
   for (const [name, spec] of Object.entries(dependencies)) {
-    if (typeof spec === "string" && spec.trim().toLowerCase() === "latest") {
+    if (typeof spec !== "string") continue;
+
+    const normalizedSpec = spec.trim();
+    if (normalizedSpec.toLowerCase() === "latest") {
       errors.push(`${section}.${name} must use a pinned or bounded version, not latest`);
+      continue;
+    }
+
+    if (exactVersionPattern.test(normalizedSpec)) {
+      const lockedVersion = packageLock.packages?.[`node_modules/${name}`]?.version;
+      if (!lockedVersion) {
+        errors.push(`${section}.${name} is pinned to ${normalizedSpec} but missing from package-lock.json`);
+      } else if (lockedVersion !== normalizedSpec) {
+        errors.push(
+          `${section}.${name} is pinned to ${normalizedSpec} but package-lock.json resolves ${lockedVersion}`,
+        );
+      }
     }
   }
 }
