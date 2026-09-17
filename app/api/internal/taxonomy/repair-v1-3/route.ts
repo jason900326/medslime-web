@@ -13,8 +13,8 @@ function normalizeIds(value: unknown) {
   return Array.from(
     new Set(
       value
-        .map((item) => String(item ?? "").trim())
-        .filter((item) => /^\d+$/.test(item)),
+        .map((item) => Number(String(item ?? "").trim()))
+        .filter((item) => Number.isSafeInteger(item) && item > 0),
     ),
   ).slice(0, 100);
 }
@@ -44,13 +44,11 @@ export async function POST(request: NextRequest) {
       throw new Error(`讀取 v1.3 repair 題目失敗：${error.message}`);
     }
 
-    const rowsById = new Map(
-      (data ?? []).map((row) => [String(row.id ?? ""), row] as const),
-    );
-    const eligibleIds: string[] = [];
-    const alreadyPendingIds: string[] = [];
-    const alreadyRepairedIds: string[] = [];
-    const skippedIds: string[] = [];
+    const rowsById = new Map((data ?? []).map((row) => [row.id, row] as const));
+    const eligibleIds: number[] = [];
+    const alreadyPendingIds: number[] = [];
+    const alreadyRepairedIds: number[] = [];
+    const skippedIds: number[] = [];
 
     for (const id of ids) {
       const row = rowsById.get(id);
