@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 
 export type QuestionLearningState = {
   questionKey: string;
@@ -192,7 +193,7 @@ export async function saveQuestionLearningState(input: {
   if (!userId) throw new Error("請先登入。");
 
   const now = new Date().toISOString();
-  const payload: Record<string, unknown> = {
+  const payload: TablesInsert<"user_question_learning_state"> = {
     user_id: userId,
     question_key: questionKey,
     concept_unfamiliar: input.conceptUnfamiliar,
@@ -212,7 +213,7 @@ export async function saveQuestionLearningState(input: {
     .single();
 
   if (result.error && missingMasteryColumns(result.error.message)) {
-    const legacyPayload = {
+    const legacyPayload: TablesInsert<"user_question_learning_state"> = {
       user_id: userId,
       question_key: questionKey,
       concept_unfamiliar: input.conceptUnfamiliar,
