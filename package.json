@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.ts",
     "calibrate:taxonomy": "node scripts/calibrate-taxonomy.mjs",
     "validate:taxonomy-v1.2": "node scripts/validate-taxonomy-v1-2.mjs",
     "validate:taxonomy-v1.3": "node scripts/validate-taxonomy-v1-3.mjs",
