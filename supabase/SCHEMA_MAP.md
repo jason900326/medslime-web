@@ -1,8 +1,10 @@
 # MedSlime Supabase schema map
 
-Last audited: 2026-09-10
+Last audited: 2026-09-17
 
 This file defines the intended source of truth for the current MedSlime app. Keep it updated when adding or replacing tables so the project does not accumulate duplicate persistence paths again.
+
+The live Supabase schema is also captured in `lib/supabase/database.types.ts`. Browser, server, and service-role Supabase clients compile against that generated `Database` type. After every database migration, regenerate the type file and run lint, typecheck, and build. See `supabase/README.md` for migration-ledger and execution rules; historical SQL filenames are not proof that a migration still needs to run.
 
 ## Active tables
 
@@ -13,6 +15,7 @@ This file defines the intended source of truth for the current MedSlime app. Kee
 | `player_entitlements` | Service entitlements | Daily free detailed-explanation usage + fixed Pro expiry (`pro_expires_at`) |
 | `exam_explanation_entitlements` | Permanent paid content access | One row per user + purchased national-exam explanation set |
 | `exam_attempts` | Exam/free-quiz attempt history | Score history, review snapshots, all-question outcomes, subject trends and Pro topic analysis |
+| `user_question_learning_state` | Per-question learner memory/mastery state | Concept-unfamiliar flag, learner note, mastery streak, mastered timestamp and last-practiced timestamp |
 | `payment_orders` | Payment ledger | ECPay ledger; new orders store direct `entitlement_type` / `entitlement_key`, never wallet or credit grants |
 | `national_exam_questions` | National-exam question bank + shared topic taxonomy | Current national-exam/free-quiz APIs; canonical `topic`, `subtopic`, `concepts` metadata |
 | `shared_ai_explanations` | Shared national-exam explanation cache | Internal cost optimization for reusable national-exam explanations |
