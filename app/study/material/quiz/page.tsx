@@ -6,6 +6,7 @@ import TopBar from "@/components/top-bar";
 import { useGameState } from "@/components/game-state-provider";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import { upsertMistakes } from "@/lib/mistake-store";
+import { useQuizSession } from "@/lib/use-quiz-session";
 
 type Question = {
   id: string;
@@ -100,15 +101,22 @@ function loadStoredQuiz(): {
 export default function MaterialQuizPage() {
   const router = useRouter();
   const game = useGameState();
+  const {
+    index,
+    setIndex,
+    answers,
+    setAnswers,
+    uncertain,
+    setUncertain,
+    struckOptions,
+    toggleStrike,
+    getStatus,
+  } = useQuizSession();
 
   const [sourceName, setSourceName] = useState("你的教材");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
-  const [struckOptions, setStruckOptions] = useState<Record<string, number[]>>({});
   const [finished, setFinished] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [recorded, setRecorded] = useState(false);
@@ -159,28 +167,6 @@ export default function MaterialQuizPage() {
   );
 
   const unansweredCount = unansweredNumbers.length;
-
-  const toggleStrike = (questionId: string, optionIndex: number) => {
-    setStruckOptions((current) => {
-      const currentList = current[questionId] ?? [];
-      const exists = currentList.includes(optionIndex);
-      return {
-        ...current,
-        [questionId]: exists
-          ? currentList.filter((item) => item !== optionIndex)
-          : [...currentList, optionIndex],
-      };
-    });
-  };
-
-  const getStatus = (id: string) => {
-    const hasAnswer = answers[id] !== undefined;
-    const isUncertain = uncertain[id] ?? false;
-    if (hasAnswer && isUncertain) return "yellow" as const;
-    if (hasAnswer) return "green" as const;
-    if (isUncertain) return "red" as const;
-    return "gray" as const;
-  };
 
   const saveMistakes = async () => {
     const now = new Date().toISOString();
