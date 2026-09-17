@@ -28,6 +28,11 @@ import {
   type GameState,
   type PlayerSlimeState,
 } from "@/lib/game-state-logic";
+import {
+  createGameStateRecord,
+  loadGameStateRecord,
+  saveGameStateRecord,
+} from "@/lib/game-state-storage";
 
 export type { DailyActivity, FocusSession } from "@/lib/game-state-logic";
 
@@ -108,15 +113,21 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const [todayKey, setTodayKey] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+  const [persistenceRevision, setPersistenceRevision] = useState(0);
+  const persistedUpdatedAtRef = useRef<string | null>(null);
+  const persistenceGenerationRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  const replaceState = (next: GameState) => {
+  const replaceState = (next: GameState, persist = true) => {
     stateRef.current = next;
     setState(next);
+    if (persist) setPersistenceRevision((revision) => revision + 1);
   };
   const updateState = (updater: (current: GameState) => GameState) => {
     const next = updater(stateRef.current);
     stateRef.current = next;
     setState(next);
+    setPersistenceRevision((revision) => revision + 1);
     return next;
   };
 
@@ -124,52 +135,58 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     setTodayKey(getLocalDateKey());
     let cancelled = false;
     const loadForUser = async (nextUserId: string | null) => {
+      const generation = persistenceGenerationRef.current + 1;
+      persistenceGenerationRef.current = generation;
+      persistedUpdatedAtRef.current = null;
+      setPersistenceRevision(0);
       setIsReady(false);
       setUserId(nextUserId);
       setLoadedUserId(null);
+
       if (!nextUserId) {
         if (!cancelled) {
-          replaceState({
-            ...anonymousState,
-            slimes: { ...anonymousState.slimes },
-            activityByDate: {},
-            claimedAchievementIds: [],
-            claimedTaskIds: [],
-            focusHistory: [],
-            nationalExamRewardHistory: [],
-          });
+          replaceState(
+            {
+              ...anonymousState,
+              slimes: { ...anonymousState.slimes },
+              activityByDate: {},
+              claimedAchievementIds: [],
+              claimedTaskIds: [],
+              focusHistory: [],
+              nationalExamRewardHistory: [],
+            },
+            false,
+          );
           setIsReady(true);
         }
         return;
       }
-      const { data, error } = await supabase
-        .from("player_account_state")
-        .select("state")
-        .eq("user_id", nextUserId)
-        .maybeSingle();
-      if (cancelled) return;
-      if (error) {
+
+      try {
+        let record = await loadGameStateRecord(supabase, nextUserId);
+        if (cancelled || persistenceGenerationRef.current !== generation) return;
+
+        if (!record) {
+          record = await createGameStateRecord(
+            supabase,
+            nextUserId,
+            cloneStarterState(),
+          );
+          if (cancelled || persistenceGenerationRef.current !== generation) return;
+        }
+
+        persistedUpdatedAtRef.current = record.updatedAt;
+        replaceState(normalizeState(record.state), false);
+        setLoadedUserId(nextUserId);
+        setIsReady(true);
+      } catch (error) {
+        if (cancelled || persistenceGenerationRef.current !== generation) return;
         console.error("讀取 MedSlime 遊戲資料失敗：", error);
-        replaceState(cloneStarterState());
-        setLoadedUserId(nextUserId);
+        // 顯示安全的本機 fallback，但刻意不設定 loadedUserId / updatedAt。
+        // 這樣暫時性的讀取錯誤永遠不會把 starter state 寫回資料庫。
+        replaceState(cloneStarterState(), false);
         setIsReady(true);
-        return;
       }
-      if (!data) {
-        const initialState = cloneStarterState();
-        const { error: insertError } = await supabase
-          .from("player_account_state")
-          .insert({ user_id: nextUserId, state: initialState });
-        if (cancelled) return;
-        if (insertError) console.error("建立 MedSlime 遊戲資料失敗：", insertError);
-        replaceState(initialState);
-        setLoadedUserId(nextUserId);
-        setIsReady(true);
-        return;
-      }
-      replaceState(normalizeState(data.state));
-      setLoadedUserId(nextUserId);
-      setIsReady(true);
     };
     const initialize = async () => {
       const {
@@ -185,25 +202,59 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
+      persistenceGenerationRef.current += 1;
       subscription.unsubscribe();
     };
   }, [supabase]);
 
   useEffect(() => {
-    if (!isReady || !userId || loadedUserId !== userId) return;
+    if (
+      persistenceRevision <= 0 ||
+      !isReady ||
+      !userId ||
+      loadedUserId !== userId ||
+      !persistedUpdatedAtRef.current
+    ) {
+      return;
+    }
+
+    const generation = persistenceGenerationRef.current;
+    const stateToSave = stateRef.current;
     const timeout = window.setTimeout(() => {
-      void supabase
-        .from("player_account_state")
-        .upsert(
-          { user_id: userId, state, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" },
-        )
-        .then(({ error }) => {
-          if (error) console.error("儲存 MedSlime 遊戲資料失敗：", error);
+      saveQueueRef.current = saveQueueRef.current
+        .then(async () => {
+          if (persistenceGenerationRef.current !== generation) return;
+          const expectedUpdatedAt = persistedUpdatedAtRef.current;
+          if (!expectedUpdatedAt) return;
+
+          const result = await saveGameStateRecord(
+            supabase,
+            userId,
+            stateToSave,
+            expectedUpdatedAt,
+          );
+          if (persistenceGenerationRef.current !== generation) return;
+
+          if (result.status === "saved") {
+            persistedUpdatedAtRef.current = result.updatedAt;
+            return;
+          }
+
+          // 另一個分頁／裝置先完成寫入：放棄舊快照並採用資料庫最新版本，
+          // 也讓已排隊的舊 save 因 generation 不同而自動失效。
+          persistenceGenerationRef.current += 1;
+          persistedUpdatedAtRef.current = result.record.updatedAt;
+          setPersistenceRevision(0);
+          replaceState(normalizeState(result.record.state), false);
+          console.warn("MedSlime 遊戲資料偵測到較新的遠端版本，已重新同步。");
+        })
+        .catch((error) => {
+          console.error("儲存 MedSlime 遊戲資料失敗：", error);
         });
     }, 300);
+
     return () => window.clearTimeout(timeout);
-  }, [state, isReady, userId, loadedUserId, supabase]);
+  }, [persistenceRevision, isReady, userId, loadedUserId, supabase]);
 
   const todayFocusSessions = useMemo(() => {
     if (!todayKey) return [];
