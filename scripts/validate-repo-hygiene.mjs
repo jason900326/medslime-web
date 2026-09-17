@@ -58,6 +58,32 @@ if (existsSync(slimeDirectory)) {
   }
 }
 
+const generatedDatabaseTypes = path.join(root, "lib", "supabase", "database.types.ts");
+if (!existsSync(generatedDatabaseTypes)) {
+  errors.push("lib/supabase/database.types.ts is required; regenerate it from the live Supabase schema");
+}
+
+const typedSupabaseClients = [
+  ["lib/supabase/client.ts", "createBrowserClient<Database>"],
+  ["lib/supabase/server.ts", "createServerClient<Database>"],
+  ["lib/supabase/admin.ts", "createSupabaseClient<Database>"],
+];
+
+for (const [relativePath, typedClientCall] of typedSupabaseClients) {
+  const filePath = path.join(root, relativePath);
+  if (!existsSync(filePath)) {
+    errors.push(`${relativePath} is missing`);
+    continue;
+  }
+
+  const source = readFileSync(filePath, "utf8");
+  if (!source.includes("database.types") || !source.includes(typedClientCall)) {
+    errors.push(
+      `${relativePath} must use the generated Database type (${typedClientCall})`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error("Repository hygiene validation failed:\n");
   for (const error of errors) {
