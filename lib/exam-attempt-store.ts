@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 
 export type ExamAttemptReviewItem = {
   id: string;
@@ -365,7 +366,7 @@ export async function saveNationalExamAttempt(
   if (!user) return null;
 
   const examKey = `${input.year}-${input.session}-${input.subject}`;
-  const baseInsert = {
+  const baseInsert: TablesInsert<"exam_attempts"> = {
     user_id: user.id,
     year: input.year,
     session: input.session,
@@ -380,7 +381,7 @@ export async function saveNationalExamAttempt(
     completed_at: new Date().toISOString(),
   };
 
-  const insertWithId = (payload: Record<string, unknown>) =>
+  const insertWithId = (payload: TablesInsert<"exam_attempts">) =>
     supabase.from("exam_attempts").insert(payload).select("id").single();
 
   let result = await insertWithId({
