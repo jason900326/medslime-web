@@ -8,6 +8,7 @@ import AIExplanationButton from "@/components/ai-explanation-button";
 import { useGameState } from "@/components/game-state-provider";
 import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
+import { useQuizSession } from "@/lib/use-quiz-session";
 
 type FreeQuestion = {
   id: string;
@@ -64,11 +65,19 @@ function FreeQuizRunner() {
     return `/study/free-quiz?${params.toString()}`;
   };
 
+  const {
+    index,
+    setIndex,
+    answers,
+    setAnswers,
+    uncertain,
+    setUncertain,
+    struckOptions,
+    toggleStrike,
+    getStatus: getQuestionStatus,
+    resetSession,
+  } = useQuizSession();
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
-  const [struckOptions, setStruckOptions] = useState<Record<string, number[]>>({});
   const [finished, setFinished] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
@@ -80,10 +89,7 @@ function FreeQuizRunner() {
 
     async function load() {
       setLoadState({ status: "loading" });
-      setIndex(0);
-      setAnswers({});
-      setUncertain({});
-      setStruckOptions({});
+      resetSession();
       setFinished(false);
       setRecorded(false);
       setElapsedAtFinish(0);
@@ -113,7 +119,7 @@ function FreeQuizRunner() {
 
     void load();
     return () => controller.abort();
-  }, [configKey, from, to, subject, count, topic, subtopic]);
+  }, [configKey, from, to, subject, count, topic, subtopic, resetSession]);
 
   if (loadState.status === "loading") return <LoadingQuiz />;
 
@@ -161,28 +167,6 @@ function FreeQuizRunner() {
     `national-exam:${item.sourceYear}:${item.sourceSession}:${subject}:${item.sourceQuestionNumber}`;
   const sourceLabel = (item: FreeQuestion) =>
     `${item.sourceYear} 年 · 第 ${item.sourceSession} 次 · ${subject}`;
-
-  const toggleStrike = (questionId: string, optionIndex: number) => {
-    setStruckOptions((current) => {
-      const list = current[questionId] ?? [];
-      const exists = list.includes(optionIndex);
-      return {
-        ...current,
-        [questionId]: exists
-          ? list.filter((item) => item !== optionIndex)
-          : [...list, optionIndex],
-      };
-    });
-  };
-
-  const getQuestionStatus = (questionId: string) => {
-    const hasAnswer = answers[questionId] !== undefined;
-    const isUncertain = uncertain[questionId] ?? false;
-    if (hasAnswer && isUncertain) return "yellow" as const;
-    if (hasAnswer) return "green" as const;
-    if (isUncertain) return "red" as const;
-    return "gray" as const;
-  };
 
   const finish = async () => {
     const startedAt = Number(sessionStorage.getItem(STARTED_AT_KEY));
