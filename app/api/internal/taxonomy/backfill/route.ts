@@ -740,7 +740,7 @@ export async function POST(request: NextRequest) {
           taxonomy_model: model,
           taxonomy_updated_at: new Date().toISOString(),
         })
-        .eq("id", source.id);
+        .eq("id", Number(source.id));
 
       if (updateError) {
         throw new Error(`寫入題目 ${source.id} 分類失敗：${updateError.message}`);
