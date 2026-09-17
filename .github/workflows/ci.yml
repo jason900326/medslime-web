@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Install, lint, typecheck, test, build
+    name: Install, lint, typecheck, test, build, smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -67,6 +67,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Production smoke tests
+        run: npm run test:smoke
 
   payment-stage-readiness:
     name: ECPay stage readiness
