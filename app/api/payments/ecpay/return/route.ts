@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
       const { error: fulfillError } = await admin.rpc("fulfill_payment_order", {
         p_merchant_trade_no: merchantTradeNo,
-        p_provider_trade_no: tradeNo,
+        p_provider_trade_no: tradeNo ?? undefined,
       });
 
       if (fulfillError) {

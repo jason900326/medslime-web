@@ -363,7 +363,13 @@ async function loadTaxonomyQuestions(
   questionIds: string[],
 ) {
   const map = new Map<string, TaxonomyQuestion>();
-  const uniqueIds = [...new Set(questionIds.filter(Boolean))];
+  const uniqueIds = [
+    ...new Set(
+      questionIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isSafeInteger(id) && id > 0),
+    ),
+  ];
 
   for (const chunk of chunkValues(uniqueIds, TAXONOMY_LOOKUP_CHUNK_SIZE)) {
     const { data, error } = await admin
