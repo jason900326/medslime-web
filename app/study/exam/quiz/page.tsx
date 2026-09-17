@@ -20,6 +20,7 @@ import {
 } from "@/components/game-state-provider";
 import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
+import { useQuizSession } from "@/lib/use-quiz-session";
 
 type Question = {
   id: string;
@@ -75,11 +76,19 @@ function ExamQuizContent() {
   const subject = searchParams.get("subject") ?? "國考";
   const examKey = `${year}-${session}-${subject}`;
 
+  const {
+    index,
+    setIndex,
+    answers,
+    setAnswers,
+    uncertain,
+    setUncertain,
+    struckOptions,
+    toggleStrike,
+    getStatus: getQuestionStatus,
+    resetSession,
+  } = useQuizSession();
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
-  const [struckOptions, setStruckOptions] = useState<Record<string, number[]>>({});
   const [finished, setFinished] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -94,10 +103,7 @@ function ExamQuizContent() {
 
     async function loadExam() {
       setLoadState({ status: "loading" });
-      setIndex(0);
-      setAnswers({});
-      setUncertain({});
-      setStruckOptions({});
+      resetSession();
       setFinished(false);
       setRecorded(false);
       setElapsedAtFinish(0);
@@ -137,7 +143,7 @@ function ExamQuizContent() {
 
     loadExam();
     return () => controller.abort();
-  }, [examKey, year, session, subject]);
+  }, [examKey, year, session, subject, resetSession]);
 
   useEffect(() => {
     const seen = localStorage.getItem(TUTORIAL_STORAGE_KEY);
@@ -196,29 +202,6 @@ function ExamQuizContent() {
     const isUncertain = uncertain[item.id] ?? false;
     return isWrong || isUncertain;
   });
-
-  const toggleStrike = (questionId: string, optionIndex: number) => {
-    setStruckOptions((current) => {
-      const list = current[questionId] ?? [];
-      const exists = list.includes(optionIndex);
-      return {
-        ...current,
-        [questionId]: exists
-          ? list.filter((item) => item !== optionIndex)
-          : [...list, optionIndex],
-      };
-    });
-  };
-
-  const getQuestionStatus = (questionId: string) => {
-    const hasAnswer = answers[questionId] !== undefined;
-    const isUncertain = uncertain[questionId] ?? false;
-
-    if (hasAnswer && isUncertain) return "yellow";
-    if (hasAnswer) return "green";
-    if (isUncertain) return "red";
-    return "gray";
-  };
 
   const saveMistakes = async () => {
     const now = new Date().toISOString();
