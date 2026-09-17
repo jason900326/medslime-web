@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/database.types";
 
 
 type MaterialRequest = {
@@ -190,8 +191,8 @@ function hammingDistanceHex(a: string, b: string) {
 type CachedMaterialRow = {
   similarity_hash: string;
   char_count: number;
-  analysis: unknown;
-  questions: unknown;
+  analysis: Json;
+  questions: Json;
 };
 
 async function findCachedMaterial(
@@ -259,8 +260,8 @@ async function saveMaterialCache(input: {
   contentHash: string;
   simHash: string;
   charCount: number;
-  analysis: unknown;
-  questions: unknown;
+  analysis: Json;
+  questions: Json;
 }) {
   const supabase = await createServerSupabaseClient();
 
@@ -437,8 +438,8 @@ export async function POST(request: Request) {
       "questions" in result
     ) {
       const typedResult = result as {
-        analysis: unknown;
-        questions: unknown;
+        analysis: Json;
+        questions: Json;
       };
 
       await saveMaterialCache({
