@@ -6,11 +6,9 @@ import {
   formatAttemptDuration,
   readExamAttempts,
   type ExamAttempt,
-} from "@/lib/exam-attempt-store";
-import {
-  readGuestExamAttempt,
   type SaveExamAttemptInput,
-} from "@/lib/guest-exam-attempt-store";
+} from "@/lib/exam-attempt-store";
+import { readGuestExamAttempt } from "@/lib/guest-exam-attempt-store";
 
 const FINISHED_EVENT = "medslime:exam-finished";
 
