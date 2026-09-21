@@ -38,6 +38,15 @@ type SubjectDirection = {
   availableTopicCount: number;
 };
 
+type DailyLearningSummary = {
+  date: string;
+  attemptCount: number;
+  answeredCount: number;
+  mainWeakness: { subject: string; topic: string } | null;
+  improvement: { subject: string; topic: string; delta: number } | null;
+  recommended: { subject: string; topic: string } | null;
+};
+
 type TaxonomyRow = {
   id: unknown;
   topic: unknown;
@@ -48,6 +57,15 @@ const LOOKUP_CHUNK_SIZE = 200;
 
 function round1(value: number) {
   return Number(value.toFixed(1));
+}
+
+function taipeiDayKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function normalizeQuestionOutcomes(value: unknown): QuestionOutcome[] {
@@ -205,6 +223,84 @@ function buildSubjectDirections(
     .sort((a, b) => a.average - b.average || a.subject.localeCompare(b.subject));
 }
 
+function buildDailySummary(
+  attempts: Attempt[],
+  observations: Array<{
+    attemptId: string;
+    completedAt: string;
+    subject: string;
+    topic: string;
+    questionId: string;
+    correct: boolean;
+    uncertain: boolean;
+  }>,
+  subjects: SubjectDirection[],
+): DailyLearningSummary {
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const yesterdayKey = taipeiDayKey(yesterday);
+  const yesterdayAttempts = attempts.filter(
+    (attempt) => taipeiDayKey(new Date(attempt.completedAt)) === yesterdayKey,
+  );
+  const yesterdayIds = new Set(yesterdayAttempts.map((attempt) => attempt.id));
+  const yesterdayObservations = observations.filter((item) =>
+    yesterdayIds.has(item.attemptId),
+  );
+
+  const weaknessCandidates = [...new Set(yesterdayObservations.map((item) => item.subject))]
+    .flatMap((subject) =>
+      buildTopicStats(
+        yesterdayObservations.filter((item) => item.subject === subject),
+      ).map((topic) => ({ subject, topic })),
+    )
+    .sort(
+      (a, b) =>
+        b.topic.priorityScore - a.topic.priorityScore ||
+        b.topic.answeredCount - a.topic.answeredCount,
+    );
+  const mainWeakness = weaknessCandidates[0] ?? null;
+
+  const improvementCandidates = [...new Set(observations.map((item) => item.subject))]
+    .flatMap((subject) =>
+      buildTopicStats(observations.filter((item) => item.subject === subject)).flatMap(
+        (topic) => {
+          if (
+            topic.attempts < 2 ||
+            topic.answeredCount < 10 ||
+            topic.recentAccuracy === null ||
+            topic.previousAccuracy === null
+          ) {
+            return [];
+          }
+          const delta = round1(topic.recentAccuracy - topic.previousAccuracy);
+          return delta >= 5 ? [{ subject, topic: topic.topic, delta }] : [];
+        },
+      ),
+    )
+    .sort((a, b) => b.delta - a.delta);
+  const improvement = improvementCandidates[0] ?? null;
+
+  const recommendedSubject = subjects[0] ?? null;
+  const recommendedTopic = recommendedSubject?.topicStats[0] ?? null;
+
+  return {
+    date: yesterdayKey,
+    attemptCount: yesterdayAttempts.length,
+    answeredCount: yesterdayAttempts.reduce(
+      (sum, attempt) =>
+        sum + attempt.questionOutcomes.filter((outcome) => outcome.answered).length,
+      0,
+    ),
+    mainWeakness: mainWeakness
+      ? { subject: mainWeakness.subject, topic: mainWeakness.topic.topic }
+      : null,
+    improvement,
+    recommended:
+      recommendedSubject && recommendedTopic
+        ? { subject: recommendedSubject.subject, topic: recommendedTopic.topic }
+        : null,
+  };
+}
+
 async function readAttempts(admin: ReturnType<typeof createAdminClient>, userId: string) {
   const result = await admin
     .from("exam_attempts")
@@ -299,9 +395,11 @@ export async function GET() {
     const visibleLimit = isPro ? 3 : 1;
 
     if (!available) {
+      const subjects = buildSubjectDirections(attempts, [], visibleLimit);
       return NextResponse.json({
-        subjects: buildSubjectDirections(attempts, [], visibleLimit),
+        subjects,
         isPro,
+        dailySummary: isPro ? buildDailySummary(attempts, [], subjects) : null,
         message: "新版作答資料尚未啟用主題分析。",
       });
     }
@@ -333,6 +431,7 @@ export async function GET() {
     return NextResponse.json({
       isPro,
       subjects,
+      dailySummary: isPro ? buildDailySummary(attempts, observations, subjects) : null,
       message:
         observations.length === 0
           ? "完成新版考卷後，這裡會開始整理你的主題弱點。"

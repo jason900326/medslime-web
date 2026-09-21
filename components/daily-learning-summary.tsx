@@ -3,37 +3,25 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useProStatus } from "@/hooks/use-pro-status";
-import { readExamAttempts, type ExamAttempt } from "@/lib/exam-attempt-store";
-
-type TopicStat = {
-  topic: string;
-  attempts: number;
-  answeredCount: number;
-  recentAccuracy: number | null;
-  previousAccuracy: number | null;
-};
-
-type SubjectDirection = {
-  subject: string;
-  topicStats: TopicStat[];
-};
 
 type DirectionPayload = {
   isPro: boolean;
-  subjects: SubjectDirection[];
+  dailySummary: {
+    date: string;
+    attemptCount: number;
+    answeredCount: number;
+    mainWeakness: { subject: string; topic: string } | null;
+    improvement: { subject: string; topic: string; delta: number } | null;
+    recommended: { subject: string; topic: string } | null;
+  } | null;
 };
 
 type SummaryState =
   | { status: "idle" | "loading" }
-  | {
-      status: "ready";
-      attempts: ExamAttempt[];
-      direction: DirectionPayload | null;
-    }
+  | { status: "ready"; direction: DirectionPayload }
   | { status: "hidden" };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const SEEN_KEY_PREFIX = "medslime_daily_learning_summary_seen_v1";
+const SEEN_KEY_PREFIX = "medslime_daily_learning_summary_seen_v2";
 
 function taipeiDayKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -56,30 +44,9 @@ function shortSubject(subject: string) {
     .trim();
 }
 
-function improvementLabel(topic: TopicStat | null) {
-  if (
-    !topic ||
-    topic.attempts < 2 ||
-    topic.answeredCount < 10 ||
-    topic.recentAccuracy === null ||
-    topic.previousAccuracy === null
-  ) {
-    return "持續累積作答後，會開始顯示改善狀態。";
-  }
-
-  const delta = topic.recentAccuracy - topic.previousAccuracy;
-  if (delta >= 5) return "最近表現有開始改善。";
-  if (delta <= -5) return "最近仍需要優先補強。";
-  return "最近表現大致持平，繼續觀察。";
-}
-
 export default function DailyLearningSummary() {
   const auth = useProStatus();
   const todayKey = useMemo(() => taipeiDayKey(new Date()), []);
-  const yesterdayKey = useMemo(
-    () => taipeiDayKey(new Date(Date.now() - DAY_MS)),
-    [],
-  );
   const [state, setState] = useState<SummaryState>({ status: "idle" });
 
   useEffect(() => {
@@ -98,18 +65,14 @@ export default function DailyLearningSummary() {
     let cancelled = false;
     setState({ status: "loading" });
 
-    void Promise.all([
-      readExamAttempts(120),
-      fetch("/api/learning-direction", { cache: "no-store" })
-        .then(async (response) => {
-          if (!response.ok) return null;
-          return (await response.json()) as DirectionPayload;
-        })
-        .catch(() => null),
-    ])
-      .then(([attempts, direction]) => {
+    void fetch("/api/learning-direction", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("學習統整讀取失敗。");
+        return (await response.json()) as DirectionPayload;
+      })
+      .then((direction) => {
         if (cancelled) return;
-        setState({ status: "ready", attempts, direction });
+        setState({ status: "ready", direction });
         try {
           window.localStorage.setItem(key, "1");
         } catch {
@@ -127,37 +90,34 @@ export default function DailyLearningSummary() {
 
   if (auth.loading || !auth.isPro || state.status !== "ready") return null;
 
-  const yesterdayAttempts = state.attempts.filter(
-    (attempt) => taipeiDayKey(new Date(attempt.completedAt)) === yesterdayKey,
-  );
-  const answeredYesterday = yesterdayAttempts.reduce(
-    (sum, attempt) => sum + attempt.answeredCount,
-    0,
-  );
-  const prioritySubject = state.direction?.subjects[0] ?? null;
-  const priorityTopic = prioritySubject?.topicStats[0] ?? null;
-
-  const practiceHref =
-    prioritySubject && priorityTopic
-      ? "/study/free-quiz/quiz?" +
-        new URLSearchParams({
-          from: "106",
-          to: "115",
-          subject: prioritySubject.subject,
-          topic: priorityTopic.topic,
-          count: "10",
-        }).toString()
-      : "/study/exam";
+  const daily = state.direction.dailySummary;
+  if (!daily) return null;
 
   const yesterdayCopy =
-    yesterdayAttempts.length > 0
-      ? `昨天完成 ${yesterdayAttempts.length} 次作答，共作答 ${answeredYesterday} 題。`
+    daily.attemptCount > 0
+      ? `昨天完成 ${daily.attemptCount} 次作答，共作答 ${daily.answeredCount} 題。`
       : "昨天沒有新的作答紀錄。";
 
-  const weaknessCopy =
-    prioritySubject && priorityTopic
-      ? `目前最需要補的是 ${shortSubject(prioritySubject.subject)}的「${priorityTopic.topic}」。`
-      : "再完成一些題目後，這裡會整理你最需要補的方向。";
+  const weaknessCopy = daily.mainWeakness
+    ? `昨天最容易失分的是 ${shortSubject(daily.mainWeakness.subject)}的「${daily.mainWeakness.topic}」。`
+    : daily.attemptCount > 0
+      ? "昨天的題目還沒有足夠 taxonomy 資料可以判定主要弱點。"
+      : "今天可以先從長期優先補強項目開始。";
+
+  const improvementCopy = daily.improvement
+    ? `最近改善：${shortSubject(daily.improvement.subject)}的「${daily.improvement.topic}」有上升。`
+    : "目前還看不到明顯的長期改善趨勢，先維持練習節奏。";
+
+  const practiceHref = daily.recommended
+    ? "/study/free-quiz/quiz?" +
+      new URLSearchParams({
+        from: "106",
+        to: "115",
+        subject: daily.recommended.subject,
+        topic: daily.recommended.topic,
+        count: "10",
+      }).toString()
+    : "/study/exam";
 
   const dismiss = () => setState({ status: "hidden" });
 
@@ -175,7 +135,7 @@ export default function DailyLearningSummary() {
             {weaknessCopy}
           </p>
           <p className="mt-1 text-xs font-bold leading-5 text-[#8f7b49]">
-            {improvementLabel(priorityTopic)}
+            {improvementCopy}
           </p>
         </div>
         <button
@@ -192,7 +152,9 @@ export default function DailyLearningSummary() {
         href={practiceHref}
         className="mt-4 inline-flex rounded-xl bg-[#2f7a4f] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#286b45]"
       >
-        {priorityTopic ? `今天先補：${priorityTopic.topic} →` : "今天開始刷一份考卷 →"}
+        {daily.recommended
+          ? `今天先補：${daily.recommended.topic} →`
+          : "今天開始刷一份考卷 →"}
       </Link>
     </section>
   );
