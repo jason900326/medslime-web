@@ -1,6 +1,7 @@
 import Link from "next/link";
 import TopBar from "@/components/top-bar";
 import AppNavigation from "@/components/app-navigation";
+import DailyLearningSummary from "@/components/daily-learning-summary";
 
 const studyItems = [
   { icon: "🎯", title: "自由測驗", href: "/study/free-quiz" },
@@ -22,6 +23,8 @@ export default function StudyPage() {
             準備國考，就從國考題庫開始。
           </p>
         </section>
+
+        <DailyLearningSummary />
 
         <Link
           href="/study/exam"
