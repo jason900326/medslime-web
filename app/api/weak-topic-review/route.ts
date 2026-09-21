@@ -2,13 +2,27 @@ import { connection, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const REVIEW_VERSION = "weak-topic-review-v1";
+const REVIEW_VERSION = "weak-topic-review-v2";
+
+type ReviewFormat =
+  | "comparison_table"
+  | "steps"
+  | "bullets"
+  | "formula_rules"
+  | "causal_chain"
+  | "pattern_match";
+
+type ReviewItem = {
+  label: string;
+  content: string;
+};
 
 type WeakTopicReview = {
   version: typeof REVIEW_VERSION;
   title: string;
   summary: string;
-  points: string[];
+  format: ReviewFormat;
+  items: ReviewItem[];
 };
 
 type OpenAIResponse = {
@@ -52,21 +66,40 @@ function normalizeReview(value: unknown): WeakTopicReview | null {
   const raw = value as Record<string, unknown>;
   const title = typeof raw.title === "string" ? raw.title.trim() : "";
   const summary = typeof raw.summary === "string" ? raw.summary.trim() : "";
-  const points = Array.isArray(raw.points)
-    ? raw.points
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, 5)
+  const allowedFormats = new Set<ReviewFormat>([
+    "comparison_table",
+    "steps",
+    "bullets",
+    "formula_rules",
+    "causal_chain",
+    "pattern_match",
+  ]);
+  const format =
+    typeof raw.format === "string" && allowedFormats.has(raw.format as ReviewFormat)
+      ? (raw.format as ReviewFormat)
+      : null;
+  const items = Array.isArray(raw.items)
+    ? raw.items
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const row = item as Record<string, unknown>;
+          const label = typeof row.label === "string" ? row.label.trim() : "";
+          const content = typeof row.content === "string" ? row.content.trim() : "";
+          if (!label || !content) return null;
+          return { label, content } satisfies ReviewItem;
+        })
+        .filter((item): item is ReviewItem => Boolean(item))
+        .slice(0, 6)
     : [];
 
-  if (!title || !summary || points.length < 2) return null;
+  if (!title || !summary || !format || items.length < 2) return null;
 
   return {
     version: REVIEW_VERSION,
     title,
     summary,
-    points,
+    format,
+    items,
   };
 }
 
@@ -173,7 +206,9 @@ export async function GET(request: NextRequest) {
       "你是 MedSlime 的弱點補強編輯。使用者的弱點主題已由程式與作答資料決定，你只負責把這個主題整理成 1–3 分鐘可以讀完的複習內容。",
       "不要重新判斷使用者是否真的弱，也不要比較其他主題。",
       "使用繁體中文，語氣直接、清楚、專業。不要寫成完整教科書章節。",
-      "summary 用 2–3 句話說清楚這個主題最該先掌握的核心；points 產生 2–5 個真正值得記住的判斷點。",
+      "summary 用 2–3 句話說清楚這個主題最該先掌握的核心。",
+      "請依內容自動挑一種 format：比較題用 comparison_table；流程用 steps；單純記憶重點用 bullets；計算題用 formula_rules；機轉用 causal_chain；鑑別或看到線索要聯想到答案時用 pattern_match。",
+      "items 產生 2–6 個最值得記住的單位。label 要短，content 要能獨立理解。comparison_table 用 label 放比較項目、content 放差異；steps 用 label 放步驟名稱；formula_rules 第一項可放核心公式；causal_chain 依因果順序排列；pattern_match 用 label 放『看到什麼』、content 放『想到什麼』。",
       "只能根據主題、考點與題目證據整理；證據不足時要保守，不要捏造數值、疾病特徵或機轉。",
     ].join("\n");
 
@@ -197,7 +232,7 @@ export async function GET(request: NextRequest) {
         text: {
           format: {
             type: "json_schema",
-            name: "medslime_weak_topic_review_v1",
+            name: "medslime_weak_topic_review_v2",
             strict: true,
             schema: {
               type: "object",
@@ -205,14 +240,33 @@ export async function GET(request: NextRequest) {
               properties: {
                 title: { type: "string" },
                 summary: { type: "string" },
-                points: {
+                format: {
+                  type: "string",
+                  enum: [
+                    "comparison_table",
+                    "steps",
+                    "bullets",
+                    "formula_rules",
+                    "causal_chain",
+                    "pattern_match",
+                  ],
+                },
+                items: {
                   type: "array",
                   minItems: 2,
-                  maxItems: 5,
-                  items: { type: "string" },
+                  maxItems: 6,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      label: { type: "string" },
+                      content: { type: "string" },
+                    },
+                    required: ["label", "content"],
+                  },
                 },
               },
-              required: ["title", "summary", "points"],
+              required: ["title", "summary", "format", "items"],
             },
           },
         },

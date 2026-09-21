@@ -34,10 +34,22 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; questions: FreeQuestion[] };
 
+type ReviewFormat =
+  | "comparison_table"
+  | "steps"
+  | "bullets"
+  | "formula_rules"
+  | "causal_chain"
+  | "pattern_match";
+
 type WeakTopicReview = {
   title: string;
   summary: string;
-  points: string[];
+  format: ReviewFormat;
+  items: Array<{
+    label: string;
+    content: string;
+  }>;
 };
 
 type ReviewState =
@@ -927,6 +939,116 @@ function LegendDot({ color }: { color: "green" | "yellow" | "red" }) {
   return <span className={`h-2 w-2 rounded-full ${className}`} />;
 }
 
+function ReviewContent({ review }: { review: WeakTopicReview }) {
+  if (review.format === "comparison_table") {
+    return (
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[#dce9e1]">
+        {review.items.map((item, index) => (
+          <div
+            key={`${item.label}-${index}`}
+            className="grid grid-cols-[minmax(88px,0.8fr)_1.7fr] border-b border-[#e8efeb] last:border-b-0"
+          >
+            <div className="bg-[#f2f8f4] px-3 py-3 text-xs font-black leading-5 text-[#315b45]">
+              {item.label}
+            </div>
+            <div className="px-3 py-3 text-sm font-bold leading-6 text-[#557768]">
+              {item.content}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "steps") {
+    return (
+      <ol className="mt-5 space-y-3">
+        {review.items.map((item, index) => (
+          <li key={`${item.label}-${index}`} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
+              {index + 1}
+            </span>
+            <div>
+              <div className="text-sm font-black text-[#315b45]">{item.label}</div>
+              <div className="mt-1 text-sm font-bold leading-6 text-[#557768]">{item.content}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  if (review.format === "causal_chain") {
+    return (
+      <div className="mt-5 space-y-2">
+        {review.items.map((item, index) => (
+          <div key={`${item.label}-${index}`}>
+            <div className="rounded-2xl bg-[#f7faf8] px-4 py-3">
+              <div className="text-sm font-black text-[#315b45]">{item.label}</div>
+              <div className="mt-1 text-sm font-bold leading-6 text-[#557768]">{item.content}</div>
+            </div>
+            {index < review.items.length - 1 && (
+              <div className="py-1 text-center text-lg font-black text-[#65b987]">↓</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "pattern_match") {
+    return (
+      <div className="mt-5 space-y-3">
+        {review.items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="grid gap-2 rounded-2xl bg-[#f7faf8] px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="text-sm font-black text-[#315b45]">看到：{item.label}</div>
+            <div className="hidden font-black text-[#65b987] sm:block">→</div>
+            <div className="text-sm font-bold leading-6 text-[#557768]">想到：{item.content}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "formula_rules") {
+    const [formula, ...rules] = review.items;
+    return (
+      <div className="mt-5">
+        {formula && (
+          <div className="rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-4">
+            <div className="text-xs font-black text-[#237849]">{formula.label}</div>
+            <div className="mt-1 break-words text-base font-black leading-7 text-[#315b45]">{formula.content}</div>
+          </div>
+        )}
+        <ul className="mt-3 space-y-2">
+          {rules.map((item, index) => (
+            <li key={`${item.label}-${index}`} className="rounded-2xl bg-[#f7faf8] px-4 py-3">
+              <span className="text-sm font-black text-[#315b45]">{item.label}：</span>
+              <span className="text-sm font-bold leading-6 text-[#557768]">{item.content}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="mt-5 space-y-3">
+      {review.items.map((item, index) => (
+        <li key={`${item.label}-${index}`} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3 text-sm leading-6">
+          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
+            ✓
+          </span>
+          <span>
+            <strong className="font-black text-[#315b45]">{item.label}：</strong>
+            <span className="font-bold text-[#557768]">{item.content}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TargetedReviewGate({
   topic,
   state,
@@ -960,16 +1082,7 @@ function TargetedReviewGate({
             <div className="mt-6">
               <h2 className="text-xl font-black text-[#237849]">{state.review.title}</h2>
               <p className="mt-3 text-sm font-bold leading-7 text-[#557768]">{state.review.summary}</p>
-              <ul className="mt-5 space-y-3">
-                {state.review.points.map((point) => (
-                  <li key={point} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3 text-sm font-bold leading-6 text-[#315b45]">
-                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
-                      ✓
-                    </span>
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
+              <ReviewContent review={state.review} />
             </div>
           )}
 
