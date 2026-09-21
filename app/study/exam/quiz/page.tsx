@@ -10,6 +10,7 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
+import Link from "next/link";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
 import AIExplanationButton from "@/components/ai-explanation-button";
@@ -19,6 +20,7 @@ import {
   type NationalExamRewardResult,
 } from "@/components/game-state-provider";
 import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
+import { saveGuestExamAttempt } from "@/lib/guest-exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 import { useQuizSession } from "@/lib/use-quiz-session";
 
@@ -97,6 +99,7 @@ function ExamQuizContent() {
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
   const [examRewardResult, setExamRewardResult] =
     useState<NationalExamRewardResult | null>(null);
+  const [guestAttemptSaved, setGuestAttemptSaved] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -108,6 +111,7 @@ function ExamQuizContent() {
       setRecorded(false);
       setElapsedAtFinish(0);
       setExamRewardResult(null);
+      setGuestAttemptSaved(false);
       setShowSubmitDialog(false);
 
       try {
@@ -240,45 +244,50 @@ function ExamQuizContent() {
     if (!recorded) {
       setRecorded(true);
 
-      try {
-        await saveNationalExamAttempt({
-          year,
-          session,
-          subject,
-          answeredCount,
-          correctCount,
-          score,
-          reviewCount: reviewQuestions.length,
-          uncertainCount,
-          durationSeconds: elapsed,
-          reviewItems: reviewQuestions.map((item) => ({
-            id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+      const attemptInput = {
+        year,
+        session,
+        subject,
+        answeredCount,
+        correctCount,
+        score,
+        reviewCount: reviewQuestions.length,
+        uncertainCount,
+        durationSeconds: elapsed,
+        reviewItems: reviewQuestions.map((item) => ({
+          id: "national-exam:" + year + ":" + session + ":" + subject + ":" + item.questionNumber,
+          questionNumber: item.questionNumber,
+          stem: item.stem,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          userAnswer: answers[item.id] ?? null,
+          uncertain: uncertain[item.id] ?? false,
+          officialPdfUrl: item.questionPdfUrl,
+        })),
+        questionOutcomes: questions.map((item) => {
+          const answer = answers[item.id];
+          const answered = answer !== undefined;
+          return {
+            questionId: item.id,
+            questionKey: "national-exam:" + year + ":" + session + ":" + subject + ":" + item.questionNumber,
             questionNumber: item.questionNumber,
-            stem: item.stem,
-            options: item.options,
+            userAnswer: answered ? answer : null,
             correctIndex: item.correctIndex,
-            userAnswer: answers[item.id] ?? null,
+            answered,
+            correct:
+              answered && item.correctIndex !== null
+                ? answer === item.correctIndex
+                : null,
             uncertain: uncertain[item.id] ?? false,
-            officialPdfUrl: item.questionPdfUrl,
-          })),
-          questionOutcomes: questions.map((item) => {
-            const answer = answers[item.id];
-            const answered = answer !== undefined;
-            return {
-              questionId: item.id,
-              questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
-              questionNumber: item.questionNumber,
-              userAnswer: answered ? answer : null,
-              correctIndex: item.correctIndex,
-              answered,
-              correct:
-                answered && item.correctIndex !== null
-                  ? answer === item.correctIndex
-                  : null,
-              uncertain: uncertain[item.id] ?? false,
-            };
-          }),
-        });
+          };
+        }),
+      };
+
+      try {
+        const savedAttemptId = await saveNationalExamAttempt(attemptInput);
+        if (!savedAttemptId && answeredCount === questions.length) {
+          setGuestAttemptSaved(saveGuestExamAttempt(attemptInput));
+        }
       } catch (error) {
         console.error("國考作答紀錄儲存失敗：", error);
       }
@@ -354,6 +363,29 @@ function ExamQuizContent() {
               <div className="mt-3 text-xs font-bold text-[#789083] sm:text-sm">
                 你另外標記了 {uncertainCount} 題「我不確定」。
               </div>
+            )}
+
+            {guestAttemptSaved && (
+              <section className="mx-auto mt-5 max-w-3xl rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 text-left">
+                <div className="text-sm font-black text-[#237849]">這份成果先幫你留住了</div>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+                  註冊或登入後，這份作答會自動加入你的學習紀錄，之後才能累積弱點並看到下一步該讀什麼。
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <Link
+                    href="/auth/sign-up?redirect=%2Fstudy%2Frecords"
+                    className="rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
+                  >
+                    註冊並保存紀錄
+                  </Link>
+                  <Link
+                    href="/auth/login?redirect=%2Fstudy%2Frecords"
+                    className="rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45]"
+                  >
+                    已有帳號，登入
+                  </Link>
+                </div>
+              </section>
             )}
 
             <div className="mx-auto mt-5 flex max-w-3xl flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
