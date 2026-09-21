@@ -180,6 +180,9 @@ function SubjectDirectionCard({
                     {index === 0 ? "建議先補" : "接著補"}
                   </div>
                   <div className="mt-0.5 truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
+                  <div className={"mt-1 text-[11px] font-bold " + improvementTone(topic)}>
+                    {improvementLabel(topic)}
+                  </div>
                 </div>
                 <PracticeLink subject={subject.subject} topic={topic.topic} label="開始補強" compact />
               </div>
@@ -198,6 +201,37 @@ function SubjectDirectionCard({
       </div>
     </details>
   );
+}
+
+function improvementLabel(topic: TopicStat) {
+  if (
+    topic.attempts < 2 ||
+    topic.answeredCount < 10 ||
+    topic.recentAccuracy === null ||
+    topic.previousAccuracy === null
+  ) {
+    return "持續練習，看看下一次表現";
+  }
+
+  const delta = topic.recentAccuracy - topic.previousAccuracy;
+  if (delta >= 5) return "最近有開始改善";
+  if (delta <= -5) return "還需要再補強";
+  return "持續觀察中";
+}
+
+function improvementTone(topic: TopicStat) {
+  if (
+    topic.attempts >= 2 &&
+    topic.answeredCount >= 10 &&
+    topic.recentAccuracy !== null &&
+    topic.previousAccuracy !== null
+  ) {
+    const delta = topic.recentAccuracy - topic.previousAccuracy;
+    if (delta >= 5) return "text-[#237849]";
+    if (delta <= -5) return "text-[#a15a5a]";
+  }
+
+  return "text-[#8a9c92]";
 }
 
 function PracticeLink({
