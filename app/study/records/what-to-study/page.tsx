@@ -12,6 +12,7 @@ type TopicStat = {
   correctCount: number;
   accuracy: number;
   uncertainCount: number;
+  repeatedWrongQuestions: number;
   recentAccuracy: number | null;
   previousAccuracy: number | null;
   priorityScore: number;
@@ -173,18 +174,38 @@ function SubjectDirectionCard({
             {subject.topicStats.map((topic, index) => (
               <div
                 key={topic.topic}
-                className="flex items-center justify-between gap-3 rounded-xl bg-[#f8fbf9] px-3 py-3"
+                className="rounded-xl bg-[#f8fbf9] px-3 py-3"
               >
-                <div className="min-w-0">
-                  <div className="text-[10px] font-black tracking-[0.08em] text-[#789083]">
-                    {index === 0 ? "建議先補" : "接著補"}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black tracking-[0.08em] text-[#789083]">
+                      {index === 0 ? "建議先補" : "接著補"}
+                    </div>
+                    <div className="mt-0.5 truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
+                    <div className={"mt-1 text-[11px] font-bold " + improvementTone(topic)}>
+                      {improvementLabel(topic)}
+                    </div>
                   </div>
-                  <div className="mt-0.5 truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
-                  <div className={"mt-1 text-[11px] font-bold " + improvementTone(topic)}>
-                    {improvementLabel(topic)}
-                  </div>
+                  <PracticeLink subject={subject.subject} topic={topic.topic} label="開始補強" compact />
                 </div>
-                <PracticeLink subject={subject.subject} topic={topic.topic} label="開始補強" compact />
+
+                <details className="mt-3 border-t border-[#e8efeb] pt-2">
+                  <summary className="cursor-pointer list-none text-[11px] font-black text-[#789083] [&::-webkit-details-marker]:hidden">
+                    查看分析依據
+                  </summary>
+                  <div className="mt-2 space-y-1 text-[11px] font-bold leading-5 text-[#789083]">
+                    <p>參考 {topic.answeredCount} 題，跨 {topic.attempts} 次作答。</p>
+                    <p>
+                      {topic.repeatedWrongQuestions > 0
+                        ? `有 ${topic.repeatedWrongQuestions} 個題目曾重複答錯。`
+                        : "目前沒有偵測到同一題重複答錯。"}
+                    </p>
+                    {topic.uncertainCount > 0 && (
+                      <p>其中有 {topic.uncertainCount} 次被標記為「我不確定」。</p>
+                    )}
+                    <p>{improvementLabel(topic)}</p>
+                  </div>
+                </details>
               </div>
             ))}
             {!isPro && subject.availableTopicCount > subject.topicStats.length && (

@@ -24,6 +24,7 @@ type TopicStat = {
   correctCount: number;
   accuracy: number;
   uncertainCount: number;
+  repeatedWrongQuestions: number;
   recentAccuracy: number | null;
   previousAccuracy: number | null;
   priorityScore: number;
@@ -83,6 +84,7 @@ function buildTopicStats(
     completedAt: string;
     subject: string;
     topic: string;
+    questionId: string;
     correct: boolean;
     uncertain: boolean;
   }>,
@@ -93,6 +95,7 @@ function buildTopicStats(
     correctCount: number;
     uncertainCount: number;
     attempts: Map<string, string>;
+    wrongByQuestion: Map<string, number>;
     observations: Array<{ completedAt: string; correct: boolean }>;
   };
 
@@ -105,11 +108,19 @@ function buildTopicStats(
       correctCount: 0,
       uncertainCount: 0,
       attempts: new Map<string, string>(),
+      wrongByQuestion: new Map<string, number>(),
       observations: [],
     };
 
     group.answeredCount += 1;
-    if (item.correct) group.correctCount += 1;
+    if (item.correct) {
+      group.correctCount += 1;
+    } else {
+      group.wrongByQuestion.set(
+        item.questionId,
+        (group.wrongByQuestion.get(item.questionId) ?? 0) + 1,
+      );
+    }
     if (item.uncertain) group.uncertainCount += 1;
     group.attempts.set(item.attemptId, item.completedAt);
     group.observations.push({ completedAt: item.completedAt, correct: item.correct });
@@ -138,6 +149,9 @@ function buildTopicStats(
         correctCount: group.correctCount,
         accuracy: round1(accuracy),
         uncertainCount: group.uncertainCount,
+        repeatedWrongQuestions: [...group.wrongByQuestion.values()].filter(
+          (count) => count >= 2,
+        ).length,
         recentAccuracy: accuracyOf(recent),
         previousAccuracy: accuracyOf(previous),
         priorityScore: round1((100 - accuracy) * evidenceWeight + uncertainRate * 0.2),
@@ -158,6 +172,7 @@ function buildSubjectDirections(
     completedAt: string;
     subject: string;
     topic: string;
+    questionId: string;
     correct: boolean;
     uncertain: boolean;
   }>,
@@ -307,6 +322,7 @@ export async function GET() {
           completedAt: attempt.completedAt,
           subject: attempt.subject,
           topic: item.topic,
+          questionId: outcome.questionId,
           correct: outcome.correct,
           uncertain: outcome.uncertain,
         },
