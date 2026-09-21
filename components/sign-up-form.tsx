@@ -6,6 +6,15 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { isSignupTrialCampaignOpen } from "@/lib/campaign";
 
+function getSafeRedirect() {
+  if (typeof window === "undefined") return "/";
+
+  const redirect = new URLSearchParams(window.location.search).get("redirect")?.trim() ?? "";
+  if (!redirect.startsWith("/") || redirect.startsWith("//")) return "/";
+  return redirect;
+}
+
+
 export function SignUpForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -21,7 +30,8 @@ export function SignUpForm() {
     setError(null);
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/`;
+    const nextPath = getSafeRedirect();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
@@ -55,7 +65,7 @@ export function SignUpForm() {
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getSafeRedirect())}`,
       },
     });
 
@@ -66,7 +76,7 @@ export function SignUpForm() {
     }
 
     if (data.session) {
-      router.push("/");
+      router.push(getSafeRedirect());
       router.refresh();
       return;
     }
