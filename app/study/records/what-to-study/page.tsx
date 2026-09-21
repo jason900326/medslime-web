@@ -12,6 +12,8 @@ type TopicStat = {
   correctCount: number;
   accuracy: number;
   uncertainCount: number;
+  recentAccuracy: number | null;
+  previousAccuracy: number | null;
   priorityScore: number;
 };
 
@@ -181,6 +183,24 @@ function SubjectDirectionCard({
                 <div className="text-[11px] font-bold text-[#8a9c92]">
                   {topic.answeredCount} 題・{topic.accuracy.toFixed(1)}%
                 </div>
+                {trendLabel(topic) && (
+                  <div
+                    className={[
+                      "text-[10px] font-black",
+                      topic.recentAccuracy !== null &&
+                      topic.previousAccuracy !== null &&
+                      topic.recentAccuracy >= topic.previousAccuracy + 5
+                        ? "text-[#237849]"
+                        : topic.recentAccuracy !== null &&
+                            topic.previousAccuracy !== null &&
+                            topic.recentAccuracy <= topic.previousAccuracy - 5
+                          ? "text-[#a15a5a]"
+                          : "text-[#8a9c92]",
+                    ].join(" ")}
+                  >
+                    {trendLabel(topic)}
+                  </div>
+                )}
               </div>
               {index === 0 && (
                 <PracticeLink subject={subject.subject} topic={topic.topic} label="10 題補強" compact />
@@ -191,6 +211,33 @@ function SubjectDirectionCard({
             <div className="pt-1 text-[11px] font-bold text-[#9a7a2b]">Pro 可查看 Top 3</div>
           )}
         </div>
+
+        {subject.topicStats[0] && (
+          <details className="mt-4 border-t border-[#edf2ef] pt-3">
+            <summary className="cursor-pointer text-xs font-black text-[#789083]">
+              查看分析依據
+            </summary>
+            <div className="mt-3 rounded-xl bg-[#f8fbf9] px-3 py-3 text-xs font-bold leading-5 text-[#70877a]">
+              <div>
+                目前依正確率、作答題數與「不確定」標記排序。
+              </div>
+              <div className="mt-1">
+                {subject.topicStats[0].topic}：做過 {subject.topicStats[0].answeredCount} 題，
+                答錯 {subject.topicStats[0].answeredCount - subject.topicStats[0].correctCount} 題，
+                跨 {subject.topicStats[0].attempts} 份作答。
+              </div>
+              {subject.topicStats[0].recentAccuracy !== null &&
+              subject.topicStats[0].previousAccuracy !== null ? (
+                <div className="mt-1">
+                  最近作答正確率 {subject.topicStats[0].recentAccuracy.toFixed(1)}%，
+                  之前為 {subject.topicStats[0].previousAccuracy.toFixed(1)}%。
+                </div>
+              ) : (
+                <div className="mt-1">資料還在累積，先以目前作答表現判斷。</div>
+              )}
+            </div>
+          </details>
+        )}
       ) : (
         <div className="mt-4 border-t border-[#edf2ef] pt-3 text-xs font-bold leading-5 text-[#789083]">
           完成新版考卷後，這裡會開始整理主題弱點。
@@ -198,6 +245,17 @@ function SubjectDirectionCard({
       )}
     </article>
   );
+}
+
+function trendLabel(topic: TopicStat) {
+  if (topic.recentAccuracy === null || topic.previousAccuracy === null) {
+    return null;
+  }
+
+  const delta = topic.recentAccuracy - topic.previousAccuracy;
+  if (delta >= 5) return `近況 +${delta.toFixed(1)}%`;
+  if (delta <= -5) return `近況 ${delta.toFixed(1)}%`;
+  return "近況持平";
 }
 
 function PracticeLink({
