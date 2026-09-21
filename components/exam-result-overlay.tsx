@@ -7,13 +7,18 @@ import {
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
+import {
+  readGuestExamAttempt,
+  type SaveExamAttemptInput,
+} from "@/lib/guest-exam-attempt-store";
 
 const FINISHED_EVENT = "medslime:exam-finished";
 
 type OverlayState =
   | { status: "hidden" }
   | { status: "saving"; eventAt: number }
-  | { status: "ready"; attempt: ExamAttempt };
+  | { status: "ready"; attempt: ExamAttempt }
+  | { status: "guest"; input: SaveExamAttemptInput };
 
 export default function ExamResultOverlay() {
   const [state, setState] = useState<OverlayState>({ status: "hidden" });
@@ -48,6 +53,12 @@ export default function ExamResultOverlay() {
               return;
             }
           }
+
+          const guestAttempt = readGuestExamAttempt();
+          if (guestAttempt) {
+            setState({ status: "guest", input: guestAttempt });
+            return;
+          }
         } catch {
           // The quiz page is still saving. Retry below.
         }
@@ -78,7 +89,9 @@ export default function ExamResultOverlay() {
           <div className="text-xs font-black tracking-[0.12em] text-[#2ba962]">RESULT</div>
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em]">作答完成</h1>
 
-          {ready ? (
+          {state.status === "guest" ? (
+            <GuestAttemptResult input={state.input} />
+          ) : ready ? (
             <>
               <div className="mt-7 grid grid-cols-2 gap-3 sm:gap-4">
                 <ResultStat label="成績" value={formatScore(ready)} />
@@ -116,6 +129,39 @@ export default function ExamResultOverlay() {
         </section>
       </div>
     </div>
+  );
+}
+
+function GuestAttemptResult({ input }: { input: SaveExamAttemptInput }) {
+  return (
+    <>
+      <div className="mt-7 grid grid-cols-2 gap-3 sm:gap-4">
+        <ResultStat label="成績" value={input.score.toFixed(2) + " 分"} />
+        <ResultStat label="需要再看" value={input.reviewCount + " 題"} />
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-4 text-left">
+        <div className="text-sm font-black text-[#237849]">這份成果先幫你留住了</div>
+        <p className="mt-2 text-sm font-bold leading-6 text-[#557768]">
+          註冊或登入後，這次作答會加入你的學習紀錄，之後才能累積弱點並看到下一步該讀什麼。
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/auth/sign-up?redirect=%2Fstudy%2Frecords"
+          className="rounded-xl bg-[#31c978] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#2dbc70]"
+        >
+          註冊並保存紀錄
+        </Link>
+        <Link
+          href="/auth/login?redirect=%2Fstudy%2Frecords"
+          className="rounded-xl border border-[#d7e7de] bg-white px-5 py-3.5 text-sm font-black text-[#315b45]"
+        >
+          已有帳號，登入
+        </Link>
+      </div>
+    </>
   );
 }
 
