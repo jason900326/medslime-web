@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
+import AppNavigation from "@/components/app-navigation";
 import AttemptCard from "@/components/records/attempt-card";
 import ProAnalysisPanel from "@/components/records/pro-analysis-panel";
 import WeakTopicPracticeCard from "@/components/records/weak-topic-practice-card";
@@ -127,6 +128,7 @@ function RecordsContent() {
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar showBack backHref="/study" backLabel="返回學習" />
+        <AppNavigation />
 
         {tab === "pro" ? (
           <section className="mt-6">
