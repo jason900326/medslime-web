@@ -10,7 +10,6 @@ import OfficialQuestionCrop from "@/components/official-question-crop";
 import QuestionSlimeMap from "@/components/question-slime-map";
 import {
   formatAttemptDate,
-  formatAttemptDuration,
   readExamAttempt,
   type ExamAttempt,
   type ExamAttemptQuestionItem,
@@ -262,11 +261,21 @@ export default function AttemptDetailPage() {
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="分數" value={readyAttempt.score.toFixed(2)} />
-          <Stat label="答對" value={`${readyAttempt.correctCount} 題`} />
-          <Stat label="答錯" value={`${wrongCount} 題`} />
-          <Stat label="作答時間" value={formatAttemptDuration(readyAttempt.durationSeconds)} />
+        <section className="mt-5 rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 sm:p-6">
+          <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">本次成績</div>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="text-4xl font-black tracking-[-0.04em] text-[#17372a]">
+                {readyAttempt.score.toFixed(2)}
+              </div>
+              <p className="mt-1 text-sm font-bold text-[#70877a]">
+                先看答錯的題目，再把不確定的地方補起來。
+              </p>
+            </div>
+            <div className="text-sm font-black text-[#237849]">
+              開始訂正 →
+            </div>
+          </div>
         </section>
 
         {legacyPartial && (
@@ -322,16 +331,16 @@ export default function AttemptDetailPage() {
         <section className="mt-6">
           <div className="flex flex-wrap items-center gap-2">
             <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>
-              全部 {questions.length}
+              全部
             </FilterButton>
             <FilterButton active={filter === "wrong"} onClick={() => setFilter("wrong")}>
-              答錯 {wrongCount}
+              答錯
             </FilterButton>
             <FilterButton active={filter === "uncertain"} onClick={() => setFilter("uncertain")}>
-              不確定 {uncertainCount}
+              不確定
             </FilterButton>
             <FilterButton active={filter === "unfamiliar"} onClick={() => setFilter("unfamiliar")}>
-              觀念不熟 {unfamiliarCount}
+              觀念不熟
             </FilterButton>
           </div>
 
@@ -787,15 +796,6 @@ function Legend({ className, label }: { className: string; label: string }) {
       <span className={`h-3 w-3 rounded border ${className}`} />
       {label}
     </span>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
-      <div className="text-xs font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
-    </div>
   );
 }
 
