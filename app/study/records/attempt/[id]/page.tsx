@@ -228,12 +228,6 @@ export default function AttemptDetailPage() {
     subject: readyAttempt.subject,
   });
 
-  const wrongCount = questions.filter((item) => item.correct === false).length;
-  const uncertainCount = questions.filter((item) => item.uncertain).length;
-  const unfamiliarCount = questions.filter(
-    (item) => learningStates.get(item.questionKey)?.conceptUnfamiliar,
-  ).length;
-
   const visibleQuestions = questions.filter((item) => {
     if (filter === "wrong") return item.correct === false;
     if (filter === "uncertain") return item.uncertain;
