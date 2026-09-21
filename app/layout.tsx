@@ -15,11 +15,11 @@ const SITE_URL = "https://medslime.vercel.app";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "MedSlime｜醫檢師國考刷題、歷屆試題、AI 詳解與弱點分析",
+    default: "MedSlime｜國考刷題與弱點補強",
     template: "%s｜MedSlime",
   },
   description:
-    "MedSlime 是給醫技系與醫事檢驗師國考考生使用的刷題網站，提供歷屆國考題、AI 詳解、錯題複習、弱點分析、讀書計時與史萊姆收藏。",
+    "刷國考歷屆題，從作答紀錄找出弱點，知道下一步該讀什麼。",
   applicationName: "MedSlime",
   keywords: [
     "醫檢師國考",
@@ -46,9 +46,8 @@ export const metadata: Metadata = {
     locale: "zh_TW",
     url: SITE_URL,
     siteName: "MedSlime",
-    title: "MedSlime｜醫檢師國考刷題、歷屆試題、AI 詳解與弱點分析",
-    description:
-      "刷醫檢師歷屆國考題、看 AI 詳解、整理錯題與弱點分析，還能收集史萊姆。",
+    title: "MedSlime｜國考刷題與弱點補強",
+    description: "刷國考歷屆題，從作答紀錄找出弱點，知道下一步該讀什麼。",
     images: [
       {
         url: "/opengraph-image.png",
@@ -60,9 +59,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MedSlime｜醫檢師國考刷題與 AI 詳解",
-    description:
-      "醫檢師歷屆國考題、AI 詳解、錯題複習、弱點分析與史萊姆收藏。",
+    title: "MedSlime｜國考刷題與弱點補強",
+    description: "刷國考歷屆題，從作答紀錄找出弱點，知道下一步該讀什麼。",
     images: ["/opengraph-image.png"],
   },
   robots: {
