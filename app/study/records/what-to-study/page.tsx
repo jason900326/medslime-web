@@ -103,7 +103,7 @@ function DirectionContent({ data }: { data: DirectionPayload }) {
                 : `${shortSubject(weakest.subject)}目前平均 ${weakest.average.toFixed(1)} 分`}
             </p>
           </div>
-          {priority && <PracticeLink subject={weakest.subject} topic={priority.topic} label="開始補強 →" />}
+          {priority && <PracticeLink subject={weakest.subject} topic={priority.topic} label="開始 10 題補強 →" />}
         </div>
         {priority && (
           <p className="mt-4 text-xs font-bold text-[#789083]">
@@ -183,7 +183,7 @@ function SubjectDirectionCard({
                 </div>
               </div>
               {index === 0 && (
-                <PracticeLink subject={subject.subject} topic={topic.topic} label="補強" compact />
+                <PracticeLink subject={subject.subject} topic={topic.topic} label="10 題補強" compact />
               )}
             </div>
           ))}
@@ -211,7 +211,13 @@ function PracticeLink({
   label: string;
   compact?: boolean;
 }) {
-  const href = `/study/free-quiz?${new URLSearchParams({ subject, topic, count: "10" }).toString()}`;
+  const href = `/study/free-quiz/quiz?${new URLSearchParams({
+    from: "106",
+    to: "115",
+    subject,
+    topic,
+    count: "10",
+  }).toString()}`;
 
   return (
     <Link
