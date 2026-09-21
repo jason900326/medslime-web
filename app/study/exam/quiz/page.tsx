@@ -20,7 +20,10 @@ import {
   type NationalExamRewardResult,
 } from "@/components/game-state-provider";
 import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
-import { saveGuestExamAttempt } from "@/lib/guest-exam-attempt-store";
+import {
+  clearGuestExamAttempt,
+  saveGuestExamAttempt,
+} from "@/lib/guest-exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 import { useQuizSession } from "@/lib/use-quiz-session";
 
@@ -283,14 +286,24 @@ function ExamQuizContent() {
         }),
       };
 
-      try {
-        const savedAttemptId = await saveNationalExamAttempt(attemptInput);
-        if (!savedAttemptId && answeredCount === questions.length) {
-          setGuestAttemptSaved(saveGuestExamAttempt(attemptInput));
-        }
-      } catch (error) {
-        console.error("國考作答紀錄儲存失敗：", error);
+      const isComplete = answeredCount === questions.length;
+      if (isComplete) {
+        setGuestAttemptSaved(saveGuestExamAttempt(attemptInput));
       }
+
+      void saveNationalExamAttempt(attemptInput)
+        .then((savedAttemptId) => {
+          if (savedAttemptId) {
+            clearGuestExamAttempt();
+            setGuestAttemptSaved(false);
+          } else if (isComplete) {
+            setGuestAttemptSaved(true);
+          }
+        })
+        .catch((error) => {
+          console.error("國考作答紀錄儲存失敗：", error);
+          if (isComplete) setGuestAttemptSaved(true);
+        });
 
       game.recordQuestionsAnswered(answeredCount);
       if (answeredCount === questions.length) {
@@ -298,11 +311,9 @@ function ExamQuizContent() {
       }
     }
 
-    try {
-      await saveMistakes();
-    } catch (error) {
+    void saveMistakes().catch((error) => {
       console.error("國考錯題儲存失敗：", error);
-    }
+    });
 
     setShowSubmitDialog(false);
     setFinished(true);
