@@ -37,17 +37,17 @@ export default function Home() {
             </p>
 
             <Link
-              href="/study/exam"
+              href={auth.isLoggedIn ? "/study/exam" : "/auth/login?redirect=%2Fstudy%2Fexam"}
               className="mt-7 inline-flex min-h-13 items-center justify-center rounded-2xl bg-[#31c978] px-6 py-4 text-base font-black text-white shadow-[0_10px_24px_rgba(49,201,120,0.22)] transition hover:-translate-y-0.5 hover:bg-[#2dbc70]"
             >
-              開始刷題
+              {auth.isLoggedIn ? "開始刷題" : "登入後開始刷題"}
               <span className="ml-2" aria-hidden="true">
                 →
               </span>
             </Link>
 
             <p className="mt-4 text-xs font-bold leading-5 text-[#82958b]">
-              不用先註冊，也能先完整體驗一份考卷。
+              登入後，作答紀錄與弱點分析會自動保存。
             </p>
 
             </div>
