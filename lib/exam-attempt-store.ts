@@ -70,7 +70,6 @@ export type SaveExamAttemptInput = {
   reviewCount: number;
   uncertainCount: number;
   durationSeconds: number;
-  completedAt?: string;
   reviewItems: ExamAttemptReviewItem[];
   questionOutcomes: ExamQuestionOutcome[];
   questionItems?: ExamAttemptQuestionItem[];
@@ -379,10 +378,7 @@ export async function saveNationalExamAttempt(
     review_count: Math.max(0, Math.floor(input.reviewCount)),
     uncertain_count: Math.max(0, Math.floor(input.uncertainCount)),
     duration_seconds: Math.max(0, Math.floor(input.durationSeconds)),
-    completed_at:
-      input.completedAt && !Number.isNaN(Date.parse(input.completedAt))
-        ? new Date(input.completedAt).toISOString()
-        : new Date().toISOString(),
+    completed_at: new Date().toISOString(),
   };
 
   const insertWithId = (payload: TablesInsert<"exam_attempts">) =>
