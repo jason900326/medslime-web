@@ -24,6 +24,8 @@ type TopicStat = {
   correctCount: number;
   accuracy: number;
   uncertainCount: number;
+  recentAccuracy: number | null;
+  previousAccuracy: number | null;
   priorityScore: number;
 };
 
@@ -91,6 +93,7 @@ function buildTopicStats(
     correctCount: number;
     uncertainCount: number;
     attempts: Map<string, string>;
+    observations: Array<{ completedAt: string; correct: boolean }>;
   };
 
   const groups = new Map<string, Group>();
@@ -102,12 +105,14 @@ function buildTopicStats(
       correctCount: 0,
       uncertainCount: 0,
       attempts: new Map<string, string>(),
+      observations: [],
     };
 
     group.answeredCount += 1;
     if (item.correct) group.correctCount += 1;
     if (item.uncertain) group.uncertainCount += 1;
     group.attempts.set(item.attemptId, item.completedAt);
+    group.observations.push({ completedAt: item.completedAt, correct: item.correct });
     groups.set(item.topic, group);
   }
 
@@ -116,6 +121,15 @@ function buildTopicStats(
       const accuracy = (group.correctCount / group.answeredCount) * 100;
       const uncertainRate = (group.uncertainCount / group.answeredCount) * 100;
       const evidenceWeight = Math.min(1, group.answeredCount / 8);
+      const ordered = [...group.observations].sort(
+        (a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
+      );
+      const recent = ordered.slice(0, 5);
+      const previous = ordered.slice(5, 10);
+      const accuracyOf = (items: typeof ordered) =>
+        items.length
+          ? round1((items.filter((item) => item.correct).length / items.length) * 100)
+          : null;
 
       return {
         topic: group.topic,
@@ -124,6 +138,8 @@ function buildTopicStats(
         correctCount: group.correctCount,
         accuracy: round1(accuracy),
         uncertainCount: group.uncertainCount,
+        recentAccuracy: accuracyOf(recent),
+        previousAccuracy: accuracyOf(previous),
         priorityScore: round1((100 - accuracy) * evidenceWeight + uncertainRate * 0.2),
       } satisfies TopicStat;
     })
