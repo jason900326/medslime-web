@@ -377,11 +377,15 @@ function FreeQuizRunner() {
               </div>
             )}
 
-            <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3">
-              <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
-              <ResultCard label="正確率" value={`${score.toFixed(1)}%`} />
-              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
-              <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
+            <div className="mt-8 text-6xl font-black tracking-[-0.06em] text-[#17372a] sm:text-7xl">
+              {score.toFixed(1)}
+              <span className="ml-1 text-2xl tracking-normal text-[#789083]">%</span>
+            </div>
+            <div className="mt-4 text-sm font-bold text-[#70877a]">
+              答對 {correctCount} / {gradableCount} 題 · {reviewQuestions.length} 題需要再看
+            </div>
+            <div className="mt-1 text-xs font-bold text-[#9aa9a1]">
+              作答時間 {formatElapsed(elapsedAtFinish)}
             </div>
 
             {targeted && (
