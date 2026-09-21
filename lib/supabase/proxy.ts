@@ -51,15 +51,26 @@ export async function updateSession(request: NextRequest) {
     pathname === "/sitemap.xml" ||
     pathname === "/robots.txt";
 
+  const isPublicApiRoute =
+    pathname === "/api/health" ||
+    pathname === "/api/payments/ecpay/return" ||
+    pathname === "/api/feedback" ||
+    pathname === "/api/beta-feedback" ||
+    pathname.startsWith("/api/internal/");
+
   const isPublicRoute =
     pathname === "/" ||
-    pathname === "/shop" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
     isPublicInfoRoute ||
-    isPublicSeoRoute;
+    isPublicSeoRoute ||
+    isPublicApiRoute;
 
   if (!user && !isPublicRoute) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "請先登入。" }, { status: 401 });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     url.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);
