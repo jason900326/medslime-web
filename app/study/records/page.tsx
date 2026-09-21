@@ -46,6 +46,8 @@ function RecordsContent() {
   const filterSession = searchParams.get("session")?.trim() ?? "";
   const filterSubject = searchParams.get("subject")?.trim() ?? "";
   const hasExamFilter = Boolean(filterYear && filterSession && filterSubject);
+  const hasSubjectFilter = Boolean(filterSubject);
+  const hasRecordFilter = hasExamFilter || hasSubjectFilter;
   const rawTab = searchParams.get("tab")?.trim() ?? "attempts";
   const legacyMistakeRoute = rawTab === "mistakes";
   const tab: RecordsTab =
@@ -106,14 +108,19 @@ function RecordsContent() {
   }, [tab, memoryItems]);
 
   const visibleAttempts = useMemo(() => {
-    if (!hasExamFilter) return attempts;
+    if (hasExamFilter) {
+      return attempts.filter(
+        (attempt) =>
+          attempt.year === filterYear &&
+          attempt.session === filterSession &&
+          attempt.subject === filterSubject,
+      );
+    }
+    if (!hasSubjectFilter) return attempts;
     return attempts.filter(
-      (attempt) =>
-        attempt.year === filterYear &&
-        attempt.session === filterSession &&
-        attempt.subject === filterSubject,
+      (attempt) => attempt.subject === filterSubject,
     );
-  }, [attempts, filterYear, filterSession, filterSubject, hasExamFilter]);
+  }, [attempts, filterYear, filterSession, filterSubject, hasExamFilter, hasSubjectFilter]);
 
   const pendingMistakes = mistakes.filter((item) => !item.reviewed);
   const subjectCount = new Set(attempts.map((item) => item.subject)).size;
@@ -171,7 +178,7 @@ function RecordsContent() {
               />
             </section>
 
-            <ProAnalysisCta attemptCount={attempts.length} />
+            <StudyDirectionCta attemptCount={attempts.length} />
 
             <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <RecordTab href="/study/records?tab=attempts" active={tab === "attempts"}>
@@ -196,12 +203,16 @@ function RecordsContent() {
                   </Link>
                 </div>
 
-                {hasExamFilter && (
+                {hasRecordFilter && (
                   <section className="mt-5 flex items-center justify-between gap-3 rounded-[20px] border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3">
                     <div className="min-w-0">
-                      <div className="text-xs font-black text-[#2ba962]">目前只看這份考卷</div>
+                      <div className="text-xs font-black text-[#2ba962]">
+                        {hasExamFilter ? "目前只看這份考卷" : "目前只看這個科目"}
+                      </div>
                       <div className="mt-1 truncate text-sm font-black text-[#315b45]">
-                        {filterYear} 年・第 {filterSession} 次・{filterSubject}
+                        {hasExamFilter
+                          ? `${filterYear} 年・第 ${filterSession} 次・${filterSubject}`
+                          : filterSubject}
                       </div>
                     </div>
                     <Link
@@ -260,26 +271,26 @@ function RecordsContent() {
   );
 }
 
-function ProAnalysisCta({ attemptCount }: { attemptCount: number }) {
+function StudyDirectionCta({ attemptCount }: { attemptCount: number }) {
   return (
     <Link
-      href="/study/records?tab=pro#pro-analysis"
+      href="/study/records/what-to-study"
       className="group mt-5 block overflow-hidden rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#f1fbf5] via-white to-[#fffaf0] p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] transition hover:-translate-y-0.5 hover:border-[#9ed9b5] sm:p-6"
     >
       <div className="flex items-center gap-2 text-sm font-black text-[#237849]">
-        <span aria-hidden="true">✨</span>
-        <span>Pro 學習分析</span>
+        <span aria-hidden="true">🧭</span>
+        <span>學習方向</span>
       </div>
       <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-[#17372a] sm:text-2xl">
-        找出弱科、弱主題與複習優先順序
+        我該讀什麼？
       </h2>
       <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
         {attemptCount > 0
-          ? `你已累積 ${attemptCount} 次作答，讓 MedSlime 幫你把分散的紀錄整理成下一步。`
-          : "完成幾次國考或自由測驗後，這裡會開始整理你的學習弱點與趨勢。"}
+          ? `你已累積 ${attemptCount} 次作答，先看看目前哪一科最需要補強。`
+          : "完成一份考卷後，這裡會開始整理你的學習方向。"}
       </p>
       <div className="mt-4 text-sm font-black text-[#237849] group-hover:underline group-hover:decoration-[#9ed9b5] group-hover:underline-offset-4">
-        查看我的分析 →
+        查看學習方向 →
       </div>
     </Link>
   );
