@@ -19,7 +19,10 @@ import {
   useGameState,
   type NationalExamRewardResult,
 } from "@/components/game-state-provider";
-import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
+import {
+  saveNationalExamAttempt,
+  type SaveExamAttemptInput,
+} from "@/lib/exam-attempt-store";
 import {
   clearGuestExamAttempt,
   saveGuestExamAttempt,
@@ -247,7 +250,7 @@ function ExamQuizContent() {
     if (!recorded) {
       setRecorded(true);
 
-      const attemptInput = {
+      const attemptInput: SaveExamAttemptInput = {
         year,
         session,
         subject,
