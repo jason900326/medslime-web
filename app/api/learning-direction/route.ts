@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -255,6 +255,7 @@ async function readTaxonomy(
 
 export async function GET() {
   try {
+    await connection();
     const supabase = await createClient();
     const {
       data: { user },
