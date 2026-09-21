@@ -52,7 +52,6 @@ type LoadState =
 const TUTORIAL_STORAGE_KEY =
   "medslime_exam_tutorial_seen_v2";
 const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
-const EXAM_FINISHED_EVENT = "medslime:exam-finished";
 
 function formatElapsed(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
@@ -245,8 +244,6 @@ function ExamQuizContent() {
     const answeredCount = Object.keys(answers).length;
 
     setElapsedAtFinish(elapsed);
-    window.dispatchEvent(new Event(EXAM_FINISHED_EVENT));
-
     if (!recorded) {
       setRecorded(true);
 
@@ -318,8 +315,6 @@ function ExamQuizContent() {
       console.error("國考錯題儲存失敗：", error);
     });
 
-    setShowSubmitDialog(false);
-    setFinished(true);
   };
 
   const closeTutorial = () => {
