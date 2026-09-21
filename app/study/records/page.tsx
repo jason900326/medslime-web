@@ -6,13 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import AppNavigation from "@/components/app-navigation";
 import AttemptCard from "@/components/records/attempt-card";
-import ProAnalysisPanel from "@/components/records/pro-analysis-panel";
-import WeakTopicPracticeCard from "@/components/records/weak-topic-practice-card";
 import {
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
-import { readMistakes, type MistakeRecord } from "@/lib/mistake-store";
 import {
   readAllQuestionLearningStates,
   readQuestionLearningMemory,
@@ -21,7 +18,7 @@ import {
 } from "@/lib/question-learning-state";
 import { loadExamExplanationAccessKeys } from "@/lib/exam-explanation-access-cache";
 
-type RecordsTab = "attempts" | "unfamiliar" | "notes" | "pro";
+type RecordsTab = "attempts" | "unfamiliar" | "notes";
 
 export default function RecordsPage() {
   return (
@@ -35,7 +32,6 @@ function RecordsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
-  const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
   const [learningStates, setLearningStates] = useState<QuestionLearningState[]>([]);
   const [memoryItems, setMemoryItems] = useState<QuestionLearningMemoryItem[] | null>(null);
   const [unlockedExamKeys, setUnlockedExamKeys] = useState<Set<string>>(new Set());
@@ -50,12 +46,17 @@ function RecordsContent() {
   const hasRecordFilter = hasExamFilter || hasSubjectFilter;
   const rawTab = searchParams.get("tab")?.trim() ?? "attempts";
   const legacyMistakeRoute = rawTab === "mistakes";
+  const legacyProRoute = rawTab === "pro";
   const tab: RecordsTab =
-    rawTab === "unfamiliar" || rawTab === "notes" || rawTab === "pro"
+    rawTab === "unfamiliar" || rawTab === "notes"
       ? rawTab
       : "attempts";
 
   useEffect(() => {
+    if (legacyProRoute) {
+      router.replace("/study/records/what-to-study");
+      return;
+    }
     if (!legacyMistakeRoute) return;
 
     const params = new URLSearchParams();
@@ -64,21 +65,26 @@ function RecordsContent() {
     if (filterSubject) params.set("subject", filterSubject);
     const suffix = params.toString() ? `?${params.toString()}` : "";
     router.replace(`/study/mistakes${suffix}`);
-  }, [legacyMistakeRoute, filterYear, filterSession, filterSubject, router]);
+  }, [
+    legacyMistakeRoute,
+    legacyProRoute,
+    filterYear,
+    filterSession,
+    filterSubject,
+    router,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
     void Promise.all([
       readExamAttempts(),
-      readMistakes(),
       readAllQuestionLearningStates(),
       loadExamExplanationAccessKeys({ force: true }).catch(() => new Set<string>()),
     ])
-      .then(([nextAttempts, nextMistakes, nextLearningStates, nextUnlockedKeys]) => {
+      .then(([nextAttempts, nextLearningStates, nextUnlockedKeys]) => {
         if (cancelled) return;
         setAttempts(nextAttempts);
-        setMistakes(nextMistakes);
         setLearningStates(nextLearningStates);
         setUnlockedExamKeys(nextUnlockedKeys);
       })
@@ -122,14 +128,13 @@ function RecordsContent() {
     );
   }, [attempts, filterYear, filterSession, filterSubject, hasExamFilter, hasSubjectFilter]);
 
-  const pendingMistakes = mistakes.filter((item) => !item.reviewed);
   const subjectCount = new Set(attempts.map((item) => item.subject)).size;
   const noteCount = learningStates.filter((item) => item.note.trim().length > 0).length;
   const recentAverage = attempts.length
     ? average(attempts.slice(0, 5).map((item) => item.score)).toFixed(1)
     : "—";
 
-  if (legacyMistakeRoute) return <LoadingRecords />;
+  if (legacyMistakeRoute || legacyProRoute) return <LoadingRecords />;
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -137,47 +142,17 @@ function RecordsContent() {
         <TopBar showBack backHref="/study" backLabel="返回學習" />
         <AppNavigation />
 
-        {tab === "pro" ? (
-          <section className="mt-6">
-            <Link
-              href="/study/records?tab=attempts"
-              className="text-sm font-black text-[#237849]"
-            >
-              ← 回到作答紀錄
-            </Link>
-            <h1 className="ms-page-title mt-4">Pro 學習分析</h1>
-            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-              把作答紀錄整理成真正的弱點趨勢與複習順序。
-            </p>
-          </section>
-        ) : (
-          <section className="mt-6">
-            <h1 className="ms-page-title">學習紀錄</h1>
-            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-              看看最近讀得怎麼樣，下一步該補哪裡。
-            </p>
-          </section>
-        )}
+        <section className="mt-6">
+          <h1 className="ms-page-title">學習紀錄</h1>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
+            回看做過的考卷；要找弱點與下一步，直接進「我該讀什麼？」。
+          </p>
+        </section>
 
         {loading ? (
           <LoadingCard />
-        ) : tab === "pro" ? (
-          <section id="pro-analysis" className="scroll-mt-4">
-            <ProAnalysisPanel />
-            <WeakTopicPracticeCard />
-          </section>
         ) : (
           <>
-            <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SummaryCard label="作答次數" value={`${attempts.length} 次`} />
-              <SummaryCard label="待複習錯題" value={`${pendingMistakes.length} 題`} />
-              <SummaryCard label="我的筆記" value={`${noteCount} 題`} />
-              <SummaryCard
-                label="最近平均"
-                value={recentAverage === "—" ? "—" : `${recentAverage} 分`}
-              />
-            </section>
-
             <StudyDirectionCta attemptCount={attempts.length} />
 
             <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -464,15 +439,6 @@ function RecordTab({
 function average(values: number[]) {
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
-      <div className="text-xs font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
-    </div>
-  );
 }
 
 function EmptyState({
