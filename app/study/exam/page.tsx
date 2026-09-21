@@ -11,7 +11,6 @@ import {
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
-import { readGuestExamAttempt } from "@/lib/guest-exam-attempt-store";
 
 const rocYears = Array.from({ length: 10 }, (_, index) => 115 - index);
 
@@ -47,10 +46,11 @@ function ExamPicker() {
   const [session, setSession] = useState<1 | 2>(1);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [purchases, setPurchases] = useState<PurchasedExam[]>([]);
-  const [hasGuestAttempt, setHasGuestAttempt] = useState(false);
   const explanationMode = searchParams.get("mode") === "explanation";
 
   useEffect(() => {
+    if (auth.loading || !auth.isLoggedIn) return;
+
     let cancelled = false;
     void readExamAttempts()
       .then((items) => {
@@ -62,11 +62,6 @@ function ExamPicker() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (auth.loading) return;
-    setHasGuestAttempt(!auth.isLoggedIn && Boolean(readGuestExamAttempt()));
   }, [auth.loading, auth.isLoggedIn]);
 
   useEffect(() => {
@@ -96,6 +91,9 @@ function ExamPicker() {
     () => new Map(purchases.map((item) => [item.exam_key, item])),
     [purchases],
   );
+
+  if (auth.loading) return <LoadingExamPicker />;
+  if (!auth.isLoggedIn) return <LoginRequired />;
 
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
@@ -157,29 +155,6 @@ function ExamPicker() {
           </div>
         </section>
 
-        {!auth.loading && !auth.isLoggedIn && hasGuestAttempt && (
-          <section className="mt-5 rounded-[22px] border border-[#eadba9] bg-[#fffaf0] px-5 py-4">
-            <div className="text-sm font-black text-[#80651e]">你已完成一份考卷</div>
-            <p className="mt-1 text-sm font-bold leading-6 text-[#80651e]">
-              先註冊或登入保存這份作答，之後就能繼續刷題並累積弱點分析。
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <Link
-                href="/auth/sign-up?redirect=%2Fstudy%2Fexam"
-                className="rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
-              >
-                註冊並保存紀錄
-              </Link>
-              <Link
-                href="/auth/login?redirect=%2Fstudy%2Fexam"
-                className="rounded-xl border border-[#e7d59d] bg-white px-4 py-3 text-center text-sm font-black text-[#80651e]"
-              >
-                已有帳號，登入
-              </Link>
-            </div>
-          </section>
-        )}
-
         <section className="mt-5">
           <div>
             <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
@@ -200,7 +175,6 @@ function ExamPicker() {
                   subject={subject}
                   latestAttempt={latestMap.get(examKey) ?? null}
                   purchased={purchaseMap.has(examKey)}
-                  guestAttemptLocked={!auth.loading && !auth.isLoggedIn && hasGuestAttempt}
                 />
               );
             })}
@@ -218,7 +192,6 @@ function ExamCard({
   subject,
   latestAttempt,
   purchased,
-  guestAttemptLocked,
 }: {
   index: number;
   year: number;
@@ -226,13 +199,15 @@ function ExamCard({
   subject: string;
   latestAttempt: ExamAttempt | null;
   purchased: boolean;
-  guestAttemptLocked: boolean;
 }) {
   const quizHref = useMemo(() => {
-    if (guestAttemptLocked) return "/auth/sign-up?redirect=%2Fstudy%2Fexam";
-    const params = new URLSearchParams({ year: String(year), session: String(session), subject });
-    return `/study/exam/quiz?${params.toString()}`;
-  }, [guestAttemptLocked, year, session, subject]);
+    const params = new URLSearchParams({
+      year: String(year),
+      session: String(session),
+      subject,
+    });
+    return "/study/exam/quiz?" + params.toString();
+  }, [year, session, subject]);
 
   const historyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -279,7 +254,7 @@ function ExamCard({
           href={quizHref}
           className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
         >
-          ✏️ {guestAttemptLocked ? "先保存這份成果" : latestAttempt ? "再次作答" : "開始作答"}
+          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
         </Link>
         {latestAttempt ? (
           <Link
@@ -293,6 +268,28 @@ function ExamCard({
         )}
       </div>
     </article>
+  );
+}
+
+function LoginRequired() {
+  return (
+    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+      <div className="mx-auto max-w-2xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+        <TopBar showBack backHref="/" backLabel="返回首頁" />
+        <section className="mt-10 rounded-[28px] border border-[#dce9e1] bg-white p-7 text-center shadow-[0_12px_30px_rgba(30,78,50,0.05)]">
+          <div className="text-3xl font-black">登入後開始刷題</div>
+          <p className="mt-3 text-sm font-bold leading-6 text-[#70877a]">
+            登入後，作答紀錄、錯題與學習方向都會自動保存。
+          </p>
+          <Link
+            href="/auth/login?redirect=%2Fstudy%2Fexam"
+            className="mt-6 inline-flex rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+          >
+            登入並開始刷題
+          </Link>
+        </section>
+      </div>
+    </main>
   );
 }
 
