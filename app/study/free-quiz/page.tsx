@@ -76,7 +76,7 @@ function FreeQuizConfigurator() {
           <h1 className="ms-page-title mt-2">{targeted ? "弱主題練習" : "自由測驗"}</h1>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
             {targeted
-              ? "這份練習會鎖定 Pro 分析找到的弱主題，優先抽出同 Subtopic 題目；細分題量不足時，只會用同一 Topic 的相關題補足。完成後的新作答也會回到弱點分析。"
+              ? "這份練習會鎖定目前分析出的弱主題，直接用 10 題確認你有沒有改善。完成後的新作答也會回到弱點分析。"
               : "自己決定年份範圍、科目與題數。系統會從歷屆國考中隨機組一份練習，答錯或標記不確定的題目一樣會進錯題紀錄。"}
           </p>
         </section>
