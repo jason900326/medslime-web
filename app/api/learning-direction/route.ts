@@ -12,6 +12,7 @@ type QuestionOutcome = {
 type Attempt = {
   id: string;
   subject: string;
+  score: number;
   completedAt: string;
   questionOutcomes: QuestionOutcome[];
 };
@@ -24,6 +25,14 @@ type TopicStat = {
   accuracy: number;
   uncertainCount: number;
   priorityScore: number;
+};
+
+type SubjectDirection = {
+  subject: string;
+  attempts: number;
+  average: number;
+  topicStats: TopicStat[];
+  availableTopicCount: number;
 };
 
 type TaxonomyRow = {
@@ -70,6 +79,7 @@ function buildTopicStats(
   observations: Array<{
     attemptId: string;
     completedAt: string;
+    subject: string;
     topic: string;
     correct: boolean;
     uncertain: boolean;
@@ -125,10 +135,49 @@ function buildTopicStats(
     );
 }
 
+function buildSubjectDirections(
+  attempts: Attempt[],
+  observations: Array<{
+    attemptId: string;
+    completedAt: string;
+    subject: string;
+    topic: string;
+    correct: boolean;
+    uncertain: boolean;
+  }>,
+  topicLimit: number,
+): SubjectDirection[] {
+  const groups = new Map<string, Attempt[]>();
+  for (const attempt of attempts) {
+    const list = groups.get(attempt.subject) ?? [];
+    list.push(attempt);
+    groups.set(attempt.subject, list);
+  }
+
+  return [...groups.entries()]
+    .map(([subject, subjectAttempts]) => {
+      const subjectTopics = buildTopicStats(
+        observations.filter((item) => item.subject === subject),
+      );
+
+      return {
+        subject,
+        attempts: subjectAttempts.length,
+        average: round1(
+          subjectAttempts.reduce((sum, attempt) => sum + Number(attempt.score ?? 0), 0) /
+            subjectAttempts.length,
+        ),
+        topicStats: subjectTopics.slice(0, topicLimit),
+        availableTopicCount: subjectTopics.length,
+      } satisfies SubjectDirection;
+    })
+    .sort((a, b) => a.average - b.average || a.subject.localeCompare(b.subject));
+}
+
 async function readAttempts(admin: ReturnType<typeof createAdminClient>, userId: string) {
   const result = await admin
     .from("exam_attempts")
-    .select("id,subject,completed_at,question_outcomes")
+    .select("id,subject,score,completed_at,question_outcomes")
     .eq("user_id", userId)
     .order("completed_at", { ascending: false })
     .limit(120);
@@ -143,6 +192,7 @@ async function readAttempts(admin: ReturnType<typeof createAdminClient>, userId:
   const attempts = ((result.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
     id: String(row.id ?? ""),
     subject: String(row.subject ?? "未分類"),
+    score: Number(row.score ?? 0),
     completedAt: String(row.completed_at ?? ""),
     questionOutcomes: normalizeQuestionOutcomes(row.question_outcomes),
   }));
@@ -187,13 +237,8 @@ async function readTaxonomy(
   return map;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const subject = new URL(request.url).searchParams.get("subject")?.trim() ?? "";
-    if (!subject) {
-      return NextResponse.json({ error: "缺少科目。" }, { status: 400 });
-    }
-
     const supabase = await createClient();
     const {
       data: { user },
@@ -219,19 +264,17 @@ export async function GET(request: Request) {
 
     const proExpiresAt = entitlementResult.data?.pro_expires_at ?? null;
     const isPro = Boolean(proExpiresAt && new Date(proExpiresAt).getTime() > Date.now());
-    const subjectAttempts = attempts.filter((attempt) => attempt.subject === subject);
+    const visibleLimit = isPro ? 3 : 1;
 
     if (!available) {
       return NextResponse.json({
-        subject,
+        subjects: buildSubjectDirections(attempts, [], visibleLimit),
         isPro,
-        topicStats: [],
-        availableTopicCount: 0,
         message: "新版作答資料尚未啟用主題分析。",
       });
     }
 
-    const outcomes = subjectAttempts.flatMap((attempt) =>
+    const outcomes = attempts.flatMap((attempt) =>
       attempt.questionOutcomes.map((outcome) => ({ attempt, outcome })),
     );
     const taxonomy = await readTaxonomy(
@@ -245,20 +288,18 @@ export async function GET(request: Request) {
         {
           attemptId: attempt.id,
           completedAt: attempt.completedAt,
+          subject: attempt.subject,
           topic: item.topic,
           correct: outcome.correct,
           uncertain: outcome.uncertain,
         },
       ];
     });
-    const topicStats = buildTopicStats(observations);
-    const visibleLimit = isPro ? 3 : 1;
+    const subjects = buildSubjectDirections(attempts, observations, visibleLimit);
 
     return NextResponse.json({
-      subject,
       isPro,
-      topicStats: topicStats.slice(0, visibleLimit),
-      availableTopicCount: topicStats.length,
+      subjects,
       message:
         observations.length === 0
           ? "完成新版考卷後，這裡會開始整理你的主題弱點。"
