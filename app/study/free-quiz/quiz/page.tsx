@@ -59,6 +59,8 @@ function FreeQuizRunner() {
   const configKey = `${from}-${to}-${subject}-${count}-${topic}-${subtopic}`;
 
   const buildConfiguratorHref = () => {
+    if (targeted) return "/study/records/what-to-study";
+
     const params = new URLSearchParams({ from, to, subject, count });
     if (topic) params.set("topic", topic);
     if (subtopic) params.set("subtopic", subtopic);
