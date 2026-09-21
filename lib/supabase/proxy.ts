@@ -40,11 +40,6 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims;
   const pathname = request.nextUrl.pathname;
 
-  const isPublicStudyRoute =
-    pathname === "/study" ||
-    pathname.startsWith("/study/material") ||
-    pathname.startsWith("/study/exam");
-
   const isPublicInfoRoute =
     pathname === "/about" ||
     pathname === "/privacy" ||
@@ -62,7 +57,6 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
     isPublicInfoRoute ||
-    isPublicStudyRoute ||
     isPublicSeoRoute;
 
   if (!user && !isPublicRoute) {
