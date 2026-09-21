@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useProStatus } from "@/hooks/use-pro-status";
 import TopBar from "@/components/top-bar";
 import {
   formatAttemptDate,
@@ -10,6 +11,7 @@ import {
   readExamAttempts,
   type ExamAttempt,
 } from "@/lib/exam-attempt-store";
+import { readGuestExamAttempt } from "@/lib/guest-exam-attempt-store";
 
 const rocYears = Array.from({ length: 10 }, (_, index) => 115 - index);
 
@@ -40,10 +42,12 @@ export default function ExamPage() {
 
 function ExamPicker() {
   const searchParams = useSearchParams();
+  const auth = useProStatus();
   const [rocYear, setRocYear] = useState(115);
   const [session, setSession] = useState<1 | 2>(1);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [purchases, setPurchases] = useState<PurchasedExam[]>([]);
+  const [hasGuestAttempt, setHasGuestAttempt] = useState(false);
   const explanationMode = searchParams.get("mode") === "explanation";
 
   useEffect(() => {
@@ -59,6 +63,11 @@ function ExamPicker() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (auth.loading) return;
+    setHasGuestAttempt(!auth.isLoggedIn && Boolean(readGuestExamAttempt()));
+  }, [auth.loading, auth.isLoggedIn]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -148,6 +157,29 @@ function ExamPicker() {
           </div>
         </section>
 
+        {!auth.loading && !auth.isLoggedIn && hasGuestAttempt && (
+          <section className="mt-5 rounded-[22px] border border-[#eadba9] bg-[#fffaf0] px-5 py-4">
+            <div className="text-sm font-black text-[#80651e]">你已完成一份考卷</div>
+            <p className="mt-1 text-sm font-bold leading-6 text-[#80651e]">
+              先註冊或登入保存這份作答，之後就能繼續刷題並累積弱點分析。
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Link
+                href="/auth/sign-up?redirect=%2Fstudy%2Fexam"
+                className="rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
+              >
+                註冊並保存紀錄
+              </Link>
+              <Link
+                href="/auth/login?redirect=%2Fstudy%2Fexam"
+                className="rounded-xl border border-[#e7d59d] bg-white px-4 py-3 text-center text-sm font-black text-[#80651e]"
+              >
+                已有帳號，登入
+              </Link>
+            </div>
+          </section>
+        )}
+
         <section className="mt-5">
           <div>
             <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
@@ -168,6 +200,7 @@ function ExamPicker() {
                   subject={subject}
                   latestAttempt={latestMap.get(examKey) ?? null}
                   purchased={purchaseMap.has(examKey)}
+                  guestAttemptLocked={!auth.loading && !auth.isLoggedIn && hasGuestAttempt}
                 />
               );
             })}
@@ -185,6 +218,7 @@ function ExamCard({
   subject,
   latestAttempt,
   purchased,
+  guestAttemptLocked,
 }: {
   index: number;
   year: number;
@@ -192,11 +226,13 @@ function ExamCard({
   subject: string;
   latestAttempt: ExamAttempt | null;
   purchased: boolean;
+  guestAttemptLocked: boolean;
 }) {
   const quizHref = useMemo(() => {
+    if (guestAttemptLocked) return "/auth/sign-up?redirect=%2Fstudy%2Fexam";
     const params = new URLSearchParams({ year: String(year), session: String(session), subject });
     return `/study/exam/quiz?${params.toString()}`;
-  }, [year, session, subject]);
+  }, [guestAttemptLocked, year, session, subject]);
 
   const historyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -243,7 +279,7 @@ function ExamCard({
           href={quizHref}
           className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
         >
-          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+          ✏️ {guestAttemptLocked ? "先保存這份成果" : latestAttempt ? "再次作答" : "開始作答"}
         </Link>
         {latestAttempt ? (
           <Link
