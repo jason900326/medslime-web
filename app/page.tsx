@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import TopBar from "@/components/top-bar";
+import AppNavigation from "@/components/app-navigation";
+import { useAuthUser } from "@/hooks/use-auth-user";
 const startSteps = [
   { number: "1", title: "選一份國考考卷" },
   { number: "2", title: "作答、看分數與錯題" },
@@ -9,10 +11,13 @@ const startSteps = [
 ];
 
 export default function Home() {
+  const auth = useAuthUser();
+
   return (
     <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-text)]">
       <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
         <TopBar />
+        {auth.isLoggedIn && <AppNavigation />}
 
         <section className="relative mt-5 overflow-hidden rounded-[30px] border border-[#d7eadf] bg-[radial-gradient(circle_at_top_right,#dff8ea_0%,transparent_38%),linear-gradient(135deg,#f0fbf4_0%,#ffffff_56%,#eef9f7_100%)] px-5 py-9 shadow-[0_18px_48px_rgba(31,83,53,0.08)] sm:px-8 sm:py-12 md:px-10 md:py-14">
           <div className="relative z-10 grid gap-9 md:grid-cols-[1.08fr_0.92fr] md:items-center md:gap-12">
