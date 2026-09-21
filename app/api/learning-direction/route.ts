@@ -13,6 +13,7 @@ type Attempt = {
   id: string;
   subject: string;
   score: number;
+  answeredCount: number;
   completedAt: string;
   questionOutcomes: QuestionOutcome[];
 };
@@ -159,20 +160,49 @@ function buildTopicStats(
         items.length
           ? round1((items.filter((item) => item.correct).length / items.length) * 100)
           : null;
+      const recentAccuracy = accuracyOf(recent);
+      const previousAccuracy = accuracyOf(previous);
+      const repeatedWrongQuestions = [...group.wrongByQuestion.values()].filter(
+        (count) => count >= 2,
+      ).length;
+      const attemptCount = group.attempts.size;
+
+      // Priority should represent persistent learning risk, not just one recent score.
+      // Improvement can lower urgency a little, but a single good practice never erases
+      // repeated mistakes accumulated across attempts.
+      const baseGap = (100 - accuracy) * (0.45 + evidenceWeight * 0.55);
+      const uncertaintyPenalty = uncertainRate * 0.15;
+      const repeatedMistakePenalty = Math.min(18, repeatedWrongQuestions * 6);
+      const persistencePenalty = Math.min(8, Math.max(0, attemptCount - 1) * 2);
+      const trendDelta =
+        recentAccuracy !== null && previousAccuracy !== null
+          ? recentAccuracy - previousAccuracy
+          : 0;
+      const trendAdjustment =
+        trendDelta < 0
+          ? Math.min(12, Math.abs(trendDelta) * 0.25)
+          : -Math.min(6, trendDelta * 0.1);
 
       return {
         topic: group.topic,
-        attempts: group.attempts.size,
+        attempts: attemptCount,
         answeredCount: group.answeredCount,
         correctCount: group.correctCount,
         accuracy: round1(accuracy),
         uncertainCount: group.uncertainCount,
-        repeatedWrongQuestions: [...group.wrongByQuestion.values()].filter(
-          (count) => count >= 2,
-        ).length,
-        recentAccuracy: accuracyOf(recent),
-        previousAccuracy: accuracyOf(previous),
-        priorityScore: round1((100 - accuracy) * evidenceWeight + uncertainRate * 0.2),
+        repeatedWrongQuestions,
+        recentAccuracy,
+        previousAccuracy,
+        priorityScore: round1(
+          Math.max(
+            0,
+            baseGap +
+              uncertaintyPenalty +
+              repeatedMistakePenalty +
+              persistencePenalty +
+              trendAdjustment,
+          ),
+        ),
       } satisfies TopicStat;
     })
     .sort(
@@ -220,7 +250,15 @@ function buildSubjectDirections(
         availableTopicCount: subjectTopics.length,
       } satisfies SubjectDirection;
     })
-    .sort((a, b) => a.average - b.average || a.subject.localeCompare(b.subject));
+    .sort((a, b) => {
+      const aPriority = a.topicStats[0]?.priorityScore ?? -1;
+      const bPriority = b.topicStats[0]?.priorityScore ?? -1;
+      return (
+        bPriority - aPriority ||
+        a.average - b.average ||
+        a.subject.localeCompare(b.subject)
+      );
+    });
 }
 
 function buildDailySummary(
@@ -287,7 +325,10 @@ function buildDailySummary(
     attemptCount: yesterdayAttempts.length,
     answeredCount: yesterdayAttempts.reduce(
       (sum, attempt) =>
-        sum + attempt.questionOutcomes.filter((outcome) => outcome.answered).length,
+        sum +
+        (attempt.answeredCount > 0
+          ? attempt.answeredCount
+          : attempt.questionOutcomes.filter((outcome) => outcome.answered).length),
       0,
     ),
     mainWeakness: mainWeakness
@@ -304,7 +345,7 @@ function buildDailySummary(
 async function readAttempts(admin: ReturnType<typeof createAdminClient>, userId: string) {
   const result = await admin
     .from("exam_attempts")
-    .select("id,subject,score,completed_at,question_outcomes")
+    .select("id,subject,score,answered_count,completed_at,question_outcomes")
     .eq("user_id", userId)
     .order("completed_at", { ascending: false })
     .limit(120);
@@ -320,6 +361,7 @@ async function readAttempts(admin: ReturnType<typeof createAdminClient>, userId:
     id: String(row.id ?? ""),
     subject: String(row.subject ?? "未分類"),
     score: Number(row.score ?? 0),
+    answeredCount: Math.max(0, Number(row.answered_count ?? 0)),
     completedAt: String(row.completed_at ?? ""),
     questionOutcomes: normalizeQuestionOutcomes(row.question_outcomes),
   }));
