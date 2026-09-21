@@ -194,6 +194,7 @@ function ExamQuizContent() {
     .filter((item) => answers[item.id] === undefined)
     .map((item) => item.questionNumber);
   const unansweredCount = unansweredNumbers.length;
+  const answeredCount = questions.length - unansweredCount;
   const uncertainCount = Object.values(uncertain).filter(Boolean).length;
   const score = correctCount * 1.25;
 
