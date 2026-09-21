@@ -223,6 +223,12 @@ function ExamQuizContent() {
 
     setShowSubmitDialog(false);
     setFinished(true);
+
+    // An incomplete submit is only a review checkpoint. Do not persist it as an
+    // exam attempt, otherwise continuing the same exam would leave a partial
+    // record and block the final completed result from being saved.
+    if (unansweredCount > 0) return;
+
     if (!recorded) {
       setRecorded(true);
 
