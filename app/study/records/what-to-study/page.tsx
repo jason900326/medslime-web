@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import AppNavigation from "@/components/app-navigation";
 import TopBar from "@/components/top-bar";
-import { readExamAttempts, type ExamAttempt } from "@/lib/exam-attempt-store";
 
 type TopicStat = {
   topic: string;
@@ -17,60 +15,32 @@ type TopicStat = {
   priorityScore: number;
 };
 
-type DirectionState =
-  | { status: "idle" | "loading" }
-  | { status: "ready"; data: DirectionPayload }
-  | { status: "error"; message: string };
-
-type DirectionPayload = {
+type SubjectDirection = {
   subject: string;
-  isPro: boolean;
+  attempts: number;
+  average: number;
   topicStats: TopicStat[];
   availableTopicCount: number;
+};
+
+type DirectionPayload = {
+  isPro: boolean;
+  subjects: SubjectDirection[];
   message: string | null;
 };
 
+type DirectionState =
+  | { status: "loading" }
+  | { status: "ready"; data: DirectionPayload }
+  | { status: "error"; message: string };
+
 export default function WhatToStudyPage() {
-  return (
-    <Suspense fallback={<DirectionLoading />}>
-      <WhatToStudyContent />
-    </Suspense>
-  );
-}
-
-function WhatToStudyContent() {
-  const searchParams = useSearchParams();
-  const selectedSubject = searchParams.get("subject")?.trim() ?? "";
-  const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [direction, setDirection] = useState<DirectionState>({ status: "idle" });
+  const [direction, setDirection] = useState<DirectionState>({ status: "loading" });
 
   useEffect(() => {
-    let cancelled = false;
-
-    void readExamAttempts()
-      .then((items) => {
-        if (!cancelled) setAttempts(items);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSubject) {
-      setDirection({ status: "idle" });
-      return;
-    }
-
     const controller = new AbortController();
-    setDirection({ status: "loading" });
 
-    void fetch(`/api/learning-direction?subject=${encodeURIComponent(selectedSubject)}`, {
+    void fetch("/api/learning-direction", {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -88,11 +58,7 @@ function WhatToStudyContent() {
       });
 
     return () => controller.abort();
-  }, [selectedSubject]);
-
-  const subjects = useMemo(() => summarizeSubjects(attempts), [attempts]);
-  const weakest = subjects[0] ?? null;
-  const selectedSummary = subjects.find((item) => item.subject === selectedSubject) ?? null;
+  }, []);
 
   return (
     <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-text)]">
@@ -101,237 +67,164 @@ function WhatToStudyContent() {
         <AppNavigation />
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-            STUDY DIRECTION
-          </div>
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">STUDY DIRECTION</div>
           <h1 className="ms-page-title mt-2">我該讀什麼？</h1>
-          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[var(--brand-text-muted)]">
-            {selectedSummary
-              ? `查看${shortSubject(selectedSummary.subject)}目前最需要補強的主題。`
-              : "先看整體科目狀況，再決定下一步要補哪一科。"}
+          <p className="mt-2 text-sm font-bold leading-6 text-[var(--brand-text-muted)]">
+            看見目前最需要補的地方，直接開始練習。
           </p>
         </section>
 
-        {loading ? (
-          <div className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-8 text-center text-sm font-black text-[#789083]">
-            正在整理你的作答紀錄⋯
-          </div>
-        ) : attempts.length === 0 ? (
-          <EmptyDirectionState />
-        ) : (
-          <>
-            {selectedSummary ? (
-              <SubjectDirection
-                summary={selectedSummary}
-                direction={direction}
-              />
-            ) : weakest ? (
-              <section className="mt-6 rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6">
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
-                  目前先補
-                </div>
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-2xl font-black tracking-[-0.03em] text-[#17372a]">
-                      {shortSubject(weakest.subject)}
-                    </h2>
-                    <p className="mt-1 text-sm font-bold text-[#70877a]">
-                      目前平均 {weakest.average.toFixed(1)} 分，先從這一科開始檢討。
-                    </p>
-                  </div>
-                  <Link
-                    href={`/study/records/what-to-study?subject=${encodeURIComponent(weakest.subject)}`}
-                    className="rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white transition hover:bg-[#2dbc70]"
-                  >
-                    查看這科紀錄 →
-                  </Link>
-                </div>
-              </section>
-            ) : null}
-
-            <section className="mt-8">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black tracking-[-0.03em]">各科狀況</h2>
-                  <p className="mt-1 text-xs font-bold text-[#8a9c92]">
-                    目前已完成 {attempts.length} 份作答
-                  </p>
-                </div>
-                <Link
-                  href="/study/records?tab=pro"
-                  className="text-xs font-black text-[#237849]"
-                >
-                  查看完整分析 →
-                </Link>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {subjects.map((subject, index) => (
-                  <Link
-                    key={subject.subject}
-                    href={`/study/records/what-to-study?subject=${encodeURIComponent(subject.subject)}`}
-                    className="group rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.035)] transition hover:-translate-y-0.5 hover:border-[#bfe1cb] hover:shadow-[0_12px_28px_rgba(31,83,53,0.07)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8f8ed] text-sm font-black text-[#279255]">
-                        {index + 1}
-                      </span>
-                      <span className="text-xs font-black text-[#237849] group-hover:translate-x-0.5">
-                        查看 →
-                      </span>
-                    </div>
-                    <h3 className="mt-4 line-clamp-2 min-h-12 text-base font-black leading-6 text-[#315b45]">
-                      {shortSubject(subject.subject)}
-                    </h3>
-                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#edf2ef] pt-3">
-                      <Metric label="平均" value={`${subject.average.toFixed(1)} 分`} />
-                      <Metric label="作答" value={`${subject.attempts} 份`} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
+        {direction.status === "loading" && <DirectionLoading />}
+        {direction.status === "error" && <DirectionError message={direction.message} />}
+        {direction.status === "ready" && <DirectionContent data={direction.data} />}
       </div>
     </main>
   );
 }
 
-function SubjectDirection({
-  summary,
-  direction,
-}: {
-  summary: ReturnType<typeof summarizeSubjects>[number];
-  direction: DirectionState;
-}) {
-  return (
-    <section className="mt-6 rounded-[24px] border border-[#cfe7d8] bg-white p-5 shadow-[0_10px_28px_rgba(31,83,53,0.04)] sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">單科弱點</div>
-          <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#17372a]">
-            {shortSubject(summary.subject)}
-          </h2>
-          <p className="mt-1 text-sm font-bold text-[#70877a]">
-            平均 {summary.average.toFixed(1)} 分・已作答 {summary.attempts} 份
-          </p>
-        </div>
-        <Link
-          href="/study/records/what-to-study"
-          className="text-xs font-black text-[#237849]"
-        >
-          ← 回到全部科目
-        </Link>
-      </div>
+function DirectionContent({ data }: { data: DirectionPayload }) {
+  const weakest = data.subjects[0] ?? null;
+  const priority = weakest?.topicStats[0] ?? null;
 
-      {direction.status === "loading" && (
-        <div className="mt-6 rounded-2xl bg-[#f7faf8] px-4 py-5 text-center text-sm font-black text-[#789083]">
-          正在整理這一科的主題表現⋯
-        </div>
-      )}
-
-      {direction.status === "error" && (
-        <div className="mt-6 rounded-2xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-4 text-sm font-bold text-[#9b5050]">
-          {direction.message}
-        </div>
-      )}
-
-      {direction.status === "ready" && (
-        <TopicDirectionResult data={direction.data} />
-      )}
-    </section>
-  );
-}
-
-function TopicDirectionResult({ data }: { data: DirectionPayload }) {
-  if (data.topicStats.length === 0) {
-    return (
-      <div className="mt-6 rounded-2xl bg-[#f7faf8] px-4 py-4 text-sm font-bold leading-6 text-[#789083]">
-        {data.message ?? "目前還沒有足夠的主題資料，完成新版考卷後會開始累積。"}
-      </div>
-    );
-  }
-
-  const priority = data.topicStats[0];
+  if (!weakest) return <EmptyDirectionState />;
 
   return (
     <>
-      <div className="mt-6 rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] p-4">
-        <div className="text-xs font-black text-[#2ba962]">建議優先補強</div>
-        <div className="mt-1 text-xl font-black text-[#237849]">{priority.topic}</div>
-        <div className="mt-1 text-sm font-bold text-[#668276]">
-          {priority.correctCount} / {priority.answeredCount} 題答對，正確率 {priority.accuracy.toFixed(1)}%
+      <section className="mt-6 rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6">
+        <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">目前先補</div>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black tracking-[-0.03em] text-[#17372a]">
+              {priority?.topic ?? shortSubject(weakest.subject)}
+            </h2>
+            <p className="mt-1 text-sm font-bold text-[#70877a]">
+              {priority
+                ? `${shortSubject(weakest.subject)}・${priority.accuracy.toFixed(1)}% 正確率`
+                : `${shortSubject(weakest.subject)}目前平均 ${weakest.average.toFixed(1)} 分`}
+            </p>
+          </div>
+          {priority && <PracticeLink subject={weakest.subject} topic={priority.topic} label="開始補強 →" />}
         </div>
-      </div>
+        {priority && (
+          <p className="mt-4 text-xs font-bold text-[#789083]">
+            做過 {priority.answeredCount} 題，答對 {priority.correctCount} 題
+          </p>
+        )}
+      </section>
 
-      <div className="mt-6">
-        <div className="text-sm font-black text-[#315b45]">
-          目前主要弱點 {data.isPro ? "Top 3" : "Top 1"}
+      <section className="mt-8">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black tracking-[-0.03em]">各科狀況</h2>
+            <p className="mt-1 text-xs font-bold text-[#8a9c92]">
+              依目前平均分數排列，先處理最需要的地方。
+            </p>
+          </div>
+          <span className="text-xs font-black text-[#789083]">{data.isPro ? "Top 3" : "Top 1"}</span>
         </div>
-        <div className="mt-3 space-y-2">
-          {data.topicStats.map((topic, index) => (
-            <TopicDirectionRow key={topic.topic} topic={topic} rank={index + 1} />
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {data.subjects.map((subject, index) => (
+            <SubjectDirectionCard
+              key={subject.subject}
+              subject={subject}
+              rank={index + 1}
+              isPro={data.isPro}
+            />
           ))}
         </div>
-      </div>
 
-      {!data.isPro && data.availableTopicCount > 1 && (
-        <div className="mt-4 rounded-xl border border-[#eadba9] bg-[#fffaf0] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
-          目前先顯示最需要補強的 Top 1。升級 Pro 後可查看完整 Top 3 弱點。
-        </div>
-      )}
+        {!data.isPro && data.subjects.some((subject) => subject.availableTopicCount > 1) && (
+          <div className="mt-4 rounded-xl border border-[#eadba9] bg-[#fffaf0] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
+            目前顯示每科最需要補強的 Top 1。升級 Pro 後可查看各科 Top 3 弱點。
+          </div>
+        )}
+
+        {data.message && <p className="mt-4 text-xs font-bold text-[#789083]">{data.message}</p>}
+      </section>
     </>
   );
 }
 
-function TopicDirectionRow({ topic, rank }: { topic: TopicStat; rank: number }) {
+function SubjectDirectionCard({
+  subject,
+  rank,
+  isPro,
+}: {
+  subject: SubjectDirection;
+  rank: number;
+  isPro: boolean;
+}) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[#dfece4] bg-[#fdfefd] px-3 py-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8f8ed] text-xs font-black text-[#279255]">
-        {rank}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
-        <div className="mt-1 text-[11px] font-bold text-[#8a9c92]">
-          {topic.attempts} 份作答・{topic.answeredCount} 題
-          {topic.uncertainCount > 0 ? `・不確定 ${topic.uncertainCount} 題` : ""}
+    <article className="rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.035)]">
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8f8ed] text-sm font-black text-[#279255]">
+          {rank}
+        </span>
+        <div className="text-right">
+          <div className="text-sm font-black text-[#237849]">{subject.average.toFixed(1)} 分</div>
+          <div className="text-[11px] font-bold text-[#8a9c92]">{subject.attempts} 份作答</div>
         </div>
       </div>
-      <div className="shrink-0 text-right">
-        <div className="text-sm font-black text-[#237849]">{topic.accuracy.toFixed(1)}%</div>
-        <div className="text-[10px] font-bold text-[#8a9c92]">正確率</div>
-      </div>
-    </div>
+
+      <h3 className="mt-4 text-base font-black leading-6 text-[#315b45]">{shortSubject(subject.subject)}</h3>
+
+      {subject.topicStats.length > 0 ? (
+        <div className="mt-4 space-y-2 border-t border-[#edf2ef] pt-3">
+          {subject.topicStats.map((topic, index) => (
+            <div key={topic.topic} className="flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f1f8f3] text-[11px] font-black text-[#279255]">
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
+                <div className="text-[11px] font-bold text-[#8a9c92]">
+                  {topic.answeredCount} 題・{topic.accuracy.toFixed(1)}%
+                </div>
+              </div>
+              {index === 0 && (
+                <PracticeLink subject={subject.subject} topic={topic.topic} label="補強" compact />
+              )}
+            </div>
+          ))}
+          {!isPro && subject.availableTopicCount > 1 && (
+            <div className="pt-1 text-[11px] font-bold text-[#9a7a2b]">Pro 可查看 Top 3</div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 border-t border-[#edf2ef] pt-3 text-xs font-bold leading-5 text-[#789083]">
+          完成新版考卷後，這裡會開始整理主題弱點。
+        </div>
+      )}
+    </article>
   );
 }
 
-function DirectionLoading() {
-  return <main className="min-h-screen bg-[var(--brand-bg)]" />;
-}
+function PracticeLink({
+  subject,
+  topic,
+  label,
+  compact = false,
+}: {
+  subject: string;
+  topic: string;
+  label: string;
+  compact?: boolean;
+}) {
+  const href = `/study/free-quiz?${new URLSearchParams({ subject, topic, count: "10" }).toString()}`;
 
-function summarizeSubjects(attempts: ExamAttempt[]) {
-  const groups = new Map<string, ExamAttempt[]>();
-  for (const attempt of attempts) {
-    const list = groups.get(attempt.subject) ?? [];
-    list.push(attempt);
-    groups.set(attempt.subject, list);
-  }
-
-  return [...groups.entries()]
-    .map(([subject, items]) => ({
-      subject,
-      attempts: items.length,
-      average: average(items.map((item) => item.score)),
-      latest: items[0]?.score ?? 0,
-      completedAt: items[0]?.completedAt ?? "",
-    }))
-    .sort((a, b) => a.average - b.average || a.subject.localeCompare(b.subject));
-}
-
-function average(values: number[]) {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return (
+    <Link
+      href={href}
+      className={
+        compact
+          ? "shrink-0 rounded-lg bg-[#e8f8ed] px-2.5 py-1.5 text-[11px] font-black text-[#237849]"
+          : "shrink-0 rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white transition hover:bg-[#2dbc70]"
+      }
+    >
+      {label}
+    </Link>
+  );
 }
 
 function shortSubject(subject: string) {
@@ -342,11 +235,18 @@ function shortSubject(subject: string) {
     .trim();
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function DirectionLoading() {
   return (
-    <div>
-      <div className="text-[11px] font-bold text-[#8a9c92]">{label}</div>
-      <div className="mt-1 text-sm font-black text-[#237849]">{value}</div>
+    <div className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-8 text-center text-sm font-black text-[#789083]">
+      正在整理你的作答紀錄⋯
+    </div>
+  );
+}
+
+function DirectionError({ message }: { message: string }) {
+  return (
+    <div className="mt-6 rounded-[24px] border border-[#f0dddd] bg-[#fff8f8] p-6 text-sm font-bold text-[#9b5050]">
+      {message}
     </div>
   );
 }
