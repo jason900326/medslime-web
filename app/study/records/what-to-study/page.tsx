@@ -93,7 +93,7 @@ function DirectionContent({ data }: { data: DirectionPayload }) {
   return (
     <>
       <section className="mt-6 rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6">
-        <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">目前先補</div>
+        <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">下一步</div>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black tracking-[-0.03em] text-[#17372a]">
@@ -101,36 +101,30 @@ function DirectionContent({ data }: { data: DirectionPayload }) {
             </h2>
             <p className="mt-1 text-sm font-bold text-[#70877a]">
               {priority
-                ? `${shortSubject(weakest.subject)}・${priority.accuracy.toFixed(1)}% 正確率`
-                : `${shortSubject(weakest.subject)}目前平均 ${weakest.average.toFixed(1)} 分`}
+                ? "先從" + shortSubject(weakest.subject) + "補起來"
+                : "先從" + shortSubject(weakest.subject) + "開始練習"}
             </p>
           </div>
-          {priority && <PracticeLink subject={weakest.subject} topic={priority.topic} label="開始 10 題補強 →" />}
+          {priority && <PracticeLink subject={weakest.subject} topic={priority.topic} label="開始補強 →" />}
         </div>
-        {priority && (
-          <p className="mt-4 text-xs font-bold text-[#789083]">
-            做過 {priority.answeredCount} 題，答對 {priority.correctCount} 題
-          </p>
-        )}
+        <p className="mt-4 text-xs font-bold text-[#789083]">
+          完成後再回來，看看下一個需要補強的地方。
+        </p>
       </section>
 
       <section className="mt-8">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black tracking-[-0.03em]">各科狀況</h2>
-            <p className="mt-1 text-xs font-bold text-[#8a9c92]">
-              依目前平均分數排列，先處理最需要的地方。
-            </p>
-          </div>
-          <span className="text-xs font-black text-[#789083]">{data.isPro ? "Top 3" : "Top 1"}</span>
+        <div>
+          <h2 className="text-xl font-black tracking-[-0.03em]">各科狀況</h2>
+          <p className="mt-1 text-xs font-bold text-[#8a9c92]">
+            展開一科，就能看到目前建議的補強方向。
+          </p>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {data.subjects.map((subject, index) => (
+        <div className="mt-4 space-y-3">
+          {data.subjects.map((subject) => (
             <SubjectDirectionCard
               key={subject.subject}
               subject={subject}
-              rank={index + 1}
               isPro={data.isPro}
             />
           ))}
@@ -138,7 +132,7 @@ function DirectionContent({ data }: { data: DirectionPayload }) {
 
         {!data.isPro && data.subjects.some((subject) => subject.availableTopicCount > 1) && (
           <div className="mt-4 rounded-xl border border-[#eadba9] bg-[#fffaf0] px-4 py-3 text-xs font-bold leading-5 text-[#80651e]">
-            目前顯示每科最需要補強的 Top 1。升級 Pro 後可查看各科 Top 3 弱點。
+            想看更多需要補強的方向？Pro 會幫你整理更完整的學習順序。
           </div>
         )}
 
@@ -150,109 +144,60 @@ function DirectionContent({ data }: { data: DirectionPayload }) {
 
 function SubjectDirectionCard({
   subject,
-  rank,
   isPro,
 }: {
   subject: SubjectDirection;
-  rank: number;
   isPro: boolean;
 }) {
+  const firstTopic = subject.topicStats[0];
+
   return (
-    <article className="rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.035)]">
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8f8ed] text-sm font-black text-[#279255]">
-          {rank}
+    <details className="group rounded-[22px] border border-[#dce9e1] bg-white shadow-[0_8px_22px_rgba(31,83,53,0.035)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <h3 className="text-base font-black leading-6 text-[#315b45]">{shortSubject(subject.subject)}</h3>
+          <p className="mt-1 truncate text-xs font-bold text-[#8a9c92]">
+            {firstTopic
+              ? "建議先補：" + firstTopic.topic
+              : "作答紀錄累積後，這裡會整理補強方向。"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-[#f1f8f3] px-3 py-1.5 text-xs font-black text-[#237849] group-open:bg-[#e8f8ed]">
+          查看
         </span>
-        <div className="text-right">
-          <div className="text-sm font-black text-[#237849]">{subject.average.toFixed(1)} 分</div>
-          <div className="text-[11px] font-bold text-[#8a9c92]">{subject.attempts} 份作答</div>
-        </div>
+      </summary>
+
+      <div className="border-t border-[#edf2ef] px-5 pb-5 pt-3">
+        {subject.topicStats.length > 0 ? (
+          <div className="space-y-2">
+            {subject.topicStats.map((topic, index) => (
+              <div
+                key={topic.topic}
+                className="flex items-center justify-between gap-3 rounded-xl bg-[#f8fbf9] px-3 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black tracking-[0.08em] text-[#789083]">
+                    {index === 0 ? "建議先補" : "接著補"}
+                  </div>
+                  <div className="mt-0.5 truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
+                </div>
+                <PracticeLink subject={subject.subject} topic={topic.topic} label="開始補強" compact />
+              </div>
+            ))}
+            {!isPro && subject.availableTopicCount > subject.topicStats.length && (
+              <p className="pt-1 text-[11px] font-bold text-[#9a7a2b]">
+                還有更多補強方向，Pro 會繼續幫你整理。
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs font-bold leading-5 text-[#789083]">
+            完成更多作答後，這裡會開始整理你的補強方向。
+          </p>
+        )}
       </div>
-
-      <h3 className="mt-4 text-base font-black leading-6 text-[#315b45]">{shortSubject(subject.subject)}</h3>
-
-      {subject.topicStats.length > 0 ? (
-        <div className="mt-4 space-y-2 border-t border-[#edf2ef] pt-3">
-          {subject.topicStats.map((topic, index) => (
-            <div key={topic.topic} className="flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f1f8f3] text-[11px] font-black text-[#279255]">
-                {index + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-black text-[#315b45]">{topic.topic}</div>
-                <div className="text-[11px] font-bold text-[#8a9c92]">
-                  {topic.answeredCount} 題・{topic.accuracy.toFixed(1)}%
-                </div>
-                {trendLabel(topic) && (
-                  <div
-                    className={[
-                      "text-[10px] font-black",
-                      topic.recentAccuracy !== null &&
-                      topic.previousAccuracy !== null &&
-                      topic.recentAccuracy >= topic.previousAccuracy + 5
-                        ? "text-[#237849]"
-                        : topic.recentAccuracy !== null &&
-                            topic.previousAccuracy !== null &&
-                            topic.recentAccuracy <= topic.previousAccuracy - 5
-                          ? "text-[#a15a5a]"
-                          : "text-[#8a9c92]",
-                    ].join(" ")}
-                  >
-                    {trendLabel(topic)}
-                  </div>
-                )}
-              </div>
-              {index === 0 && (
-                <PracticeLink subject={subject.subject} topic={topic.topic} label="10 題補強" compact />
-              )}
-            </div>
-          ))}
-          {!isPro && subject.availableTopicCount > 1 && (
-            <div className="pt-1 text-[11px] font-bold text-[#9a7a2b]">Pro 可查看 Top 3</div>
-          )}
-          {subject.topicStats[0] && (
-            <details className="mt-4 border-t border-[#edf2ef] pt-3">
-              <summary className="cursor-pointer text-xs font-black text-[#789083]">
-                查看分析依據
-              </summary>
-              <div className="mt-3 rounded-xl bg-[#f8fbf9] px-3 py-3 text-xs font-bold leading-5 text-[#70877a]">
-                <div>目前依正確率、作答題數與「不確定」標記排序。</div>
-                <div className="mt-1">
-                  {subject.topicStats[0].topic}：做過 {subject.topicStats[0].answeredCount} 題，
-                  答錯 {subject.topicStats[0].answeredCount - subject.topicStats[0].correctCount} 題，
-                  跨 {subject.topicStats[0].attempts} 份作答。
-                </div>
-                {subject.topicStats[0].recentAccuracy !== null &&
-                subject.topicStats[0].previousAccuracy !== null ? (
-                  <div className="mt-1">
-                    最近作答正確率 {subject.topicStats[0].recentAccuracy.toFixed(1)}%，
-                    之前為 {subject.topicStats[0].previousAccuracy.toFixed(1)}%。
-                  </div>
-                ) : (
-                  <div className="mt-1">資料還在累積，先以目前作答表現判斷。</div>
-                )}
-              </div>
-            </details>
-          )}
-        </div>
-      ) : (
-        <div className="mt-4 border-t border-[#edf2ef] pt-3 text-xs font-bold leading-5 text-[#789083]">
-          完成新版考卷後，這裡會開始整理主題弱點。
-        </div>
-      )}
-    </article>
+    </details>
   );
-}
-
-function trendLabel(topic: TopicStat) {
-  if (topic.recentAccuracy === null || topic.previousAccuracy === null) {
-    return null;
-  }
-
-  const delta = topic.recentAccuracy - topic.previousAccuracy;
-  if (delta >= 5) return `近況 +${delta.toFixed(1)}%`;
-  if (delta <= -5) return `近況 ${delta.toFixed(1)}%`;
-  return "近況持平";
 }
 
 function PracticeLink({
@@ -266,13 +211,14 @@ function PracticeLink({
   label: string;
   compact?: boolean;
 }) {
-  const href = `/study/free-quiz/quiz?${new URLSearchParams({
+  const params = new URLSearchParams({
     from: "106",
     to: "115",
     subject,
     topic,
     count: "10",
-  }).toString()}`;
+  });
+  const href = "/study/free-quiz/quiz?" + params.toString();
 
   return (
     <Link
