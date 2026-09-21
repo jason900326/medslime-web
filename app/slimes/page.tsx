@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import TopBar from "@/components/top-bar";
+import AppNavigation from "@/components/app-navigation";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { useGameState } from "@/components/game-state-provider";
@@ -74,6 +75,7 @@ export default function SlimesPage() {
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-5 md:px-8 md:py-10">
         <TopBar showBack />
+        <AppNavigation />
 
         <section className="mt-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
