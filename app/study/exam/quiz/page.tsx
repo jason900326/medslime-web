@@ -10,11 +10,8 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
-import Link from "next/link";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
-import AIExplanationButton from "@/components/ai-explanation-button";
-import ExamExplanationOffer from "@/components/exam-explanation-offer";
 import {
   useGameState,
   type NationalExamRewardResult,
@@ -23,10 +20,6 @@ import {
   saveNationalExamAttempt,
   type SaveExamAttemptInput,
 } from "@/lib/exam-attempt-store";
-import {
-  clearGuestExamAttempt,
-  saveGuestExamAttempt,
-} from "@/lib/guest-exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 import { useQuizSession } from "@/lib/use-quiz-session";
 
@@ -52,18 +45,6 @@ type LoadState =
 const TUTORIAL_STORAGE_KEY =
   "medslime_exam_tutorial_seen_v2";
 const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
-
-function formatElapsed(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const mm = String(minutes).padStart(2, "0");
-  const ss = String(seconds).padStart(2, "0");
-
-  if (hours <= 0) return `${mm}:${ss}`;
-  return `${String(hours).padStart(2, "0")}:${mm}:${ss}`;
-}
 
 export default function ExamQuizPage() {
   return (
@@ -101,10 +82,8 @@ function ExamQuizContent() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOriginalQuestion, setShowOriginalQuestion] = useState(false);
   const [recorded, setRecorded] = useState(false);
-  const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
   const [examRewardResult, setExamRewardResult] =
     useState<NationalExamRewardResult | null>(null);
-  const [guestAttemptSaved, setGuestAttemptSaved] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -114,9 +93,7 @@ function ExamQuizContent() {
       resetSession();
       setFinished(false);
       setRecorded(false);
-      setElapsedAtFinish(0);
       setExamRewardResult(null);
-      setGuestAttemptSaved(false);
       setShowSubmitDialog(false);
 
       try {
@@ -243,7 +220,6 @@ function ExamQuizContent() {
         : 0;
     const answeredCount = Object.keys(answers).length;
 
-    setElapsedAtFinish(elapsed);
     setShowSubmitDialog(false);
     setFinished(true);
     if (!recorded) {
@@ -288,24 +264,9 @@ function ExamQuizContent() {
         }),
       };
 
-      const isComplete = answeredCount === questions.length;
-      if (isComplete) {
-        setGuestAttemptSaved(saveGuestExamAttempt(attemptInput));
-      }
-
-      void saveNationalExamAttempt(attemptInput)
-        .then((savedAttemptId) => {
-          if (savedAttemptId) {
-            clearGuestExamAttempt();
-            setGuestAttemptSaved(false);
-          } else if (isComplete) {
-            setGuestAttemptSaved(true);
-          }
-        })
-        .catch((error) => {
-          console.error("國考作答紀錄儲存失敗：", error);
-          if (isComplete) setGuestAttemptSaved(true);
-        });
+      void saveNationalExamAttempt(attemptInput).catch((error) => {
+        console.error("國考作答紀錄儲存失敗：", error);
+      });
 
       game.recordQuestionsAnswered(answeredCount);
       if (answeredCount === questions.length) {
@@ -325,214 +286,86 @@ function ExamQuizContent() {
   };
 
   if (finished) {
-    const previewReviewQuestions = reviewQuestions.slice(0, 3);
-    const hiddenReviewCount = Math.max(0, reviewQuestions.length - previewReviewQuestions.length);
+    const completed = unansweredCount === 0;
+    const resultTarget =
+      reviewQuestions.length > 0
+        ? "/study/records?tab=mistakes"
+        : "/study/records?tab=attempts";
 
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
+        <div className="mx-auto max-w-2xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
           <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
 
-          <section className="mt-6 rounded-[26px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-10 sm:rounded-[30px] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962] sm:text-sm">
-              RESULT
-            </div>
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
+          <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-white p-6 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-12 sm:p-9">
+            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">RESULT</div>
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+              {completed ? "作答完成" : "這次尚未完成"}
+            </h1>
 
-            <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3 sm:mt-8 sm:gap-4">
-              <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
-              <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
-              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
-              <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
-            </div>
-
-            {unansweredCount > 0 ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#eadfce] bg-[#fffaf2] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
-                完整作答全部題目才會發放國考完成獎勵；這次有 {unansweredCount} 題未作答，因此不發金幣。
-              </div>
-            ) : examRewardResult?.status === "rewarded" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] p-3 text-sm font-black text-[#237849] sm:p-4">
-                國考完整作答獎勵：🪙 +{examRewardResult.amount}
-              </div>
-            ) : examRewardResult?.status === "duplicate" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
-                這份國考的首次完成獎勵已領取過；重做仍會正常保存學習紀錄，但不重複發金幣。
-              </div>
-            ) : examRewardResult?.status === "weekly-cap" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
-                本週已領滿 2 份國考完成獎勵；下週可再從新的國考取得獎勵。
-              </div>
-            ) : null}
-
-            {gradableCount < questions.length && (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
-                有 {questions.length - gradableCount} 題目前沒有可用的單一標準答案，因此未納入計分。
-              </div>
-            )}
-
-            {uncertainCount > 0 && (
-              <div className="mt-3 text-xs font-bold text-[#789083] sm:text-sm">
-                你另外標記了 {uncertainCount} 題「我不確定」。
-              </div>
-            )}
-
-            {guestAttemptSaved && (
-              <section className="mx-auto mt-5 max-w-3xl rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 text-left">
-                <div className="text-sm font-black text-[#237849]">這份成果先幫你留住了</div>
-                <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-                  註冊或登入後，這份作答會自動加入你的學習紀錄，之後才能累積弱點並看到下一步該讀什麼。
-                </p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <Link
-                    href="/auth/sign-up?redirect=%2Fstudy%2Frecords"
-                    className="rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
-                  >
-                    註冊並保存紀錄
-                  </Link>
-                  <Link
-                    href="/auth/login?redirect=%2Fstudy%2Frecords"
-                    className="rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45]"
-                  >
-                    已有帳號，登入
-                  </Link>
+            {completed ? (
+              <>
+                <div className="mt-8 text-6xl font-black tracking-[-0.06em] text-[#17372a] sm:text-7xl">
+                  {score.toFixed(2)}
+                  <span className="ml-2 text-2xl tracking-normal text-[#789083]">分</span>
                 </div>
-              </section>
+                <div className="mt-4 text-sm font-bold text-[#70877a]">
+                  答對 {correctCount} 題 · {reviewQuestions.length} 題需要再看
+                </div>
+              </>
+            ) : (
+              <div className="mt-8 rounded-2xl bg-[#fffaf2] px-5 py-5 text-sm font-black leading-6 text-[#80651e]">
+                已作答 {answeredCount} / {questions.length} 題，還有 {unansweredCount} 題。
+                <div className="mt-1 text-xs font-bold text-[#9a7a2b]">
+                  完成整份考卷後，才會形成完整的學習紀錄。
+                </div>
+              </div>
             )}
 
-            <div className="mx-auto mt-5 flex max-w-3xl flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
-              {reviewQuestions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/study/records?tab=mistakes")}
-                  className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
-                >
-                  前往錯題紀錄
-                </button>
-              )}
+            {completed && examRewardResult?.status === "rewarded" && (
+              <div className="mx-auto mt-5 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]">
+                國考完成獎勵：🪙 +{examRewardResult.amount}
+              </div>
+            )}
+
+            {completed && gradableCount < questions.length && (
+              <div className="mt-4 text-xs font-bold leading-5 text-[#8a9c92]">
+                有 {questions.length - gradableCount} 題沒有標準答案，未列入分數。
+              </div>
+            )}
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (completed) {
+                    router.push(resultTarget);
+                  } else {
+                    setFinished(false);
+                    setShowSubmitDialog(false);
+                  }
+                }}
+                className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+              >
+                {completed
+                  ? reviewQuestions.length > 0
+                    ? "查看錯題"
+                    : "查看學習紀錄"
+                  : "繼續作答"}
+              </button>
               <button
                 type="button"
                 onClick={() => router.push("/study/exam")}
-                className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f5faf7] sm:px-6"
+                className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45]"
               >
                 再選一份考卷
               </button>
             </div>
-
-            <ExamExplanationOffer
-              year={year}
-              session={session}
-              subject={subject}
-              reviewCount={reviewQuestions.length}
-            />
-
-            {reviewQuestions.length > 0 ? (
-              <section className="mx-auto mt-7 max-w-3xl space-y-4 text-left sm:mt-8">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
-                    <div className="mt-1 text-xs font-bold text-[#789083]">
-                      先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題紀錄。
-                    </div>
-                  </div>
-                </div>
-
-                {previewReviewQuestions.map((item) => {
-                  const userAnswer = answers[item.id];
-                  const isUncertain = uncertain[item.id] ?? false;
-                  const isWrong =
-                    item.correctIndex !== null &&
-                    userAnswer !== undefined &&
-                    userAnswer !== item.correctIndex;
-
-                  return (
-                    <div
-                      key={`result-review-${item.id}`}
-                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-4 sm:p-5"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-black text-[#2ba962]">
-                          第 {item.questionNumber} 題
-                        </div>
-                        {isWrong && (
-                          <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
-                            答錯
-                          </span>
-                        )}
-                        {isUncertain && (
-                          <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#80651e]">
-                            ❓ 不確定
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-3 text-base font-black leading-7 text-[#17372a]">
-                        {item.stem}
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        {item.options.map((option, optionIndex) => {
-                          const isCorrect = item.correctIndex === optionIndex;
-                          const isChosen = userAnswer === optionIndex;
-
-                          return (
-                            <div
-                              key={`result-${item.id}-${optionIndex}`}
-                              className={[
-                                "rounded-xl border px-4 py-3 text-sm font-bold",
-                                isCorrect
-                                  ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
-                                  : isChosen
-                                    ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
-                                    : "border-[#e1e9e4] bg-white text-[#60786c]",
-                              ].join(" ")}
-                            >
-                              {String.fromCharCode(65 + optionIndex)}. {option}
-                              {isCorrect && " ✓"}
-                              {isChosen && !isCorrect && " ← 你的答案"}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {item.correctIndex !== null && (
-                        <AIExplanationButton
-                          payload={{
-                            questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
-                            source: "national-exam",
-                            sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
-                            stem: item.stem,
-                            options: item.options,
-                            correctIndex: item.correctIndex,
-                            userAnswer: userAnswer === undefined ? null : userAnswer,
-                            uncertain: isUncertain,
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {hiddenReviewCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => router.push("/study/records?tab=mistakes")}
-                    className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
-                  >
-                    還有 {hiddenReviewCount} 題，前往錯題紀錄查看全部 →
-                  </button>
-                )}
-              </section>
-            ) : (
-              <div className="mx-auto mt-7 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
-                ✓ 這次沒有需要複習的錯題或不確定題目。
-              </div>
-            )}
           </section>
         </div>
       </main>
     );
   }
-
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
@@ -1044,19 +877,6 @@ function TutorialItem({
       <div>
         <div className="text-lg font-black">{title}</div>
         <div className="mt-1 text-sm font-bold leading-6 text-[#789083]">{copy}</div>
-      </div>
-    </div>
-  );
-}
-
-function ResultCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-[18px] border border-[#dfece4] bg-[#f8fcf9] px-3 py-4 sm:rounded-[20px] sm:p-5">
-      <div className="text-xs font-bold leading-4 text-[#789083] sm:text-sm">
-        {label}
-      </div>
-      <div className="mt-1 break-keep text-lg font-black leading-tight sm:text-2xl">
-        {value}
       </div>
     </div>
   );
