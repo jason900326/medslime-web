@@ -1125,15 +1125,6 @@ function TargetedReviewGate({
   );
 }
 
-function ResultCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-[#f7faf8] px-4 py-4">
-      <div className="text-xs font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
-    </div>
-  );
-}
-
 function LoadingQuiz() {
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
