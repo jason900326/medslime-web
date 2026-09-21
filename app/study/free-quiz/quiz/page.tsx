@@ -67,6 +67,12 @@ function FreeQuizRunner() {
     return `/study/free-quiz?${params.toString()}`;
   };
 
+  const buildTargetedQuizHref = () => {
+    const params = new URLSearchParams({ from, to, subject, topic, count: "10" });
+    if (subtopic) params.set("subtopic", subtopic);
+    return `/study/free-quiz/quiz?${params.toString()}`;
+  };
+
   const {
     index,
     setIndex,
@@ -129,7 +135,11 @@ function FreeQuizRunner() {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
+          <TopBar
+            showBack
+            backHref={buildConfiguratorHref()}
+            backLabel={targeted ? "返回我該讀什麼？" : "返回自由測驗"}
+          />
           <section className="mt-8 rounded-[24px] border border-[#f0dddd] bg-white p-6">
             <div className="text-xl font-black text-[#9b5050]">無法建立自由測驗</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">{loadState.message}</div>
@@ -258,13 +268,17 @@ function FreeQuizRunner() {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
+          <TopBar
+            showBack
+            backHref={buildConfiguratorHref()}
+            backLabel={targeted ? "返回我該讀什麼？" : "返回自由測驗"}
+          />
 
           <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
             <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
               {targeted ? "WEAK TOPIC RESULT" : "FREE QUIZ RESULT"}
             </div>
-            <h1 className="mt-2 text-3xl font-black">{targeted ? "弱主題練習完成" : "自由測驗完成"}</h1>
+            <h1 className="mt-2 text-3xl font-black">{targeted ? "這次補強完成" : "自由測驗完成"}</h1>
             <div className="mt-2 text-sm font-bold text-[#789083]">{from}–{to} 年 · {subject}</div>
             {targeted && (
               <div className="mx-auto mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">
@@ -279,6 +293,19 @@ function FreeQuizRunner() {
               <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
             </div>
 
+            {targeted && (
+              <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-4 text-left">
+                <div className="text-sm font-black text-[#237849]">
+                  這次補強正確率 {score.toFixed(1)}%
+                </div>
+                <div className="mt-1 text-xs font-bold leading-5 text-[#668276]">
+                  {score >= 80
+                    ? "這次表現不錯，但先不急著把弱點移除；之後在不同考卷再作答幾次，才能確認是否真的改善。"
+                    : "這個主題還需要再補，先看這次錯題，再用下一份同主題練習驗證。"}
+                </div>
+              </div>
+            )}
+
             <div className="mx-auto mt-6 flex max-w-xl flex-col gap-2 sm:flex-row">
               {reviewQuestions.length > 0 && (
                 <button
@@ -289,13 +316,32 @@ function FreeQuizRunner() {
                   前往錯題紀錄
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => router.push(buildConfiguratorHref())}
-                className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
-              >
-                再組一份
-              </button>
+              {targeted ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push(buildTargetedQuizHref())}
+                    className="flex-1 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                  >
+                    再做 10 題
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/study/records/what-to-study")}
+                    className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
+                  >
+                    回到弱點方向
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => router.push(buildConfiguratorHref())}
+                  className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
+                >
+                  再組一份
+                </button>
+              )}
             </div>
 
             {preview.length > 0 && (
