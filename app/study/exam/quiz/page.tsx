@@ -244,6 +244,8 @@ function ExamQuizContent() {
     const answeredCount = Object.keys(answers).length;
 
     setElapsedAtFinish(elapsed);
+    setShowSubmitDialog(false);
+    setFinished(true);
     if (!recorded) {
       setRecorded(true);
 
