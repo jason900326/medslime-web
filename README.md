@@ -705,17 +705,20 @@ Payment
 
 ### `/study/records`
 
-目前已有：
+目前已整理為：
 
-- 作答紀錄
+- 簡化的作答紀錄
 - 筆記
-- Pro analysis
-- deterministic Topic/Subtopic analytics
-- weak-topic practice
+- 「我該讀什麼？」
+- deterministic 弱點排序
+- progressive disclosure 的分析依據
+- weak-topic quick review
+- 同 Topic 歷屆題補強
+- 長期改善追蹤
 
-但 user-facing 仍使用「Pro 學習分析」。
+舊的 user-facing「Pro 學習分析」入口已退場；舊 `?tab=pro` 會導向「我該讀什麼？」。
 
-**Target:** 改為以「我該讀什麼？」作為核心入口，重新整理為六科總覽 → 單科 Top 3 弱點 → 建議優先補強 → 補強內容 → 同 Topic 練習 → 長期追蹤。
+**Current direction:** 以「我該讀什麼？」作為核心入口，維持「弱點方向 → 快速補強 → 同 Topic 練習 → 長期追蹤」的單一路徑。
 
 ---
 
@@ -729,16 +732,17 @@ Payment
 
 工作：
 
-- [ ] 重製網站首頁資訊架構
-- [ ] Hero 改為「弱點補起來，分數撿回來。」
-- [ ] Hero 副標明確說明「刷歷屆題 → 找弱點 → 知道下一步讀什麼」
-- [ ] Primary CTA 改為「開始刷題」
-- [ ] 首頁移除／降級史萊姆房間、商城、收藏、抽卡、成就、任務的主要視覺權重
-- [ ] 建立清楚的「學習 / 學習紀錄 / 史萊姆」導覽
-- [ ] 學習頁突出「國考題庫」
-- [ ] 自由測驗、錯題複習、教材上傳、專心讀書降為 secondary actions
-- [ ] 保留現有考卷選擇流程，不無故重做
-- [ ] 確認導覽與文案不寫死只有醫事檢驗師
+- [x] 重製網站首頁資訊架構
+- [x] Hero 改為「弱點補起來，分數撿回來。」
+- [x] Hero 副標明確說明「刷歷屆題 → 找弱點 → 知道下一步讀什麼」
+- [x] Primary CTA 改為「開始刷題」
+- [x] 首頁移除／降級史萊姆房間、商城、收藏、抽卡、成就、任務的主要視覺權重
+- [x] 建立清楚的「學習 / 學習紀錄 / 史萊姆」導覽
+- [x] 學習頁突出「國考題庫」
+- [x] 自由測驗、錯題複習、教材上傳、專心讀書降為 secondary actions
+- [x] 保留現有考卷選擇流程，不無故重做
+- [x] 導覽與核心首頁文案不再把產品定位寫死為單一職類
+- [ ] 多職類題庫仍需先擴充資料 schema（目前 national_exam_questions 尚無 profession 欄位），完成後再加入職類選擇
 
 ### Phase 2 — 建立差異化核心價值
 
@@ -766,30 +770,30 @@ Payment
 
 工作：
 
-- [ ] 將現有 Pro analysis user-facing 入口改為「我該讀什麼？」
-- [ ] 建立六科總覽
-- [ ] 建立單科 Top 3 弱點
-- [ ] 顯示推薦優先補強項目
-- [ ] 「查看分析依據」採 progressive disclosure
-- [ ] Free 顯示 Top 1
-- [ ] Pro 顯示 Top 3
-- [ ] 建立 1～3 分鐘 AI 弱點補強
-- [ ] 建立 5～10 題同 Topic 歷屆題練習
-- [ ] 顯示補強練習正確率
-- [ ] 不因一次練習結果直接清除 weakness
-- [ ] 以跨考卷、跨時間資料調整 weakness priority
+- [x] 將現有 Pro analysis user-facing 入口改為「我該讀什麼？」
+- [x] 建立六科總覽
+- [x] 建立單科 Top 3 弱點
+- [x] 顯示推薦優先補強項目
+- [x] 「查看分析依據」採 progressive disclosure
+- [x] Free 顯示 Top 1
+- [x] Pro 顯示 Top 3
+- [x] 建立 1～3 分鐘 AI 弱點補強
+- [x] 建立 5～10 題同 Topic 歷屆題練習
+- [x] 顯示補強練習正確率
+- [x] 不因一次練習結果直接清除 weakness
+- [x] 以跨考卷、跨時間資料調整 weakness priority
 
 ### Phase 3 — Pro daily yesterday summary
 
 前兩階段穩定後：
 
-- [ ] 每日第一次進學習頁顯示昨日摘要卡
-- [ ] 顯示昨天學了什麼
-- [ ] 顯示昨天主要弱點
-- [ ] 顯示改善項目
-- [ ] 顯示今天建議先做什麼
-- [ ] 當日 dismiss 後不再重複
-- [ ] Free 不顯示
+- [x] 每日第一次進學習頁顯示昨日摘要卡
+- [x] 顯示昨天學了什麼
+- [x] 顯示昨天主要弱點
+- [x] 顯示改善項目
+- [x] 顯示今天建議先做什麼
+- [x] 當日 dismiss 後不再重複
+- [x] Free 不顯示
 
 ---
 
