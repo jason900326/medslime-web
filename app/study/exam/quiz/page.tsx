@@ -10,6 +10,7 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
+import Link from "next/link";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
 import {
@@ -21,6 +22,12 @@ import {
   type SaveExamAttemptInput,
 } from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
+import { useAuthUser } from "@/hooks/use-auth-user";
+import {
+  clearGuestExamAttempt,
+  readGuestExamAttempt,
+  saveGuestExamAttempt,
+} from "@/lib/guest-exam-attempt-store";
 import { useQuizSession } from "@/lib/use-quiz-session";
 
 type Question = {
@@ -58,6 +65,7 @@ function ExamQuizContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const game = useGameState();
+  const auth = useAuthUser();
 
   const year = searchParams.get("year") ?? "115";
   const session = searchParams.get("session") ?? "1";
@@ -82,10 +90,18 @@ function ExamQuizContent() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOriginalQuestion, setShowOriginalQuestion] = useState(false);
   const [recorded, setRecorded] = useState(false);
+  const [guestAttemptSaved, setGuestAttemptSaved] = useState(false);
+  const [showResultReview, setShowResultReview] = useState(false);
   const [examRewardResult, setExamRewardResult] =
     useState<NationalExamRewardResult | null>(null);
 
   useEffect(() => {
+    if (auth.loading) return;
+    if (!auth.isLoggedIn && readGuestExamAttempt()) {
+      router.replace("/study/exam");
+      return;
+    }
+
     const controller = new AbortController();
 
     async function loadExam() {
@@ -93,6 +109,8 @@ function ExamQuizContent() {
       resetSession();
       setFinished(false);
       setRecorded(false);
+      setGuestAttemptSaved(false);
+      setShowResultReview(false);
       setExamRewardResult(null);
       setShowSubmitDialog(false);
 
@@ -129,7 +147,7 @@ function ExamQuizContent() {
 
     loadExam();
     return () => controller.abort();
-  }, [examKey, year, session, subject, resetSession]);
+  }, [auth.loading, auth.isLoggedIn, examKey, year, session, subject, resetSession, router]);
 
   useEffect(() => {
     const seen = localStorage.getItem(TUTORIAL_STORAGE_KEY);
@@ -245,6 +263,7 @@ function ExamQuizContent() {
           uncertain: uncertain[item.id] ?? false,
           officialPdfUrl: item.questionPdfUrl,
         })),
+        completedAt: new Date().toISOString(),
         questionOutcomes: questions.map((item) => {
           const answer = answers[item.id];
           const answered = answer !== undefined;
@@ -262,21 +281,58 @@ function ExamQuizContent() {
             uncertain: uncertain[item.id] ?? false,
           };
         }),
+        questionItems: questions.map((item) => {
+          const answer = answers[item.id];
+          const answered = answer !== undefined;
+          return {
+            id: item.id,
+            questionKey: "national-exam:" + year + ":" + session + ":" + subject + ":" + item.questionNumber,
+            questionNumber: item.questionNumber,
+            sourceYear: year,
+            sourceSession: session,
+            sourceSubject: subject,
+            stem: item.stem,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            userAnswer: answered ? answer : null,
+            answered,
+            correct:
+              answered && item.correctIndex !== null
+                ? answer === item.correctIndex
+                : null,
+            uncertain: uncertain[item.id] ?? false,
+            officialPdfUrl: item.questionPdfUrl,
+          };
+        }),
       };
 
-      void saveNationalExamAttempt(attemptInput).catch((error) => {
-        console.error("國考作答紀錄儲存失敗：", error);
-      });
+      const isComplete = answeredCount === questions.length;
+      if (isComplete && !auth.isLoggedIn) {
+        setGuestAttemptSaved(saveGuestExamAttempt(attemptInput));
+      }
 
-      game.recordQuestionsAnswered(answeredCount);
-      if (answeredCount === questions.length) {
-        setExamRewardResult(game.claimNationalExamCompletionReward(examKey));
+      if (auth.isLoggedIn) {
+        void saveNationalExamAttempt(attemptInput)
+          .then((savedAttemptId) => {
+            if (savedAttemptId) {
+              clearGuestExamAttempt();
+              setGuestAttemptSaved(false);
+            }
+          })
+          .catch((error) => {
+            console.error("國考作答紀錄儲存失敗：", error);
+          });
+
+        game.recordQuestionsAnswered(answeredCount);
+        if (isComplete) {
+          setExamRewardResult(game.claimNationalExamCompletionReward(examKey));
+        }
+
+        void saveMistakes().catch((error) => {
+          console.error("國考錯題儲存失敗：", error);
+        });
       }
     }
-
-    void saveMistakes().catch((error) => {
-      console.error("國考錯題儲存失敗：", error);
-    });
 
   };
 
@@ -334,34 +390,144 @@ function ExamQuizContent() {
               </div>
             )}
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <button
-                type="button"
-                onClick={() => {
-                  if (completed) {
-                    router.push(resultTarget);
-                  } else {
+            {completed && !auth.isLoggedIn && guestAttemptSaved && (
+              <section className="mt-6 rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 text-left">
+                <div className="text-sm font-black text-[#237849]">你已經產生自己的學習資料</div>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#557768]">
+                  這份作答先存在這台裝置。建立帳號後會自動保存到學習紀錄，之後 MedSlime 才能用長期資料找出真正的弱點。
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <Link
+                    href="/auth/sign-up?redirect=%2Fstudy%2Frecords"
+                    className="rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white"
+                  >
+                    保存我的學習資料
+                  </Link>
+                  <Link
+                    href="/auth/login?redirect=%2Fstudy%2Frecords"
+                    className="rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45]"
+                  >
+                    已有帳號，登入
+                  </Link>
+                </div>
+              </section>
+            )}
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+              {completed ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowResultReview((value) => !value)}
+                    className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+                  >
+                    {showResultReview ? "收起整份考卷" : "查看整份考卷"}
+                  </button>
+                  {auth.isLoggedIn && (
+                    <button
+                      type="button"
+                      onClick={() => router.push(resultTarget)}
+                      className="rounded-2xl border border-[#cfe7d8] bg-white px-6 py-4 font-black text-[#315b45]"
+                    >
+                      {reviewQuestions.length > 0 ? "前往錯題紀錄" : "查看學習紀錄"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
                     setFinished(false);
                     setShowSubmitDialog(false);
-                  }
-                }}
-                className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
-              >
-                {completed
-                  ? reviewQuestions.length > 0
-                    ? "查看錯題"
-                    : "查看學習紀錄"
-                  : "繼續作答"}
-              </button>
+                  }}
+                  className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+                >
+                  繼續作答
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => router.push("/study/exam")}
                 className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45]"
               >
-                再選一份考卷
+                返回選卷
               </button>
             </div>
           </section>
+
+          {completed && showResultReview && (
+            <section className="mt-5 rounded-[28px] border border-[#dce9e1] bg-white p-5 shadow-[0_10px_28px_rgba(30,78,50,0.04)] sm:p-7">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">REVIEW</div>
+                  <h2 className="mt-1 text-2xl font-black">整份考卷訂正</h2>
+                </div>
+                <div className="text-xs font-bold text-[#789083]">
+                  綠色是正解，紅色是你選錯的答案。
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {questions.map((item) => {
+                  const userAnswer = answers[item.id];
+                  const isUncertain = uncertain[item.id] ?? false;
+                  const isWrong =
+                    item.correctIndex !== null &&
+                    userAnswer !== undefined &&
+                    userAnswer !== item.correctIndex;
+
+                  return (
+                    <article
+                      key={"result-review-" + item.id}
+                      className="rounded-[20px] border border-[#e2ebe5] bg-[#fbfefc] p-4 sm:p-5"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-black text-[#2ba962]">第 {item.questionNumber} 題</div>
+                        {isWrong && (
+                          <span className="rounded-full bg-[#fff1f1] px-2.5 py-1 text-[11px] font-black text-[#9b5050]">
+                            答錯
+                          </span>
+                        )}
+                        {isUncertain && (
+                          <span className="rounded-full bg-[#fff8df] px-2.5 py-1 text-[11px] font-black text-[#80651e]">
+                            不確定
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 text-sm font-black leading-6 text-[#17372a] sm:text-base sm:leading-7">
+                        {item.stem}
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {item.options.map((option, optionIndex) => {
+                          const isCorrect = item.correctIndex === optionIndex;
+                          const isChosen = userAnswer === optionIndex;
+                          return (
+                            <div
+                              key={item.id + "-result-option-" + optionIndex}
+                              className={[
+                                "rounded-xl border px-4 py-3 text-sm font-bold",
+                                isCorrect
+                                  ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
+                                  : isChosen
+                                    ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
+                                    : "border-[#e1e9e4] bg-white text-[#60786c]",
+                              ].join(" ")}
+                            >
+                              {String.fromCharCode(65 + optionIndex)}. {option}
+                              {isCorrect && " ✓ 正解"}
+                              {isChosen && !isCorrect && " ← 你的答案"}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       </main>
     );
