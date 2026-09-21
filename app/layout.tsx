@@ -9,6 +9,7 @@ import CampaignWelcomeGift from "@/components/campaign-welcome-gift";
 import RouteUtilities from "@/components/route-utilities";
 import SiteFooter from "@/components/site-footer";
 import LegacyEraLabelNormalizer from "@/components/legacy-era-label-normalizer";
+import GuestExamAttemptSync from "@/components/guest-exam-attempt-sync";
 
 const SITE_URL = "https://medslime.vercel.app";
 
@@ -94,6 +95,7 @@ export default function RootLayout({
               <ScrollJumpButtons />
               <RouteUtilities />
               <LegacyEraLabelNormalizer />
+              <GuestExamAttemptSync />
             </FocusTimerProvider>
           </GameStateProvider>
         </Suspense>
