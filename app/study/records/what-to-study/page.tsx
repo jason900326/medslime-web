@@ -212,6 +212,8 @@ function SubjectDirectionCard({
           )}
         </div>
 
+        </div>
+
         {subject.topicStats[0] && (
           <details className="mt-4 border-t border-[#edf2ef] pt-3">
             <summary className="cursor-pointer text-xs font-black text-[#789083]">
