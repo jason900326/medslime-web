@@ -29,9 +29,22 @@ type FreeQuestion = {
 };
 
 type LoadState =
+  | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; questions: FreeQuestion[] };
+
+type WeakTopicReview = {
+  title: string;
+  summary: string;
+  points: string[];
+};
+
+type ReviewState =
+  | { status: "loading" }
+  | { status: "ready"; review: WeakTopicReview }
+  | { status: "locked"; message: string }
+  | { status: "error"; message: string };
 
 const STARTED_AT_KEY = "medslime_free_quiz_started_at";
 const EXAM_FINISHED_EVENT = "medslime:exam-finished";
@@ -85,7 +98,13 @@ function FreeQuizRunner() {
     getStatus: getQuestionStatus,
     resetSession,
   } = useQuizSession();
-  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  const [reviewGateOpen, setReviewGateOpen] = useState(!targeted);
+  const [reviewState, setReviewState] = useState<ReviewState | null>(
+    targeted ? { status: "loading" } : null,
+  );
+  const [loadState, setLoadState] = useState<LoadState>({
+    status: targeted ? "idle" : "loading",
+  });
   const [finished, setFinished] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
@@ -93,6 +112,49 @@ function FreeQuizRunner() {
   const [showOfficial, setShowOfficial] = useState(false);
 
   useEffect(() => {
+    if (!targeted) return;
+
+    const controller = new AbortController();
+
+    void fetch(
+      `/api/weak-topic-review?${new URLSearchParams({ subject, topic }).toString()}`,
+      { cache: "no-store", signal: controller.signal },
+    )
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          review?: WeakTopicReview;
+          error?: string;
+          code?: string;
+        };
+
+        if (response.status === 403 || payload.code === "PRO_REQUIRED") {
+          setReviewState({
+            status: "locked",
+            message: payload.error ?? "快速弱點補強是 Pro 功能。",
+          });
+          return;
+        }
+
+        if (!response.ok || !payload.review) {
+          throw new Error(payload.error ?? "快速補強內容讀取失敗。");
+        }
+
+        setReviewState({ status: "ready", review: payload.review });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setReviewState({
+          status: "error",
+          message: error instanceof Error ? error.message : "快速補強內容讀取失敗。",
+        });
+      });
+
+    return () => controller.abort();
+  }, [subject, targeted, topic]);
+
+  useEffect(() => {
+    if (targeted && !reviewGateOpen) return;
+
     const controller = new AbortController();
 
     async function load() {
@@ -127,9 +189,26 @@ function FreeQuizRunner() {
 
     void load();
     return () => controller.abort();
-  }, [configKey, from, to, subject, count, topic, subtopic, resetSession]);
+  }, [configKey, from, to, subject, count, reviewGateOpen, targeted, topic, subtopic, resetSession]);
+
+  const startTargetedPractice = () => {
+    setReviewGateOpen(true);
+  };
+
+  if (targeted && !reviewGateOpen) {
+    return (
+      <TargetedReviewGate
+        topic={targetLabel}
+        state={reviewState ?? { status: "loading" }}
+        onStart={startTargetedPractice}
+        onBack={() => router.push("/study/records/what-to-study")}
+      />
+    );
+  }
 
   if (loadState.status === "loading") return <LoadingQuiz />;
+
+  if (loadState.status === "idle") return <LoadingQuiz />;
 
   if (loadState.status === "error") {
     return (
@@ -846,6 +925,87 @@ function LegendDot({ color }: { color: "green" | "yellow" | "red" }) {
     red: "bg-[#de7777]",
   }[color];
   return <span className={`h-2 w-2 rounded-full ${className}`} />;
+}
+
+function TargetedReviewGate({
+  topic,
+  state,
+  onStart,
+  onBack,
+}: {
+  topic: string;
+  state: ReviewState;
+  onStart: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+      <div className="mx-auto max-w-3xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+        <TopBar showBack backHref="/study/records/what-to-study" backLabel="返回我該讀什麼？" />
+
+        <section className="mt-7 rounded-[28px] border border-[#cfe7d8] bg-white p-5 shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
+          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">QUICK REVIEW</div>
+          <h1 className="mt-2 text-3xl font-black">先補一下，再做題</h1>
+          <div className="mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1.5 text-xs font-black text-[#237849]">
+            {topic}
+          </div>
+
+          {state.status === "loading" && (
+            <div className="mt-7 rounded-2xl bg-[#f7faf8] px-4 py-6 text-center text-sm font-black text-[#789083]">
+              正在整理 1–3 分鐘重點⋯
+            </div>
+          )}
+
+          {state.status === "ready" && (
+            <div className="mt-6">
+              <h2 className="text-xl font-black text-[#237849]">{state.review.title}</h2>
+              <p className="mt-3 text-sm font-bold leading-7 text-[#557768]">{state.review.summary}</p>
+              <ul className="mt-5 space-y-3">
+                {state.review.points.map((point) => (
+                  <li key={point} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3 text-sm font-bold leading-6 text-[#315b45]">
+                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
+                      ✓
+                    </span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {state.status === "locked" && (
+            <div className="mt-6 rounded-2xl border border-[#eadba9] bg-[#fffaf0] px-4 py-4 text-sm font-bold leading-6 text-[#80651e]">
+              {state.message} 你仍可以直接做 10 題同主題練習，先確認自己的表現。
+            </div>
+          )}
+
+          {state.status === "error" && (
+            <div className="mt-6 rounded-2xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-4 text-sm font-bold leading-6 text-[#9b5050]">
+              {state.message} 你仍可以直接開始練習。
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={onStart}
+              disabled={state.status === "loading"}
+              className="flex-1 rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-wait disabled:opacity-55"
+            >
+              開始 10 題補強 →
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-sm font-black text-[#315b45]"
+            >
+              先回去
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }
 
 function ResultCard({ label, value }: { label: string; value: string }) {
