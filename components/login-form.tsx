@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 function getSafeRedirect() {
   if (typeof window === "undefined") return "/";
@@ -24,44 +23,14 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     setGoogleLoading(true);
     setError(null);
 
-    try {
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-      ) {
-        throw new Error(
-          "本機缺少 NEXT_PUBLIC_SUPABASE_URL 或 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY，請檢查 .env.local。",
-        );
-      }
-
-      const supabase = createClient();
-      const next = getSafeRedirect();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo, skipBrowserRedirect: true },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data.url) {
-        throw new Error("Supabase 沒有回傳 Google 登入網址。");
-      }
-
-      window.location.assign(data.url);
-    } catch (reason) {
-      const message =
-        reason instanceof Error ? reason.message : "無法啟動 Google 登入。";
-      setError(`Google 登入失敗：${message}`);
-      setGoogleLoading(false);
-    }
+    const next = getSafeRedirect();
+    window.location.assign(
+      `/auth/login/google?next=${encodeURIComponent(next)}`,
+    );
   };
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -71,55 +40,30 @@ export function LoginForm() {
     setError(null);
 
     try {
-      if (
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-      ) {
-        throw new Error(
-          "本機缺少 NEXT_PUBLIC_SUPABASE_URL 或 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY，請檢查 .env.local。",
-        );
-      }
-
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data.session) {
-        throw new Error("Supabase 已接受登入，但沒有建立 session。");
-      }
-
-      const { data: sessionCheck } = await supabase.auth.getSession();
-      if (!sessionCheck.session) {
-        throw new Error(
-          "登入成功，但瀏覽器沒有保存 session。請確認目前瀏覽器允許本站 Cookie。",
-        );
-      }
-
-      const serverCheck = await fetch("/api/auth/check", {
-        cache: "no-store",
+      const response = await fetch("/auth/login/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       });
-      if (!serverCheck.ok) {
-        throw new Error(
-          "瀏覽器已登入，但網站伺服器讀不到登入 session。請重新啟動本機 dev server 後再試。",
-        );
+
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || "登入失敗，請稍後再試。");
       }
 
       window.location.replace(getSafeRedirect());
     } catch (reason) {
       const message =
         reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
-      setError(
-        message === "Invalid login credentials"
-          ? "Email 或密碼錯誤。若這個帳號原本是用 Google 建立，請使用 Google 登入。"
-          : `登入失敗：${message}`,
-      );
+      setError(message);
       setIsLoading(false);
     }
   };

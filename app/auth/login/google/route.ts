@@ -16,17 +16,16 @@ function safeNext(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
-  const next = safeNext(request.nextUrl.searchParams.get("next"));
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!code || !supabaseUrl || !publishableKey) {
-    const message = !code
-      ? "Missing OAuth code"
-      : "本機缺少 Supabase 環境變數，請檢查 .env.local。";
+  if (!supabaseUrl || !publishableKey) {
     return NextResponse.redirect(
-      new URL(`/auth/error?error=${encodeURIComponent(message)}`, request.url),
+      new URL(
+        "/auth/error?error=" +
+          encodeURIComponent("本機缺少 Supabase 環境變數，請檢查 .env.local。"),
+        request.url,
+      ),
     );
   }
 
@@ -42,17 +41,29 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) {
+  const next = safeNext(request.nextUrl.searchParams.get("next"));
+  const redirectTo = new URL("/auth/callback", request.url);
+  redirectTo.searchParams.set("next", next);
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: redirectTo.toString(),
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error || !data.url) {
     return NextResponse.redirect(
       new URL(
-        `/auth/error?error=${encodeURIComponent(error.message)}`,
+        "/auth/error?error=" +
+          encodeURIComponent(error?.message || "無法取得 Google 登入網址。"),
         request.url,
       ),
     );
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const response = NextResponse.redirect(data.url);
   pendingCookies.forEach(({ name, value, options }) =>
     response.cookies.set(name, value, options),
   );
