@@ -101,6 +101,16 @@ export function LoginForm() {
         );
       }
 
+      const serverCheck = await fetch("/api/auth/check", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!serverCheck.ok) {
+        throw new Error(
+          "瀏覽器已登入，但網站伺服器讀不到登入 session。請重新啟動本機 dev server 後再試。",
+        );
+      }
+
       window.location.replace(getSafeRedirect());
     } catch (reason) {
       const message =
