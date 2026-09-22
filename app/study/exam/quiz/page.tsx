@@ -1,5 +1,8 @@
 "use client";
 
+import QuizDialog from "@/components/quiz-dialog";
+import QuizOption from "@/components/quiz-option";
+
 import {
   Suspense,
   useEffect,
@@ -150,7 +153,7 @@ function ExamQuizContent() {
             <button
               type="button"
               onClick={() => router.push("/study/exam")}
-              className="mt-6 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+              className="mt-6 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
             >
               返回選卷
             </button>
@@ -303,8 +306,8 @@ function ExamQuizContent() {
         <div className="mx-auto max-w-2xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
           <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
 
-          <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-white p-6 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-12 sm:p-9">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">RESULT</div>
+          <section className="study-panel mt-6 text-center">
+
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">
               {completed ? "作答完成" : "這次尚未完成"}
             </h1>
@@ -351,7 +354,7 @@ function ExamQuizContent() {
                     setShowSubmitDialog(false);
                   }
                 }}
-                className="rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+                className="rounded-2xl bg-[#247451] px-6 py-4 font-black text-white"
               >
                 {completed
                   ? reviewQuestions.length > 0
@@ -384,6 +387,7 @@ function ExamQuizContent() {
           <h1 className="mt-2 text-2xl font-black">{subject}</h1>
         </section>
 
+        <p className="mt-4 text-sm leading-6 text-[#60786c]">點選項即可作答；不確定可先標記，交卷前再回來檢查。</p>
         <QuestionProgress
           questions={questions}
           currentIndex={index}
@@ -391,7 +395,7 @@ function ExamQuizContent() {
           onJump={setIndex}
         />
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+        <section className="study-panel mt-6 ">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-black text-[#789083]">
               Q{question.questionNumber} / {questions.length}
@@ -401,7 +405,7 @@ function ExamQuizContent() {
               onClick={() => setShowSubmitDialog(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
-              結束測驗
+              交卷
             </button>
           </div>
 
@@ -437,48 +441,15 @@ function ExamQuizContent() {
               const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
               return (
-                <div
+                <QuizOption
                   key={`${question.id}-${optionIndex}`}
-                  className={[
-                    "flex items-stretch rounded-2xl border transition",
-                    selected
-                      ? "border-[#65d795] bg-[#eaf9f0]"
-                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [question.id]: optionIndex,
-                      }))
-                    }
-                    className="flex w-14 shrink-0 items-center justify-center"
-                  >
-                    <span
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selected
-                          ? "border-[#31c978] bg-[#31c978]"
-                          : "border-[#b8c9bf] bg-white",
-                      ].join(" ")}
-                    >
-                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
-                    className={[
-                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                      struck ? "line-through opacity-45" : "",
-                    ].join(" ")}
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </button>
-                </div>
+                  label={String.fromCharCode(65 + optionIndex)}
+                  text={option}
+                  selected={selected}
+                  excluded={struck}
+                  onSelect={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))}
+                  onExclude={() => toggleStrike(question.id, optionIndex)}
+                />
               );
             })}
           </div>
@@ -529,7 +500,7 @@ function ExamQuizContent() {
                 onClick={() =>
                   setIndex((current) => Math.min(questions.length - 1, current + 1))
                 }
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
                 下一題 →
               </button>
@@ -537,9 +508,9 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={() => setShowSubmitDialog(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
-                完成測驗
+                交卷
               </button>
             )}
           </div>
@@ -548,13 +519,13 @@ function ExamQuizContent() {
 
       {showSubmitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-5">
-          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+          <QuizDialog onClose={() => setShowSubmitDialog(false)}>
             <div className="text-2xl font-black">是否要交卷？</div>
 
             {unansweredCount > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unansweredCount} 題未作答。
-                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
+                <div className="mt-3 border-t border-[#ead8d8] pt-3 text-left leading-6 text-[#8f5151]">
                   未作答題號：{unansweredNumbers.join("、")}
                 </div>
                 <div className="mt-3">確定仍要交卷嗎？</div>
@@ -574,12 +545,12 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={finishExam}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
+                className="rounded-xl bg-[#247451] px-4 py-3 font-black text-white"
               >
                 確認交卷
               </button>
             </div>
-          </div>
+          </QuizDialog>
         </div>
       )}
 
@@ -588,9 +559,7 @@ function ExamQuizContent() {
           <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-[22px] border border-[#dce9e1] bg-white p-4 shadow-2xl sm:rounded-[28px] sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black tracking-[0.1em] text-[#2ba962] sm:text-xs">
-                  OFFICIAL QUESTION
-                </div>
+
                 <div className="mt-1 text-lg font-black sm:text-xl">
                   官方原題 · 第 {question.questionNumber} 題
                 </div>
@@ -838,8 +807,8 @@ function ExamTutorial({ onClose }: { onClose: () => void }) {
 
         <div className="mx-auto mt-8 max-w-4xl rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_36px_rgba(31,83,53,0.06)]">
           <div className="grid gap-5 md:grid-cols-3">
-            <TutorialItem icon="◯" title="點圓圈" copy="選擇正式答案" />
-            <TutorialItem icon="Aa" title="點選項文字" copy="劃掉／取消劃掉選項" />
+            <TutorialItem icon="◯" title="點選項" copy="選擇答案，已選答案會以綠色標示" />
+            <TutorialItem icon="Aa" title="排除選項" copy="點右側排除；再次點選可取消" />
             <TutorialItem icon="?" title="我不確定" copy="答案照樣保留，同時標記這題不熟" />
           </div>
 
@@ -857,7 +826,7 @@ function ExamTutorial({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="mx-auto mt-6 block w-full max-w-4xl rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+          className="mx-auto mt-6 block w-full max-w-4xl rounded-2xl bg-[#247451] px-6 py-4 font-black text-white"
         >
           知道了，開始作答
         </button>

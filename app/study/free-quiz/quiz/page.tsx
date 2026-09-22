@@ -1,5 +1,8 @@
 "use client";
 
+import QuizDialog from "@/components/quiz-dialog";
+import QuizOption from "@/components/quiz-option";
+
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
@@ -229,7 +232,7 @@ function FreeQuizRunner() {
           <TopBar
             showBack
             backHref={buildConfiguratorHref()}
-            backLabel={targeted ? "返回我該讀什麼？" : "返回自由測驗"}
+            backLabel={targeted ? "返回學習分析" : "返回自由測驗"}
           />
           <section className="mt-8 rounded-[24px] border border-[#f0dddd] bg-white p-6">
             <div className="text-xl font-black text-[#9b5050]">無法建立自由測驗</div>
@@ -237,7 +240,7 @@ function FreeQuizRunner() {
             <button
               type="button"
               onClick={() => router.push(buildConfiguratorHref())}
-              className="mt-5 rounded-xl bg-[#31c978] px-5 py-3 text-sm font-black text-white"
+              className="mt-5 rounded-xl bg-[#247451] px-5 py-3 text-sm font-black text-white"
             >
               重新設定
             </button>
@@ -362,13 +365,11 @@ function FreeQuizRunner() {
           <TopBar
             showBack
             backHref={buildConfiguratorHref()}
-            backLabel={targeted ? "返回我該讀什麼？" : "返回自由測驗"}
+            backLabel={targeted ? "返回學習分析" : "返回自由測驗"}
           />
 
-          <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-              {targeted ? "WEAK TOPIC RESULT" : "FREE QUIZ RESULT"}
-            </div>
+          <section className="study-panel mt-6 text-center">
+
             <h1 className="mt-2 text-3xl font-black">{targeted ? "這次補強完成" : "自由測驗完成"}</h1>
             <div className="mt-2 text-sm font-bold text-[#789083]">{from}–{to} 年 · {subject}</div>
             {targeted && (
@@ -406,9 +407,9 @@ function FreeQuizRunner() {
                 <button
                   type="button"
                   onClick={() => router.push("/study/records?tab=mistakes")}
-                  className="flex-1 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                  className="flex-1 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
                 >
-                  前往錯題紀錄
+                  查看待複習題目
                 </button>
               )}
               {targeted ? (
@@ -416,7 +417,7 @@ function FreeQuizRunner() {
                   <button
                     type="button"
                     onClick={() => router.push(buildTargetedQuizHref())}
-                    className="flex-1 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                    className="flex-1 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
                   >
                     再做 10 題
                   </button>
@@ -425,7 +426,7 @@ function FreeQuizRunner() {
                     onClick={() => router.push("/study/records/what-to-study")}
                     className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
                   >
-                    回到弱點方向
+                    回到學習分析
                   </button>
                 </>
               ) : (
@@ -514,6 +515,7 @@ function FreeQuizRunner() {
           )}
         </section>
 
+        <p className="mt-4 text-sm leading-6 text-[#60786c]">點選項即可作答；不確定可先標記，交卷前再回來檢查。</p>
         <QuestionProgress
           questions={questions}
           currentIndex={index}
@@ -521,7 +523,7 @@ function FreeQuizRunner() {
           onJump={setIndex}
         />
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+        <section className="study-panel mt-6 ">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-black text-[#789083]">
               Q{index + 1} / {questions.length}
@@ -531,7 +533,7 @@ function FreeQuizRunner() {
               onClick={() => setShowSubmit(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
-              結束測驗
+              交卷
             </button>
           </div>
 
@@ -571,50 +573,15 @@ function FreeQuizRunner() {
               const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
               return (
-                <div
+                <QuizOption
                   key={`${question.id}-${optionIndex}`}
-                  className={[
-                    "flex items-stretch rounded-2xl border transition",
-                    selected
-                      ? "border-[#65d795] bg-[#eaf9f0]"
-                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [question.id]: optionIndex,
-                      }))
-                    }
-                    className="flex w-14 shrink-0 items-center justify-center"
-                    aria-label={`選擇 ${String.fromCharCode(65 + optionIndex)}`}
-                  >
-                    <span
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selected
-                          ? "border-[#31c978] bg-[#31c978]"
-                          : "border-[#b8c9bf] bg-white",
-                      ].join(" ")}
-                    >
-                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
-                    className={[
-                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                      struck ? "line-through opacity-45" : "",
-                    ].join(" ")}
-                    aria-label={`${struck ? "取消刪除線" : "劃掉"} ${String.fromCharCode(65 + optionIndex)} 選項`}
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </button>
-                </div>
+                  label={String.fromCharCode(65 + optionIndex)}
+                  text={option}
+                  selected={selected}
+                  excluded={struck}
+                  onSelect={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))}
+                  onExclude={() => toggleStrike(question.id, optionIndex)}
+                />
               );
             })}
           </div>
@@ -663,7 +630,7 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={() => setIndex((current) => Math.min(questions.length - 1, current + 1))}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
                 下一題 →
               </button>
@@ -671,9 +638,9 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={() => setShowSubmit(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
-                完成測驗
+                交卷
               </button>
             )}
           </div>
@@ -682,12 +649,12 @@ function FreeQuizRunner() {
 
       {showSubmit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/35 px-4">
-          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+          <QuizDialog onClose={() => setShowSubmit(false)}>
             <div className="text-2xl font-black">是否要交卷？</div>
             {unanswered.length > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unanswered.length} 題未作答。
-                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
+                <div className="mt-3 border-t border-[#ead8d8] pt-3 text-left leading-6 text-[#8f5151]">
                   未作答題號：{unanswered.map((item) => item.questionNumber).join("、")}
                 </div>
                 <div className="mt-3">確定仍要交卷嗎？</div>
@@ -706,12 +673,12 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={finish}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
+                className="rounded-xl bg-[#247451] px-4 py-3 font-black text-white"
               >
                 確認交卷
               </button>
             </div>
-          </div>
+          </QuizDialog>
         </div>
       )}
 
@@ -720,7 +687,7 @@ function FreeQuizRunner() {
           <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">OFFICIAL QUESTION</div>
+
                 <div className="mt-1 text-xl font-black">
                   {question.sourceYear} 年・第 {question.sourceSession} 次・第 {question.sourceQuestionNumber} 題
                 </div>
@@ -1067,10 +1034,10 @@ function TargetedReviewGate({
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-3xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-        <TopBar showBack backHref="/study/records/what-to-study" backLabel="返回我該讀什麼？" />
+        <TopBar showBack backHref="/study/records/what-to-study" backLabel="返回學習分析" />
 
         <section className="mt-7 rounded-[28px] border border-[#cfe7d8] bg-white p-5 shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">QUICK REVIEW</div>
+
           <h1 className="mt-2 text-3xl font-black">先補一下，再做題</h1>
           <div className="mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1.5 text-xs font-black text-[#237849]">
             {topic}
@@ -1107,7 +1074,7 @@ function TargetedReviewGate({
               type="button"
               onClick={onStart}
               disabled={state.status === "loading"}
-              className="flex-1 rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-wait disabled:opacity-55"
+              className="flex-1 rounded-2xl bg-[#247451] px-5 py-4 text-base font-black text-white transition hover:bg-[#1c5e40] disabled:cursor-wait disabled:opacity-55"
             >
               開始 10 題補強 →
             </button>

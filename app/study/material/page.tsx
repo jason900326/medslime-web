@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 import InfoDialogButton from "@/components/info-dialog-button";
 import { useAuthUser } from "@/hooks/use-auth-user";
 
@@ -133,13 +133,11 @@ export default function MaterialPage() {
 
   const startQuiz = () => { if (result) router.push("/study/material/quiz"); };
 
-  return <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-    <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
-      <TopBar showBack backHref="/study" backLabel="返回學習" />
+  return <StudyShell>
       <section className="mt-8">
-        <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">MATERIAL</div>
+
         <div className="mt-2 flex items-center justify-between gap-3">
-          <h1 className="text-4xl font-black tracking-[-0.04em]">我有教材</h1>
+          <h1 className="ms-page-title">教材上傳</h1>
           <InfoDialogButton title="教材上傳說明">
             <p>上傳 PDF，MedSlime 會讀取教材內容、整理重點，並產生 10 題四選一測驗。</p>
             <p>教材上傳需登入。普通用戶每天 5 次，MedSlime Pro 用戶每天 10 次。</p>
@@ -147,20 +145,25 @@ export default function MaterialPage() {
           </InfoDialogButton>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-[#70877a]">
-          <span className="rounded-full bg-white px-3 py-1.5">單檔上限 10 MB</span>
-          {auth.userId ? <><span className="rounded-full bg-white px-3 py-1.5">{isPro ? "PRO · 每日 10 次" : "普通用戶 · 每日 5 次"}</span><span className="rounded-full bg-white px-3 py-1.5">今日剩餘 {remaining} / {dailyLimit} 次</span></> : <span className="rounded-full bg-white px-3 py-1.5">登入後可使用教材分析</span>}
+          <span className="py-1.5 pr-4">單檔上限 10 MB</span>
+          {auth.userId ? <><span className="py-1.5 pr-4">{isPro ? "PRO · 每日 10 次" : "普通用戶 · 每日 5 次"}</span><span className="py-1.5 pr-4">今日剩餘 {remaining} / {dailyLimit} 次</span></> : <span className="py-1.5 pr-4">登入後可使用教材分析</span>}
         </div>
       </section>
 
-      <section className="mt-8 rounded-[30px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_34px_rgba(30,78,50,0.06)] md:p-8">
+      <ol aria-label="教材練習流程" className="mt-7 grid grid-cols-3 gap-3 border-y border-[#dfe7e0] py-4 text-sm text-[#667c6d]">
+        <li className={!file ? "font-bold text-[#246947]" : ""} aria-current={!file ? "step" : undefined}>01 選擇 PDF</li>
+        <li className={file && analysisState !== "ready" ? "font-bold text-[#246947]" : ""} aria-current={file && analysisState !== "ready" ? "step" : undefined}>02 分析教材</li>
+        <li className={analysisState === "ready" ? "font-bold text-[#246947]" : ""} aria-current={analysisState === "ready" ? "step" : undefined}>03 開始練習</li>
+      </ol>
+      <section className="mt-7" aria-label="上傳與分析教材">
         <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
-        {!auth.loading && !auth.userId ? <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-[#cfe0d6] bg-[#fbfefc] px-6 text-center">
+        {!auth.loading && !auth.userId ? <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#cfe0d6] bg-[#fbfefc] px-6 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eaf9f0] text-3xl">🔒</div>
           <div className="mt-5 text-xl font-black">登入後才能上傳教材</div>
           <div className="mt-2 text-sm font-bold text-[#789083]">普通用戶每天 5 次，Pro 用戶每天 10 次。</div>
           <button type="button" onClick={() => router.push("/login")} className="mt-6 rounded-2xl bg-[#31c978] px-6 py-3 font-black text-white">前往登入</button>
         </div> : !file ? <>
-          <button type="button" onClick={chooseFile} disabled={!canUse} className="flex min-h-[280px] w-full flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-[#cfe0d6] bg-[#fbfefc] px-6 text-center transition hover:border-[#78d79f] hover:bg-[#f5fcf8] disabled:cursor-not-allowed disabled:opacity-55">
+          <button type="button" onClick={chooseFile} disabled={!canUse} className="flex min-h-[280px] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#cfe0d6] bg-[#fbfefc] px-6 text-center transition hover:border-[#78d79f] hover:bg-[#f5fcf8] disabled:cursor-not-allowed disabled:opacity-55">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eaf9f0] text-3xl">📄</div>
             <div className="mt-5 text-xl font-black">{planLoading ? "正在確認使用額度..." : remaining > 0 ? "選擇 PDF 教材" : "今天的教材分析次數已用完"}</div>
             <div className="mt-2 text-sm font-bold text-[#789083]">{remaining > 0 ? "選好教材後，MedSlime 會幫你整理成 10 題測驗。" : `每日最多分析 ${dailyLimit} 份教材，明天會自動恢復。`}</div>
@@ -168,12 +171,11 @@ export default function MaterialPage() {
           {errorMessage && <div className="mt-4 rounded-xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-3 text-sm font-bold text-[#9b5050]">{errorMessage}</div>}
         </> : analysisState === "idle" ? <>
           <div className="flex flex-col gap-5 rounded-[24px] border border-[#dfeae3] bg-[#f9fcfa] p-5 sm:flex-row sm:items-center"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">📄</div><div className="min-w-0 flex-1"><div className="truncate text-lg font-black">{file.name}</div><div className="mt-1 text-sm font-bold text-[#789083]">{(file.size / 1024 / 1024).toFixed(2)} MB</div></div><button type="button" onClick={resetFile} className="rounded-xl border border-[#d7e7de] bg-white px-4 py-2 text-sm font-black text-[#60786c]">更換檔案</button></div>
-          <button type="button" onClick={analyzeFile} disabled={!canUse} className="mt-5 w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white disabled:opacity-50">AI 分析教材</button>
+          <button type="button" onClick={analyzeFile} disabled={!canUse} className="ms-primary-action mt-5 w-full disabled:opacity-50">AI 分析教材</button>
         </> : busy ? <AnalysisLoading fileName={file.name} stage={analysisState} /> : analysisState === "error" ? <div className="rounded-[22px] border border-[#f0dddd] bg-[#fff8f8] p-5"><div className="font-black text-[#9b5050]">教材分析失敗</div><div className="mt-2 text-sm font-bold leading-6 text-[#9b5050]">{errorMessage}</div><button type="button" onClick={analyzeFile} disabled={!canUse} className="mt-4 rounded-xl bg-[#31c978] px-4 py-2 text-sm font-black text-white disabled:opacity-50">再試一次</button></div> : analysisState === "ready" && result ? <AnalysisReady onStart={startQuiz} /> : null}
       </section>
-      <section className="mt-6 rounded-[22px] border border-[#dfece4] bg-white p-5"><div className="text-sm font-black text-[#315b45]">小提醒</div><p className="mt-2 text-sm font-bold leading-7 text-[#789083]">文字型 PDF 的讀取效果最好。若教材主要是掃描圖片，可能暫時無法產生測驗。</p></section>
-    </div>
-  </main>;
+      <section className="mt-6 border-t border-[#dfece4] pt-5"><div className="text-sm font-black text-[#315b45]">小提醒</div><p className="mt-2 text-sm font-bold leading-7 text-[#789083]">文字型 PDF 的讀取效果最好。若教材主要是掃描圖片，可能暫時無法產生測驗。</p></section>
+    </StudyShell>;
 }
 
 function AnalysisLoading({ fileName, stage }: { fileName: string; stage: "reading" | "analyzing" }) {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OfficialQuestionCrop from "@/components/official-question-crop";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import { useGameState } from "@/components/game-state-provider";
@@ -11,7 +11,7 @@ import {
   type MistakeRecord,
 } from "@/lib/mistake-store";
 
-type MistakeFilter = "全部" | "國考" | "教材" | "已複習";
+type MistakeFilter = "待複習" | "全部" | "國考" | "教材" | "已複習";
 
 function displaySourceLabel(value: string) {
   return value.replace(/^民國\s*/, "");
@@ -30,8 +30,10 @@ export default function MistakeRecordsTab({
   filterSession: string;
   filterSubject: string;
 }) {
-  const [filter, setFilter] = useState<MistakeFilter>("全部");
+  const [filter, setFilter] = useState<MistakeFilter>("待複習");
   const [subjectFilter, setSubjectFilter] = useState("全部科目");
+  const [visibleCount, setVisibleCount] = useState(10);
+  useEffect(() => setVisibleCount(10), [filter, subjectFilter, filterYear, filterSession, filterSubject]);
   const hasExamFilter = Boolean(filterYear && filterSession && filterSubject);
 
   const nationalSubjects = useMemo(
@@ -63,10 +65,11 @@ export default function MistakeRecordsTab({
         }
         if (filter === "國考" && item.source !== "national-exam") return false;
         if (filter === "教材" && item.source !== "material") return false;
+        if (filter === "待複習" && item.reviewed) return false;
+        if (filterSubject && !hasExamFilter && item.subject !== filterSubject) return false;
         if (filter === "已複習" && !item.reviewed) return false;
         if (
           !hasExamFilter &&
-          filter === "國考" &&
           subjectFilter !== "全部科目" &&
           item.subject !== subjectFilter
         ) {
@@ -97,12 +100,12 @@ export default function MistakeRecordsTab({
         <SummaryCard label="待複習" value={`${pending.length} 題`} />
       </section>
 
-      {hasExamFilter && (
+      {(hasExamFilter || filterSubject) && (
         <section className="mt-4 flex items-center justify-between gap-3 rounded-[20px] border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-xs font-black text-[#2ba962]">目前只看這次考卷</div>
+            <div className="text-xs font-black text-[#2ba962]">目前篩選</div>
             <div className="mt-1 truncate text-sm font-black text-[#315b45]">
-              {filterYear} 年・第 {filterSession} 次・{filterSubject}
+              {hasExamFilter ? `${filterYear} 年・第 ${filterSession} 次・${filterSubject}` : filterSubject}
             </div>
           </div>
           <Link
@@ -116,34 +119,19 @@ export default function MistakeRecordsTab({
 
       {!hasExamFilter && (
         <>
-          <section className="mt-4 flex flex-wrap gap-2">
-            {(["全部", "國考", "教材", "已複習"] as MistakeFilter[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  setFilter(item);
-                  if (item !== "國考") setSubjectFilter("全部科目");
-                }}
-                className={[
-                  "rounded-full border px-4 py-2 text-sm font-black transition",
-                  filter === item
-                    ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                    : "border-[#dbe9e1] bg-white text-[#466a58]",
-                ].join(" ")}
-              >
-                {item}
-              </button>
-            ))}
-          </section>
+          <label className="mt-4 block"><span className="study-field-label">顯示題目</span>
+            <select className="study-field" value={filter} onChange={event => { setFilter(event.target.value as MistakeFilter); setSubjectFilter("全部科目"); }}>
+              {(["待複習", "全部", "國考", "教材", "已複習"] as MistakeFilter[]).map(item => <option key={item}>{item}</option>)}
+            </select>
+          </label>
 
-          {filter === "國考" && nationalSubjects.length > 0 && (
+          {!filterSubject && filter !== "教材" && nationalSubjects.length > 0 && (
             <label className="mt-3 block">
               <span className="mb-2 block text-xs font-black text-[#789083]">科目</span>
               <select
                 value={subjectFilter}
                 onChange={(event) => setSubjectFilter(event.target.value)}
-                className="w-full rounded-2xl border border-[#d7e7de] bg-white px-4 py-3 text-sm font-black text-[#315b45] outline-none focus:border-[#65d795]"
+                className="w-full rounded-2xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-black text-[#315b45] outline-none focus:border-[#65d795]"
               >
                 <option value="全部科目">全部科目</option>
                 {nationalSubjects.map((subject) => (
@@ -167,7 +155,7 @@ export default function MistakeRecordsTab({
             action="去刷國考題"
           />
         ) : (
-          filtered.map((item) => (
+          filtered.slice(0, visibleCount).map((item) => (
             <MistakeRecordCard
               key={item.id}
               item={item}
@@ -176,6 +164,7 @@ export default function MistakeRecordsTab({
           ))
         )}
       </section>
+      {filtered.length > visibleCount && <button type="button" onClick={() => setVisibleCount(count => count + 10)} className="study-choice mt-5 w-full">載入更多（還有 {filtered.length - visibleCount} 題）</button>}
     </>
   );
 }
@@ -229,7 +218,7 @@ function MistakeRecordCard({
     <>
       <article
         className={[
-          "rounded-[24px] border bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]",
+          "rounded-xl border bg-white p-5",
           item.reviewed ? "border-[#e5ebe7] opacity-80" : "border-[#dce9e1]",
         ].join(" ")}
       >
@@ -246,9 +235,7 @@ function MistakeRecordCard({
               </>
             ) : (
               <>
-                <div className="text-xs font-black tracking-[0.06em] text-[#2ba962]">
-                  MATERIAL
-                </div>
+
                 <div className="mt-1 text-sm font-bold text-[#789083]">{cleanSourceLabel}</div>
               </>
             )}
@@ -365,7 +352,7 @@ function MistakeRecordCard({
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce9e1] bg-white p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">OFFICIAL QUESTION</div>
+
                 <div className="mt-1 text-xl font-black">官方原題 · 第 {item.questionNumber} 題</div>
                 <div className="mt-1 text-sm font-bold text-[#789083]">{cleanSourceLabel}</div>
               </div>

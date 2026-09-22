@@ -65,15 +65,15 @@ export default function FeedbackPage() {
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-5 md:px-8 md:py-10">
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
-        <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_36px_rgba(31,83,53,0.05)] sm:p-8">
-          <div className="text-xs font-black tracking-[0.12em] text-[#2ba962]">FEEDBACK</div>
+        <section className="mt-8 rounded-xl border border-[#dce9e1] bg-white p-6 sm:p-8">
+
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">回報問題</h1>
           <p className="mt-3 text-sm font-bold leading-7 text-[#70877a] sm:text-base">
             發現錯題、AI 解析怪怪的、付款沒入帳或網站哪裡壞掉，都可以直接在這裡告訴我。
           </p>
         </section>
 
-        <form onSubmit={submit} className="mt-5 space-y-5 rounded-[26px] border border-[#dfece4] bg-white p-5 shadow-[0_10px_28px_rgba(31,83,53,0.04)] sm:p-6">
+        <form onSubmit={submit} className="mt-5 space-y-5 rounded-xl border border-[#dfece4] bg-white p-5 sm:p-6">
           <div>
             <label htmlFor="feedback-email" className="text-sm font-black">你的 Email</label>
             <p className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">如果需要確認細節或回覆，我會透過這個信箱聯絡你。</p>
@@ -151,7 +151,7 @@ export default function FeedbackPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl bg-[#247451] px-5 py-4 text-base font-black text-white transition hover:bg-[#1c5e40] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "送出中…" : "送出回報"}
           </button>

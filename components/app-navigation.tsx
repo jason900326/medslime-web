@@ -2,48 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BookOpen, ChartNoAxesCombined, Smile } from "lucide-react";
 
 const navigationItems = [
-  { href: "/study", label: "學習" },
-  { href: "/study/records", label: "學習紀錄" },
-  { href: "/slimes", label: "史萊姆" },
+  { href: "/study", label: "學習", icon: BookOpen },
+  { href: "/study/records", label: "學習紀錄", icon: ChartNoAxesCombined },
+  { href: "/slimes", label: "史萊姆", icon: Smile },
 ];
 
 export default function AppNavigation() {
   const pathname = usePathname();
-
   return (
-    <nav
-      aria-label="主要導覽"
-      className="mt-5 grid grid-cols-3 gap-2 rounded-[20px] border border-[#dceae2] bg-white p-1.5 shadow-[0_8px_22px_rgba(30,78,50,0.04)]"
-    >
-      {navigationItems.map((item) => {
-        const active = isActive(item.href, pathname);
-
+    <nav aria-label="主要導覽" className="mt-5 flex gap-2 border-b border-[#dce7df] sm:gap-6">
+      {navigationItems.map(({ icon: Icon, ...item }) => {
+        const active = item.href === "/study"
+          ? pathname === "/study" || (pathname.startsWith("/study/") && !pathname.startsWith("/study/records"))
+          : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={[
-              "flex min-h-11 items-center justify-center rounded-2xl px-2 text-xs font-black transition sm:text-sm",
-              active
-                ? "bg-[#e8f8ed] text-[#237849]"
-                : "text-[#789083] hover:bg-[#f5faf7] hover:text-[#315b45]",
-            ].join(" ")}
-          >
-            {item.label}
+          <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
+            className={`-mb-px flex min-h-12 flex-1 items-center justify-center gap-2 border-b-2 px-2 text-sm font-semibold transition sm:flex-none sm:px-4 ${active ? "border-[#27835b] text-[#236c4d]" : "border-transparent text-[#61786b] hover:border-[#b7ccbf] hover:text-[#17372a]"}`}>
+            <Icon size={17} aria-hidden="true" />{item.label}
           </Link>
         );
       })}
     </nav>
   );
-}
-
-function isActive(href: string, pathname: string) {
-  if (href === "/study") {
-    return pathname === "/study" || (pathname.startsWith("/study/") && !pathname.startsWith("/study/records"));
-  }
-
-  return pathname === href || pathname.startsWith(`${href}/`);
 }

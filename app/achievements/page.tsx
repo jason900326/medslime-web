@@ -120,7 +120,7 @@ export default function AchievementsPage() {
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
         <section className="mt-8">
-          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">ACHIEVEMENTS</div>
+
           <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">成就</h1>
           <p className="mt-3 max-w-2xl leading-7 text-[#70877a]">
             共 24 個成就，依登入帳號的真實學習、收藏與抽卡進度計算。
@@ -162,7 +162,7 @@ export default function AchievementsPage() {
               <article
                 key={achievement.id}
                 className={[
-                  "rounded-[26px] border bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.05)]",
+                  "rounded-xl border bg-white p-5",
                   achievement.claimed
                     ? "border-[#e4ebe7] opacity-75"
                     : complete
@@ -216,7 +216,7 @@ export default function AchievementsPage() {
                     className={[
                       "rounded-xl px-4 py-2 text-sm font-black",
                       complete && !achievement.claimed
-                        ? "bg-[#31c978] text-white"
+                        ? "bg-[#247451] text-white"
                         : "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]",
                     ].join(" ")}
                   >
@@ -234,7 +234,7 @@ export default function AchievementsPage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-[#dfece4] bg-white p-5">
+    <div className="rounded-xl border border-[#dfece4] bg-white p-5">
       <div className="text-sm font-bold text-[#789083]">{label}</div>
       <div className="mt-1 text-2xl font-black">{value}</div>
     </div>

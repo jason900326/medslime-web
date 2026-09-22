@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
 import AIExplanationButton from "@/components/ai-explanation-button";
 import OfficialQuestionCrop from "@/components/official-question-crop";
@@ -202,15 +202,12 @@ export default function AttemptDetailPage() {
 
   if (state.status === "error") {
     return (
-      <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref="/study/records?tab=attempts" backLabel="返回作答紀錄" />
+      <StudyShell>
           <div className="mt-8 rounded-[24px] border border-[#f0dddd] bg-white p-6">
             <div className="text-xl font-black text-[#9b5050]">無法開啟作答紀錄</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">{state.message}</div>
           </div>
-        </div>
-      </main>
+        </StudyShell>
     );
   }
 
@@ -238,12 +235,10 @@ export default function AttemptDetailPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-        <TopBar showBack backHref="/study/records?tab=attempts" backLabel="返回作答紀錄" />
+    <StudyShell>
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">EXAM REVIEW</div>
+
           <h1 className="ms-page-title mt-2">這次作答</h1>
           <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
             {freeQuiz
@@ -255,7 +250,7 @@ export default function AttemptDetailPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-[24px] border border-[#cfe7d8] bg-gradient-to-br from-[#eefaf2] via-white to-[#fffaf0] p-5 sm:p-6">
+        <section className="mt-5 border-y border-[#dfe7e0] py-5">
           <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">本次成績</div>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -266,9 +261,7 @@ export default function AttemptDetailPage() {
                 先看答錯的題目，再把不確定的地方補起來。
               </p>
             </div>
-            <div className="text-sm font-black text-[#237849]">
-              開始訂正 →
-            </div>
+            <a href="#review-questions" className="study-text-action">開始訂正 ↓</a>
           </div>
         </section>
 
@@ -279,7 +272,7 @@ export default function AttemptDetailPage() {
         )}
 
         {!freeQuiz && (
-          <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white p-5">
+          <section className="mt-5 border-b border-[#dfe7e0] pb-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -306,7 +299,7 @@ export default function AttemptDetailPage() {
           </section>
         )}
 
-        <section className="mt-5 rounded-[24px] border border-[#dce9e1] bg-white p-4 sm:p-5">
+        <section className="mt-5 border-b border-[#dfe7e0] pb-5">
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-bold text-[#789083]">
             <Legend className="bg-[#eaf9f0] border-[#9ed9b5]" label="答對" />
             <Legend className="bg-[#fff1f1] border-[#e6a2a2]" label="答錯" />
@@ -322,7 +315,7 @@ export default function AttemptDetailPage() {
           />
         </section>
 
-        <section className="mt-6">
+        <section id="review-questions" className="mt-6 scroll-mt-6">
           <div className="flex flex-wrap items-center gap-2">
             <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>
               全部
@@ -392,8 +385,7 @@ export default function AttemptDetailPage() {
             返回作答紀錄
           </Link>
         </div>
-      </div>
-    </main>
+      </StudyShell>
   );
 }
 
@@ -480,7 +472,7 @@ function QuestionReviewCard({
   return (
     <article
       id={questionAnchorId(item.questionKey)}
-      className="scroll-mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_10px_26px_rgba(31,83,53,0.045)] sm:p-6"
+      className="scroll-mt-5 study-panel"
     >
       <div className="flex flex-wrap items-center gap-2">
         <div className="text-sm font-black text-[#2ba962]">
@@ -751,12 +743,8 @@ function FilterButton({
     <button
       type="button"
       onClick={onClick}
-      className={[
-        "rounded-full border px-4 py-2 text-sm font-black transition",
-        active
-          ? "border-[#31c978] bg-[#eaf9f0] text-[#237849]"
-          : "border-[#dce9e1] bg-white text-[#60786c] hover:bg-[#f5faf7]",
-      ].join(" ")}
+      aria-pressed={active}
+      className="study-choice"
     >
       {children}
     </button>

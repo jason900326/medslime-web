@@ -39,8 +39,12 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+
     try {
       const response = await fetch("/auth/login/password", {
+        signal: controller.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -62,9 +66,13 @@ export function LoginForm() {
       window.location.replace(getSafeRedirect());
     } catch (reason) {
       const message =
-        reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
+        reason instanceof Error && reason.name === "AbortError"
+          ? "登入連線逾時，請確認手機與電腦在同一個網路，再試一次。"
+          : reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
       setError(message);
       setIsLoading(false);
+    } finally {
+      window.clearTimeout(timeout);
     }
   };
 
@@ -141,7 +149,7 @@ export function LoginForm() {
         </label>
 
         {error && (
-          <div className="rounded-xl border border-[#f0dddd] bg-[#fff7f7] px-4 py-3 text-sm font-bold text-[#9b5050]">
+          <div role="alert" className="rounded-xl border border-[#f0dddd] bg-[#fff7f7] px-4 py-3 text-sm font-bold text-[#9b5050]">
             {error}
           </div>
         )}
