@@ -29,6 +29,15 @@ export function LoginForm() {
     setError(null);
 
     try {
+      if (
+        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+        !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      ) {
+        throw new Error(
+          "本機缺少 NEXT_PUBLIC_SUPABASE_URL 或 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY，請檢查 .env.local。",
+        );
+      }
+
       const supabase = createClient();
       const next = getSafeRedirect();
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
@@ -62,8 +71,17 @@ export function LoginForm() {
     setError(null);
 
     try {
+      if (
+        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+        !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      ) {
+        throw new Error(
+          "本機缺少 NEXT_PUBLIC_SUPABASE_URL 或 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY，請檢查 .env.local。",
+        );
+      }
+
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -72,7 +90,18 @@ export function LoginForm() {
         throw error;
       }
 
-      window.location.assign(getSafeRedirect());
+      if (!data.session) {
+        throw new Error("Supabase 已接受登入，但沒有建立 session。");
+      }
+
+      const { data: sessionCheck } = await supabase.auth.getSession();
+      if (!sessionCheck.session) {
+        throw new Error(
+          "登入成功，但瀏覽器沒有保存 session。請確認目前瀏覽器允許本站 Cookie。",
+        );
+      }
+
+      window.location.replace(getSafeRedirect());
     } catch (reason) {
       const message =
         reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
