@@ -1,5 +1,8 @@
 "use client";
 
+import QuizDialog from "@/components/quiz-dialog";
+import QuizOption from "@/components/quiz-option";
+
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TopBar from "@/components/top-bar";
@@ -29,9 +32,34 @@ type FreeQuestion = {
 };
 
 type LoadState =
+  | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; questions: FreeQuestion[] };
+
+type ReviewFormat =
+  | "comparison_table"
+  | "steps"
+  | "bullets"
+  | "formula_rules"
+  | "causal_chain"
+  | "pattern_match";
+
+type WeakTopicReview = {
+  title: string;
+  summary: string;
+  format: ReviewFormat;
+  items: Array<{
+    label: string;
+    content: string;
+  }>;
+};
+
+type ReviewState =
+  | { status: "loading" }
+  | { status: "ready"; review: WeakTopicReview }
+  | { status: "locked"; message: string }
+  | { status: "error"; message: string };
 
 const STARTED_AT_KEY = "medslime_free_quiz_started_at";
 const EXAM_FINISHED_EVENT = "medslime:exam-finished";
@@ -59,10 +87,18 @@ function FreeQuizRunner() {
   const configKey = `${from}-${to}-${subject}-${count}-${topic}-${subtopic}`;
 
   const buildConfiguratorHref = () => {
+    if (targeted) return "/study/records/what-to-study";
+
     const params = new URLSearchParams({ from, to, subject, count });
     if (topic) params.set("topic", topic);
     if (subtopic) params.set("subtopic", subtopic);
     return `/study/free-quiz?${params.toString()}`;
+  };
+
+  const buildTargetedQuizHref = () => {
+    const params = new URLSearchParams({ from, to, subject, topic, count: "10" });
+    if (subtopic) params.set("subtopic", subtopic);
+    return `/study/free-quiz/quiz?${params.toString()}`;
   };
 
   const {
@@ -77,7 +113,13 @@ function FreeQuizRunner() {
     getStatus: getQuestionStatus,
     resetSession,
   } = useQuizSession();
-  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  const [reviewGateOpen, setReviewGateOpen] = useState(!targeted);
+  const [reviewState, setReviewState] = useState<ReviewState | null>(
+    targeted ? { status: "loading" } : null,
+  );
+  const [loadState, setLoadState] = useState<LoadState>({
+    status: targeted ? "idle" : "loading",
+  });
   const [finished, setFinished] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
@@ -85,6 +127,49 @@ function FreeQuizRunner() {
   const [showOfficial, setShowOfficial] = useState(false);
 
   useEffect(() => {
+    if (!targeted) return;
+
+    const controller = new AbortController();
+
+    void fetch(
+      `/api/weak-topic-review?${new URLSearchParams({ subject, topic }).toString()}`,
+      { cache: "no-store", signal: controller.signal },
+    )
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          review?: WeakTopicReview;
+          error?: string;
+          code?: string;
+        };
+
+        if (response.status === 403 || payload.code === "PRO_REQUIRED") {
+          setReviewState({
+            status: "locked",
+            message: payload.error ?? "快速弱點補強是 Pro 功能。",
+          });
+          return;
+        }
+
+        if (!response.ok || !payload.review) {
+          throw new Error(payload.error ?? "快速補強內容讀取失敗。");
+        }
+
+        setReviewState({ status: "ready", review: payload.review });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setReviewState({
+          status: "error",
+          message: error instanceof Error ? error.message : "快速補強內容讀取失敗。",
+        });
+      });
+
+    return () => controller.abort();
+  }, [subject, targeted, topic]);
+
+  useEffect(() => {
+    if (targeted && !reviewGateOpen) return;
+
     const controller = new AbortController();
 
     async function load() {
@@ -119,22 +204,43 @@ function FreeQuizRunner() {
 
     void load();
     return () => controller.abort();
-  }, [configKey, from, to, subject, count, topic, subtopic, resetSession]);
+  }, [configKey, from, to, subject, count, reviewGateOpen, targeted, topic, subtopic, resetSession]);
+
+  const startTargetedPractice = () => {
+    setReviewGateOpen(true);
+  };
+
+  if (targeted && !reviewGateOpen) {
+    return (
+      <TargetedReviewGate
+        topic={targetLabel}
+        state={reviewState ?? { status: "loading" }}
+        onStart={startTargetedPractice}
+        onBack={() => router.push("/study/records/what-to-study")}
+      />
+    );
+  }
 
   if (loadState.status === "loading") return <LoadingQuiz />;
+
+  if (loadState.status === "idle") return <LoadingQuiz />;
 
   if (loadState.status === "error") {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
+          <TopBar
+            showBack
+            backHref={buildConfiguratorHref()}
+            backLabel={targeted ? "返回學習分析" : "返回自由測驗"}
+          />
           <section className="mt-8 rounded-[24px] border border-[#f0dddd] bg-white p-6">
             <div className="text-xl font-black text-[#9b5050]">無法建立自由測驗</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#70877a]">{loadState.message}</div>
             <button
               type="button"
               onClick={() => router.push(buildConfiguratorHref())}
-              className="mt-5 rounded-xl bg-[#31c978] px-5 py-3 text-sm font-black text-white"
+              className="mt-5 rounded-xl bg-[#247451] px-5 py-3 text-sm font-black text-white"
             >
               重新設定
             </button>
@@ -256,13 +362,15 @@ function FreeQuizRunner() {
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-          <TopBar showBack backHref={buildConfiguratorHref()} backLabel="返回自由測驗" />
+          <TopBar
+            showBack
+            backHref={buildConfiguratorHref()}
+            backLabel={targeted ? "返回學習分析" : "返回自由測驗"}
+          />
 
-          <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-              {targeted ? "WEAK TOPIC RESULT" : "FREE QUIZ RESULT"}
-            </div>
-            <h1 className="mt-2 text-3xl font-black">{targeted ? "弱主題練習完成" : "自由測驗完成"}</h1>
+          <section className="study-panel mt-6 text-center">
+
+            <h1 className="mt-2 text-3xl font-black">{targeted ? "這次補強完成" : "自由測驗完成"}</h1>
             <div className="mt-2 text-sm font-bold text-[#789083]">{from}–{to} 年 · {subject}</div>
             {targeted && (
               <div className="mx-auto mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1 text-xs font-black text-[#237849]">
@@ -270,30 +378,66 @@ function FreeQuizRunner() {
               </div>
             )}
 
-            <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3">
-              <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
-              <ResultCard label="正確率" value={`${score.toFixed(1)}%`} />
-              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
-              <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
+            <div className="mt-8 text-6xl font-black tracking-[-0.06em] text-[#17372a] sm:text-7xl">
+              {score.toFixed(1)}
+              <span className="ml-1 text-2xl tracking-normal text-[#789083]">%</span>
             </div>
+            <div className="mt-4 text-sm font-bold text-[#70877a]">
+              答對 {correctCount} / {gradableCount} 題 · {reviewQuestions.length} 題需要再看
+            </div>
+            <div className="mt-1 text-xs font-bold text-[#9aa9a1]">
+              作答時間 {formatElapsed(elapsedAtFinish)}
+            </div>
+
+            {targeted && (
+              <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-4 text-left">
+                <div className="text-sm font-black text-[#237849]">
+                  這次補強正確率 {score.toFixed(1)}%
+                </div>
+                <div className="mt-1 text-xs font-bold leading-5 text-[#668276]">
+                  {score >= 80
+                    ? "這次表現不錯，但先不急著把弱點移除；之後在不同考卷再作答幾次，才能確認是否真的改善。"
+                    : "這個主題還需要再補，先看這次錯題，再用下一份同主題練習驗證。"}
+                </div>
+              </div>
+            )}
 
             <div className="mx-auto mt-6 flex max-w-xl flex-col gap-2 sm:flex-row">
               {reviewQuestions.length > 0 && (
                 <button
                   type="button"
                   onClick={() => router.push("/study/records?tab=mistakes")}
-                  className="flex-1 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+                  className="flex-1 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
                 >
-                  前往錯題紀錄
+                  查看待複習題目
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => router.push(buildConfiguratorHref())}
-                className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
-              >
-                再組一份
-              </button>
+              {targeted ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push(buildTargetedQuizHref())}
+                    className="flex-1 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
+                  >
+                    再做 10 題
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/study/records/what-to-study")}
+                    className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
+                  >
+                    回到學習分析
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => router.push(buildConfiguratorHref())}
+                  className="flex-1 rounded-xl border border-[#d7e7de] bg-white px-5 py-3 font-black text-[#315b45]"
+                >
+                  再組一份
+                </button>
+              )}
             </div>
 
             {preview.length > 0 && (
@@ -371,6 +515,7 @@ function FreeQuizRunner() {
           )}
         </section>
 
+        <p className="mt-4 text-sm leading-6 text-[#60786c]">點選項即可作答；不確定可先標記，交卷前再回來檢查。</p>
         <QuestionProgress
           questions={questions}
           currentIndex={index}
@@ -378,7 +523,7 @@ function FreeQuizRunner() {
           onJump={setIndex}
         />
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+        <section className="study-panel mt-6 ">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-black text-[#789083]">
               Q{index + 1} / {questions.length}
@@ -388,7 +533,7 @@ function FreeQuizRunner() {
               onClick={() => setShowSubmit(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
-              結束測驗
+              交卷
             </button>
           </div>
 
@@ -428,50 +573,15 @@ function FreeQuizRunner() {
               const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
               return (
-                <div
+                <QuizOption
                   key={`${question.id}-${optionIndex}`}
-                  className={[
-                    "flex items-stretch rounded-2xl border transition",
-                    selected
-                      ? "border-[#65d795] bg-[#eaf9f0]"
-                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [question.id]: optionIndex,
-                      }))
-                    }
-                    className="flex w-14 shrink-0 items-center justify-center"
-                    aria-label={`選擇 ${String.fromCharCode(65 + optionIndex)}`}
-                  >
-                    <span
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selected
-                          ? "border-[#31c978] bg-[#31c978]"
-                          : "border-[#b8c9bf] bg-white",
-                      ].join(" ")}
-                    >
-                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
-                    className={[
-                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                      struck ? "line-through opacity-45" : "",
-                    ].join(" ")}
-                    aria-label={`${struck ? "取消刪除線" : "劃掉"} ${String.fromCharCode(65 + optionIndex)} 選項`}
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </button>
-                </div>
+                  label={String.fromCharCode(65 + optionIndex)}
+                  text={option}
+                  selected={selected}
+                  excluded={struck}
+                  onSelect={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))}
+                  onExclude={() => toggleStrike(question.id, optionIndex)}
+                />
               );
             })}
           </div>
@@ -520,7 +630,7 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={() => setIndex((current) => Math.min(questions.length - 1, current + 1))}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
                 下一題 →
               </button>
@@ -528,9 +638,9 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={() => setShowSubmit(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
-                完成測驗
+                交卷
               </button>
             )}
           </div>
@@ -539,12 +649,12 @@ function FreeQuizRunner() {
 
       {showSubmit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/35 px-4">
-          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+          <QuizDialog onClose={() => setShowSubmit(false)}>
             <div className="text-2xl font-black">是否要交卷？</div>
             {unanswered.length > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unanswered.length} 題未作答。
-                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
+                <div className="mt-3 border-t border-[#ead8d8] pt-3 text-left leading-6 text-[#8f5151]">
                   未作答題號：{unanswered.map((item) => item.questionNumber).join("、")}
                 </div>
                 <div className="mt-3">確定仍要交卷嗎？</div>
@@ -563,12 +673,12 @@ function FreeQuizRunner() {
               <button
                 type="button"
                 onClick={finish}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
+                className="rounded-xl bg-[#247451] px-4 py-3 font-black text-white"
               >
                 確認交卷
               </button>
             </div>
-          </div>
+          </QuizDialog>
         </div>
       )}
 
@@ -577,7 +687,7 @@ function FreeQuizRunner() {
           <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">OFFICIAL QUESTION</div>
+
                 <div className="mt-1 text-xl font-black">
                   {question.sourceYear} 年・第 {question.sourceSession} 次・第 {question.sourceQuestionNumber} 題
                 </div>
@@ -800,12 +910,185 @@ function LegendDot({ color }: { color: "green" | "yellow" | "red" }) {
   return <span className={`h-2 w-2 rounded-full ${className}`} />;
 }
 
-function ResultCard({ label, value }: { label: string; value: string }) {
+function ReviewContent({ review }: { review: WeakTopicReview }) {
+  if (review.format === "comparison_table") {
+    return (
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[#dce9e1]">
+        {review.items.map((item, index) => (
+          <div
+            key={`${item.label}-${index}`}
+            className="grid grid-cols-[minmax(88px,0.8fr)_1.7fr] border-b border-[#e8efeb] last:border-b-0"
+          >
+            <div className="bg-[#f2f8f4] px-3 py-3 text-xs font-black leading-5 text-[#315b45]">
+              {item.label}
+            </div>
+            <div className="px-3 py-3 text-sm font-bold leading-6 text-[#557768]">
+              {item.content}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "steps") {
+    return (
+      <ol className="mt-5 space-y-3">
+        {review.items.map((item, index) => (
+          <li key={`${item.label}-${index}`} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
+              {index + 1}
+            </span>
+            <div>
+              <div className="text-sm font-black text-[#315b45]">{item.label}</div>
+              <div className="mt-1 text-sm font-bold leading-6 text-[#557768]">{item.content}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  if (review.format === "causal_chain") {
+    return (
+      <div className="mt-5 space-y-2">
+        {review.items.map((item, index) => (
+          <div key={`${item.label}-${index}`}>
+            <div className="rounded-2xl bg-[#f7faf8] px-4 py-3">
+              <div className="text-sm font-black text-[#315b45]">{item.label}</div>
+              <div className="mt-1 text-sm font-bold leading-6 text-[#557768]">{item.content}</div>
+            </div>
+            {index < review.items.length - 1 && (
+              <div className="py-1 text-center text-lg font-black text-[#65b987]">↓</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "pattern_match") {
+    return (
+      <div className="mt-5 space-y-3">
+        {review.items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="grid gap-2 rounded-2xl bg-[#f7faf8] px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="text-sm font-black text-[#315b45]">看到：{item.label}</div>
+            <div className="hidden font-black text-[#65b987] sm:block">→</div>
+            <div className="text-sm font-bold leading-6 text-[#557768]">想到：{item.content}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (review.format === "formula_rules") {
+    const [formula, ...rules] = review.items;
+    return (
+      <div className="mt-5">
+        {formula && (
+          <div className="rounded-2xl border border-[#cfe7d8] bg-[#eefaf2] px-4 py-4">
+            <div className="text-xs font-black text-[#237849]">{formula.label}</div>
+            <div className="mt-1 break-words text-base font-black leading-7 text-[#315b45]">{formula.content}</div>
+          </div>
+        )}
+        <ul className="mt-3 space-y-2">
+          {rules.map((item, index) => (
+            <li key={`${item.label}-${index}`} className="rounded-2xl bg-[#f7faf8] px-4 py-3">
+              <span className="text-sm font-black text-[#315b45]">{item.label}：</span>
+              <span className="text-sm font-bold leading-6 text-[#557768]">{item.content}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-2xl bg-[#f7faf8] px-4 py-4">
-      <div className="text-xs font-bold text-[#789083]">{label}</div>
-      <div className="mt-1 text-lg font-black text-[#17372a]">{value}</div>
-    </div>
+    <ul className="mt-5 space-y-3">
+      {review.items.map((item, index) => (
+        <li key={`${item.label}-${index}`} className="flex gap-3 rounded-2xl bg-[#f7faf8] px-4 py-3 text-sm leading-6">
+          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dff4e8] text-xs font-black text-[#237849]">
+            ✓
+          </span>
+          <span>
+            <strong className="font-black text-[#315b45]">{item.label}：</strong>
+            <span className="font-bold text-[#557768]">{item.content}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TargetedReviewGate({
+  topic,
+  state,
+  onStart,
+  onBack,
+}: {
+  topic: string;
+  state: ReviewState;
+  onStart: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+      <div className="mx-auto max-w-3xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+        <TopBar showBack backHref="/study/records/what-to-study" backLabel="返回學習分析" />
+
+        <section className="mt-7 rounded-[28px] border border-[#cfe7d8] bg-white p-5 shadow-[0_14px_34px_rgba(30,78,50,0.055)] sm:p-8">
+
+          <h1 className="mt-2 text-3xl font-black">先補一下，再做題</h1>
+          <div className="mt-2 inline-flex rounded-full bg-[#eaf9f0] px-3 py-1.5 text-xs font-black text-[#237849]">
+            {topic}
+          </div>
+
+          {state.status === "loading" && (
+            <div className="mt-7 rounded-2xl bg-[#f7faf8] px-4 py-6 text-center text-sm font-black text-[#789083]">
+              正在整理 1–3 分鐘重點⋯
+            </div>
+          )}
+
+          {state.status === "ready" && (
+            <div className="mt-6">
+              <h2 className="text-xl font-black text-[#237849]">{state.review.title}</h2>
+              <p className="mt-3 text-sm font-bold leading-7 text-[#557768]">{state.review.summary}</p>
+              <ReviewContent review={state.review} />
+            </div>
+          )}
+
+          {state.status === "locked" && (
+            <div className="mt-6 rounded-2xl border border-[#eadba9] bg-[#fffaf0] px-4 py-4 text-sm font-bold leading-6 text-[#80651e]">
+              {state.message} 你仍可以直接做 10 題同主題練習，先確認自己的表現。
+            </div>
+          )}
+
+          {state.status === "error" && (
+            <div className="mt-6 rounded-2xl border border-[#f0dddd] bg-[#fff8f8] px-4 py-4 text-sm font-bold leading-6 text-[#9b5050]">
+              {state.message} 你仍可以直接開始練習。
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={onStart}
+              disabled={state.status === "loading"}
+              className="flex-1 rounded-2xl bg-[#247451] px-5 py-4 text-base font-black text-white transition hover:bg-[#1c5e40] disabled:cursor-wait disabled:opacity-55"
+            >
+              開始 10 題補強 →
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-4 text-sm font-black text-[#315b45]"
+            >
+              先回去
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }
 

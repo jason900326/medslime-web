@@ -158,7 +158,7 @@ export default function GachaPage() {
           </div>
         )}
 
-        <section className="mt-6 rounded-[26px] border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 shadow-[0_14px_34px_rgba(40,106,69,0.06)] md:p-7">
+        <section className="mt-6 rounded-xl border border-[#d8e9df] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-5 md:p-7">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-2xl font-black tracking-[-0.04em] sm:text-3xl md:text-4xl">
               抽一隻新的史萊姆。
@@ -241,7 +241,7 @@ function PullOption({
   onSecondary?: () => void;
 }) {
   return (
-    <article className="rounded-[22px] border border-[#e3e9e5] bg-white p-4">
+    <article className="rounded-xl border border-[#e3e9e5] bg-white p-4">
       <div className="text-base font-black">{title}</div>
       <div className="mt-1 text-sm font-medium text-[#789083]">{subtitle}</div>
 
@@ -252,7 +252,7 @@ function PullOption({
           "mt-4 w-full rounded-xl px-4 py-3 text-sm font-black transition",
           disabled
             ? "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]"
-            : "bg-[#31c978] text-white hover:bg-[#2dbc70]",
+            : "bg-[#247451] text-white hover:bg-[#1c5e40]",
         ].join(" ")}
       >
         {buttonLabel}

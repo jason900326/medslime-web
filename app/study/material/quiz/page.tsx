@@ -1,5 +1,8 @@
 "use client";
 
+import QuizDialog from "@/components/quiz-dialog";
+import QuizOption from "@/components/quiz-option";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/top-bar";
@@ -235,7 +238,7 @@ export default function MaterialQuizPage() {
             <button
               type="button"
               onClick={() => router.push("/study/material")}
-              className="mt-6 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+              className="mt-6 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
             >
               返回教材分析
             </button>
@@ -257,10 +260,8 @@ export default function MaterialQuizPage() {
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
           <TopBar showBack backHref="/study/material" backLabel="返回教材" />
 
-          <section className="mt-6 rounded-[26px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-10 sm:rounded-[30px] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962] sm:text-sm">
-              RESULT
-            </div>
+          <section className="study-panel mt-6 text-center">
+
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
 
             <div className="mx-auto mt-6 max-w-xl sm:mt-8">
@@ -290,10 +291,10 @@ export default function MaterialQuizPage() {
               {reviewQuestions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => router.push("/study/mistakes")}
-                  className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
+                  onClick={() => router.push("/study/records?tab=mistakes")}
+                  className="rounded-2xl bg-[#247451] px-5 py-3.5 font-black text-white transition hover:bg-[#1c5e40] sm:px-6"
                 >
-                  前往錯題庫 · {reviewQuestions.length} 題待複習
+                  查看待複習題目 · {reviewQuestions.length} 題待複習
                 </button>
               )}
               <button
@@ -395,10 +396,10 @@ export default function MaterialQuizPage() {
                 {hiddenReviewCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => router.push("/study/mistakes")}
+                    onClick={() => router.push("/study/records?tab=mistakes")}
                     className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
                   >
-                    還有 {hiddenReviewCount} 題，前往錯題庫查看全部 →
+                    還有 {hiddenReviewCount} 題，查看待複習題目查看全部 →
                   </button>
                 )}
               </section>
@@ -419,12 +420,11 @@ export default function MaterialQuizPage() {
         <TopBar showBack backHref="/study/material" backLabel="返回教材" />
 
         <section className="mt-8">
-          <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-            MATERIAL QUIZ
-          </div>
+
           <h1 className="mt-2 truncate text-2xl font-black">{sourceName}</h1>
         </section>
 
+        <p className="mt-4 text-sm leading-6 text-[#60786c]">點選項即可作答；不確定可先標記，交卷前再回來檢查。</p>
         <QuestionProgress
           questions={questions}
           currentIndex={index}
@@ -432,7 +432,7 @@ export default function MaterialQuizPage() {
           onJump={setIndex}
         />
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+        <section className="study-panel mt-6 ">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-sm font-black text-[#789083]">
@@ -450,7 +450,7 @@ export default function MaterialQuizPage() {
               onClick={() => setShowSubmitDialog(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
-              結束測驗
+              交卷
             </button>
           </div>
 
@@ -464,50 +464,15 @@ export default function MaterialQuizPage() {
               const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
               return (
-                <div
+                <QuizOption
                   key={`${question.id}-${optionIndex}`}
-                  className={[
-                    "flex items-stretch rounded-2xl border transition",
-                    selected
-                      ? "border-[#65d795] bg-[#eaf9f0]"
-                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [question.id]: optionIndex,
-                      }))
-                    }
-                    className="flex w-14 shrink-0 items-center justify-center"
-                  >
-                    <span
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selected
-                          ? "border-[#31c978] bg-[#31c978]"
-                          : "border-[#b8c9bf] bg-white",
-                      ].join(" ")}
-                    >
-                      {selected && (
-                        <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                      )}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
-                    className={[
-                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                      struck ? "line-through opacity-45" : "",
-                    ].join(" ")}
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </button>
-                </div>
+                  label={String.fromCharCode(65 + optionIndex)}
+                  text={option}
+                  selected={selected}
+                  excluded={struck}
+                  onSelect={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))}
+                  onExclude={() => toggleStrike(question.id, optionIndex)}
+                />
               );
             })}
           </div>
@@ -560,7 +525,7 @@ export default function MaterialQuizPage() {
                     Math.min(questions.length - 1, current + 1),
                   )
                 }
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
                 下一題 →
               </button>
@@ -568,9 +533,9 @@ export default function MaterialQuizPage() {
               <button
                 type="button"
                 onClick={() => setShowSubmitDialog(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
-                完成測驗
+                交卷
               </button>
             )}
           </div>
@@ -579,13 +544,13 @@ export default function MaterialQuizPage() {
 
       {showSubmitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-5">
-          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+          <QuizDialog onClose={() => setShowSubmitDialog(false)}>
             <div className="text-2xl font-black">是否要交卷？</div>
 
             {unansweredCount > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unansweredCount} 題未作答。
-                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2">
+                <div className="mt-3 border-t border-[#ead8d8] pt-3">
                   未作答題號：{unansweredNumbers.join("、")}
                 </div>
                 <div className="mt-3">確定仍要交卷嗎？</div>
@@ -605,12 +570,12 @@ export default function MaterialQuizPage() {
               <button
                 type="button"
                 onClick={finishQuiz}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
+                className="rounded-xl bg-[#247451] px-4 py-3 font-black text-white"
               >
                 確認交卷
               </button>
             </div>
-          </div>
+          </QuizDialog>
         </div>
       )}
     </main>
@@ -629,7 +594,7 @@ function QuestionProgress({
   onJump: (index: number) => void;
 }) {
   return (
-    <section className="mt-6 rounded-[24px] border border-[#dce9e1] bg-white p-4">
+    <section className="study-panel mt-6 ">
       <div className="grid grid-cols-10 gap-1">
         {questions.map((item, questionIndex) => (
           <button

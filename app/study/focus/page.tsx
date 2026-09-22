@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 import InfoDialogButton from "@/components/info-dialog-button";
 import {
   getPlayerDisplayName,
@@ -58,19 +58,13 @@ export default function FocusPage() {
           : "準備開始";
 
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-        <TopBar showBack backHref="/study" backLabel="返回學習" />
+    <StudyShell>
 
         <section className="mt-6 flex items-end justify-between gap-4">
           <div>
             <h1 className="ms-page-title">專心讀書</h1>
-            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-              選一段時間，和陪伴史萊姆一起完成這輪專注。
-            </p>
-            <p className="mt-1 text-xs font-bold leading-5 text-[#8a9c92]">
-              開始後可以去刷題或使用其他功能，計時器會繼續倒數。
-            </p>
+
+
           </div>
           <InfoDialogButton title="專注獎勵說明">
             <p>完成至少 10 分鐘即可獲得獎勵。</p>
@@ -82,15 +76,7 @@ export default function FocusPage() {
           </InfoDialogButton>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3">
-          <SummaryCard label="今日專注" value={`${game.todayFocusMinutes} 分鐘`} />
-          <SummaryCard
-            label="今日獎勵"
-            value={`${game.todayFocusCoins} / ${game.focusCoinCap} 金幣`}
-          />
-        </section>
-
-        <section className="mt-5 rounded-[30px] border border-[#d8e9df] bg-white p-5 shadow-[0_14px_34px_rgba(40,106,69,0.055)] sm:p-7">
+        <section className="focus-stage mx-auto mt-6 max-w-2xl study-panel">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
@@ -105,7 +91,8 @@ export default function FocusPage() {
             </div>
           </div>
 
-          <div className="mt-5 text-center text-6xl font-black tracking-[-0.065em] tabular-nums sm:text-7xl md:text-8xl">
+          <div className="mt-4 flex justify-center"><img src={companionImage} alt={companionName} className="h-28 w-28 object-contain" /></div>
+          <div role="timer" aria-label="剩餘專注時間" className="mt-2 text-center text-6xl font-black tracking-[-0.065em] tabular-nums sm:text-7xl md:text-8xl">
             {timer.isReady ? timer.displayTime : "--:--"}
           </div>
 
@@ -117,12 +104,8 @@ export default function FocusPage() {
                     key={minutes}
                     type="button"
                     onClick={() => timer.applyMinutes(minutes)}
-                    className={[
-                      "rounded-full border px-4 py-2 text-sm font-black transition",
-                      timer.plannedMinutes === minutes
-                        ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                        : "border-[#dbe9e1] bg-white text-[#557768]",
-                    ].join(" ")}
+                    aria-pressed={timer.plannedMinutes === minutes}
+                    className="study-choice"
                   >
                     {minutes} 分
                   </button>
@@ -143,6 +126,7 @@ export default function FocusPage() {
                       applyCustom();
                     }
                   }}
+                  aria-label="自訂專注分鐘（1 至 240）"
                   placeholder="自訂分鐘"
                   className="min-w-0 flex-1 rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
                 />
@@ -157,47 +141,13 @@ export default function FocusPage() {
             </div>
           )}
 
-          <div className="mt-6 rounded-[22px] border border-[#deebe3] bg-[#f6fbf8] px-4 py-4 sm:px-5">
-            <div className="flex items-center gap-4">
-              <div className="flex h-20 w-20 shrink-0 items-end justify-center overflow-hidden sm:h-24 sm:w-24">
-                <img
-                  src={companionImage}
-                  alt={companionName}
-                  className="h-full w-full object-contain"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-black tracking-[0.08em] text-[#2ba962]">
-                  陪伴史萊姆
-                </div>
-                <div className="mt-1 truncate text-base font-black text-[#315b45]">
-                  {companionName}
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#dce9e1]">
-                  <div
-                    className="h-full rounded-full bg-[#55b97b] transition-[width] duration-500"
-                    style={{ width: `${timer.progress}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 text-center text-sm font-bold text-[#789083]">
-            {game.todayFocusCoins >= game.focusCoinCap
-              ? "今日專注金幣已達上限"
-              : timer.plannedMinutes < 10
-                ? "至少設定 10 分鐘才有金幣獎勵"
-                : `完成本輪可獲得 🪙 ${plannedReward}`}
-          </div>
-
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <div className="mx-auto mt-5 flex max-w-sm flex-wrap justify-center gap-3">
             {timer.mode === "idle" && (
               <button
                 type="button"
                 onClick={timer.start}
                 disabled={!timer.isReady}
-                className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white disabled:opacity-50 sm:w-auto sm:min-w-[240px]"
+                className="ms-primary-action w-full disabled:opacity-50 sm:w-auto sm:min-w-[240px]"
               >
                 開始專注
               </button>
@@ -208,14 +158,14 @@ export default function FocusPage() {
                 <button
                   type="button"
                   onClick={timer.pause}
-                  className="min-w-[150px] rounded-2xl bg-[#17372a] px-5 py-3 font-black text-white"
+                  className="min-w-0 flex-1 rounded-xl bg-[#17372a] px-5 py-3 font-black text-white"
                 >
                   暫停
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowStopConfirm(true)}
-                  className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
+                  className="min-w-0 flex-1 rounded-xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
                 >
                   提前結束
                 </button>
@@ -227,14 +177,14 @@ export default function FocusPage() {
                 <button
                   type="button"
                   onClick={timer.resume}
-                  className="min-w-[150px] rounded-2xl bg-[#31c978] px-5 py-3 font-black text-white"
+                  className="min-w-0 flex-1 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
                 >
                   繼續
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowStopConfirm(true)}
-                  className="min-w-[150px] rounded-2xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
+                  className="min-w-0 flex-1 rounded-xl border border-[#ead8d8] bg-white px-5 py-3 font-black text-[#9b5050]"
                 >
                   提前結束
                 </button>
@@ -245,12 +195,22 @@ export default function FocusPage() {
               <button
                 type="button"
                 onClick={timer.reset}
-                className="w-full rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
+                className="w-full rounded-2xl bg-[#247451] px-6 py-4 font-black text-white sm:w-auto sm:min-w-[240px]"
               >
                 再來一輪
               </button>
             )}
           </div>
+
+
+          <div className="mt-5 text-center text-xs font-bold text-[#789083]">
+            {game.todayFocusCoins >= game.focusCoinCap
+              ? "今日專注金幣已達上限"
+              : timer.plannedMinutes < 10
+                ? "至少設定 10 分鐘才有金幣獎勵"
+                : `完成本輪可獲得 🪙 ${plannedReward}`}
+          </div>
+
 
           {timer.mode === "finished" && (
             <div className="mt-4 rounded-2xl bg-[#eefaf2] px-4 py-3 text-center text-sm font-bold text-[#557768]">
@@ -263,7 +223,15 @@ export default function FocusPage() {
           )}
         </section>
 
-        <section className="mt-5 rounded-[24px] border border-[#d8e9df] bg-white p-5 sm:p-6">
+        <section className="mt-5 flex flex-wrap gap-x-12 gap-y-4 border-b border-[#dfe7e0] py-4">
+          <SummaryCard label="今日專注" value={`${game.todayFocusMinutes} 分鐘`} />
+          <SummaryCard
+            label="今日獎勵"
+            value={`${game.todayFocusCoins} / ${game.focusCoinCap} 金幣`}
+          />
+        </section>
+
+        <section className="mt-8 border-t border-[#dfe7e0] py-6">
           <div className="flex items-end justify-between gap-3">
             <h2 className="text-lg font-black">最近專注</h2>
             <div className="text-xs font-bold text-[#8a9c92]">
@@ -304,15 +272,12 @@ export default function FocusPage() {
             )}
           </div>
         </section>
-      </div>
 
       {showStopConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-sm rounded-[24px] bg-white p-5 shadow-xl">
             <div className="text-lg font-black">要提前結束嗎？</div>
-            <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-              這輪不會獲得金幣，但專注時間仍會被記錄。
-            </p>
+
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
@@ -332,13 +297,13 @@ export default function FocusPage() {
           </div>
         </div>
       )}
-    </main>
+    </StudyShell>
   );
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
+    <div className="py-1">
       <div className="text-xs font-bold text-[#789083]">{label}</div>
       <div className="mt-1 truncate text-lg font-black">{value}</div>
     </div>

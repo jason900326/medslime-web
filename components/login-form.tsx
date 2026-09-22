@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 function getSafeRedirect() {
   if (typeof window === "undefined") return "/";
@@ -24,23 +23,14 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     setGoogleLoading(true);
     setError(null);
 
-    const supabase = createClient();
     const next = getSafeRedirect();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-
-    if (error) {
-      setError(`Google 登入失敗：${error.message}`);
-      setGoogleLoading(false);
-    }
+    window.location.assign(
+      `/auth/login/google?next=${encodeURIComponent(next)}`,
+    );
   };
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -49,24 +39,41 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
 
-    const supabase = createClient();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const response = await fetch("/auth/login/password", {
+        signal: controller.signal,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
 
-    if (error) {
-      setError(
-        error.message === "Invalid login credentials"
-          ? "Email 或密碼錯誤。"
-          : error.message,
-      );
+      const result = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || "登入失敗，請稍後再試。");
+      }
+
+      window.location.replace(getSafeRedirect());
+    } catch (reason) {
+      const message =
+        reason instanceof Error && reason.name === "AbortError"
+          ? "登入連線逾時，請確認手機與電腦在同一個網路，再試一次。"
+          : reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
+      setError(message);
       setIsLoading(false);
-      return;
+    } finally {
+      window.clearTimeout(timeout);
     }
-
-    window.location.assign(getSafeRedirect());
   };
 
   return (
@@ -80,7 +87,7 @@ export function LoginForm() {
       </h1>
 
       <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        登入後可以保存你的史萊姆、任務、成就與學習紀錄。
+        登入後開始刷題，並保存你的作答紀錄、弱點與學習進度。
       </p>
 
       <button
@@ -142,7 +149,7 @@ export function LoginForm() {
         </label>
 
         {error && (
-          <div className="rounded-xl border border-[#f0dddd] bg-[#fff7f7] px-4 py-3 text-sm font-bold text-[#9b5050]">
+          <div role="alert" className="rounded-xl border border-[#f0dddd] bg-[#fff7f7] px-4 py-3 text-sm font-bold text-[#9b5050]">
             {error}
           </div>
         )}

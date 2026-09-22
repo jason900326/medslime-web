@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useProStatus } from "@/hooks/use-pro-status";
 import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 import {
   formatAttemptDate,
   latestAttemptMap,
@@ -40,6 +42,7 @@ export default function ExamPage() {
 
 function ExamPicker() {
   const searchParams = useSearchParams();
+  const auth = useProStatus();
   const [rocYear, setRocYear] = useState(115);
   const [session, setSession] = useState<1 | 2>(1);
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
@@ -47,6 +50,8 @@ function ExamPicker() {
   const explanationMode = searchParams.get("mode") === "explanation";
 
   useEffect(() => {
+    if (auth.loading || !auth.isLoggedIn) return;
+
     let cancelled = false;
     void readExamAttempts()
       .then((items) => {
@@ -58,7 +63,7 @@ function ExamPicker() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [auth.loading, auth.isLoggedIn]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,17 +93,16 @@ function ExamPicker() {
     [purchases],
   );
 
+  if (auth.loading) return <LoadingExamPicker />;
+  if (!auth.isLoggedIn) return <LoginRequired />;
+
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-        <TopBar showBack backHref="/study" backLabel="返回學習" />
+    <StudyShell>
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">NATIONAL EXAM</div>
+
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">歷屆國考</h1>
-          <p className="mt-2 text-sm font-bold leading-6 text-[#70877a]">
-            選年度與梯次，再挑一份考卷開始作答；寫過的考卷會留下成績與錯題紀錄。
-          </p>
+
         </section>
 
         {explanationMode && (
@@ -110,11 +114,12 @@ function ExamPicker() {
           </section>
         )}
 
-        <section className="mt-5 rounded-[26px] border border-[#dce9e1] bg-white p-5 shadow-[0_12px_30px_rgba(30,78,50,0.05)] md:p-7">
+        <section className="mt-7 border-y border-[#dfe7e0] py-5">
           <div className="grid gap-5 md:grid-cols-[1fr_1fr]">
             <div>
-              <div className="mb-2 text-sm font-black text-[#557768]">年度</div>
+              <label htmlFor="exam-year" className="study-field-label">01　選擇年度</label>
               <select
+                id="exam-year"
                 value={rocYear}
                 onChange={(event) => setRocYear(Number(event.target.value))}
                 className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold text-[#17372a] outline-none focus:border-[#65d795]"
@@ -126,19 +131,15 @@ function ExamPicker() {
             </div>
 
             <div>
-              <div className="mb-2 text-sm font-black text-[#557768]">梯次</div>
+              <div className="study-field-label">02　選擇梯次</div>
               <div className="grid grid-cols-2 gap-2">
                 {[1, 2].map((item) => (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setSession(item as 1 | 2)}
-                    className={[
-                      "rounded-xl border px-4 py-3 text-base font-black transition",
-                      session === item
-                        ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                        : "border-[#dbe9e1] bg-white text-[#466a58]",
-                    ].join(" ")}
+                    aria-pressed={session === item}
+                    className="study-choice"
                   >
                     第 {item} 次
                   </button>
@@ -153,10 +154,10 @@ function ExamPicker() {
             <div className="text-xs font-black tracking-[0.08em] text-[#2ba962]">
               {rocYear} 年 · 第 {session} 次
             </div>
-            <h2 className="mt-1 text-xl font-black">選擇科目考卷</h2>
+            <h2 className="mt-1 text-xl font-black">03　選擇科目考卷</h2>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="study-list mt-4">
             {subjects.map((subject, index) => {
               const examKey = `${rocYear}-${session}-${subject}`;
               return (
@@ -173,8 +174,7 @@ function ExamPicker() {
             })}
           </div>
         </section>
-      </div>
-    </main>
+      </StudyShell>
   );
 }
 
@@ -194,8 +194,12 @@ function ExamCard({
   purchased: boolean;
 }) {
   const quizHref = useMemo(() => {
-    const params = new URLSearchParams({ year: String(year), session: String(session), subject });
-    return `/study/exam/quiz?${params.toString()}`;
+    const params = new URLSearchParams({
+      year: String(year),
+      session: String(session),
+      subject,
+    });
+    return "/study/exam/quiz?" + params.toString();
   }, [year, session, subject]);
 
   const historyHref = useMemo(() => {
@@ -209,9 +213,9 @@ function ExamCard({
   }, [year, session, subject]);
 
   return (
-    <article className="flex min-h-[180px] flex-col rounded-[22px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)]">
+    <article className="study-list-row grid items-center gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eefaf2] text-sm font-black text-[#237849]">
+        <div className="flex h-10 w-7 shrink-0 items-center justify-center text-sm font-semibold text-[#64816e]">
           {index + 1}
         </div>
         <div className="min-w-0 flex-1">
@@ -238,17 +242,17 @@ function ExamCard({
         </div>
       </div>
 
-      <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pl-10 md:flex-col md:items-end md:pl-0">
         <Link
           href={quizHref}
-          className="block w-full rounded-xl bg-[#31c978] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#2dbc70]"
+          className="study-text-action"
         >
-          ✏️ {latestAttempt ? "再次作答" : "開始作答"}
+          {latestAttempt ? "再次作答" : "開始作答"} →
         </Link>
         {latestAttempt ? (
           <Link
             href={historyHref}
-            className="block w-full rounded-xl border border-[#cfe7d8] bg-white px-4 py-3 text-center text-sm font-black text-[#315b45] transition hover:bg-[#f3fbf6]"
+            className="inline-flex min-h-11 items-center text-xs text-[#657b6d] hover:underline"
           >
             {purchased ? "查看錯題與詳解" : "歷史作答"}
           </Link>
@@ -257,6 +261,28 @@ function ExamCard({
         )}
       </div>
     </article>
+  );
+}
+
+function LoginRequired() {
+  return (
+    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
+      <div className="mx-auto max-w-2xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
+        <TopBar showBack backHref="/" backLabel="返回首頁" />
+        <section className="mt-10 rounded-[28px] border border-[#dce9e1] bg-white p-7 text-center shadow-[0_12px_30px_rgba(30,78,50,0.05)]">
+          <div className="text-3xl font-black">登入後開始刷題</div>
+          <p className="mt-3 text-sm font-bold leading-6 text-[#70877a]">
+            登入後，作答紀錄、錯題與學習方向都會自動保存。
+          </p>
+          <Link
+            href="/auth/login?redirect=%2Fstudy%2Fexam"
+            className="mt-6 inline-flex rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+          >
+            登入並開始刷題
+          </Link>
+        </section>
+      </div>
+    </main>
   );
 }
 

@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import ExamElapsedTimer from "@/components/exam-elapsed-timer";
-import ExamResultOverlay from "@/components/exam-result-overlay";
 
 export default function RouteUtilities() {
   const pathname = usePathname();
@@ -11,10 +10,5 @@ export default function RouteUtilities() {
 
   if (!nationalExam && !freeQuiz) return null;
 
-  return (
-    <>
-      {nationalExam && <ExamElapsedTimer />}
-      <ExamResultOverlay />
-    </>
-  );
+  return nationalExam ? <ExamElapsedTimer /> : null;
 }

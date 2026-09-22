@@ -44,7 +44,7 @@ export default function TopBar({
             <button
               type="button"
               onClick={() => router.push(backHref)}
-              className="shrink-0 rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)] px-2.5 py-2 text-xs font-bold text-[var(--brand-text-secondary)] transition hover:bg-[#f5faf7] sm:px-3 sm:text-sm"
+              className="shrink-0 py-2 pr-2 text-xs font-medium text-[var(--brand-text-secondary)] transition hover:text-[#247451] sm:pr-3 sm:text-sm"
             >
               ← {backLabel}
             </button>
@@ -85,7 +85,7 @@ export default function TopBar({
       </div>
 
       {!pro.loading && pro.isLoggedIn && (
-        <div className="flex w-full items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 border-b border-[#e1eae4] pb-3">
           {showFocusTimer && (
             <div className="min-w-0 flex-1">
               <Link
@@ -109,12 +109,9 @@ export default function TopBar({
           <div className="min-w-0 flex-1">
             <ResourcePill label={`🔥 ${game.streak} 天`} />
           </div>
-          <div className="min-w-0 flex-1">
-            <ResourcePill label={`🪙 ${game.coins}`} href="/shop" ariaLabel="前往資源頁" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <ResourcePill label={`🎫 ${game.tickets}`} href="/shop" ariaLabel="前往資源頁" />
-          </div>
+          <Link href="/shop" aria-label={`資源商店，${game.coins} 金幣、${game.tickets} 張抽卡券`} className="flex min-h-11 min-w-0 flex-[2] items-center justify-around gap-3 rounded-lg px-2 text-xs font-medium text-[var(--brand-text-secondary)] hover:bg-[#edf5ef] md:text-sm">
+            <span>🪙 {game.coins}</span><span>🎫 {game.tickets}</span>
+          </Link>
         </div>
       )}
     </header>
@@ -199,7 +196,7 @@ function ResourcePill({
   ariaLabel?: string;
 }) {
   const className =
-    "flex h-11 w-full min-w-0 items-center justify-center rounded-full border border-[var(--brand-border-soft)] bg-[var(--brand-surface)] px-2 text-xs font-black text-[var(--brand-text)] shadow-sm transition md:px-4 md:text-sm";
+    "flex min-h-10 w-full min-w-0 items-center justify-center rounded-md px-2 text-xs font-medium text-[var(--brand-text-secondary)] transition md:px-4 md:text-sm";
 
   if (href) {
     return (
@@ -207,7 +204,7 @@ function ResourcePill({
         href={href}
         aria-label={ariaLabel}
         title="查看可購買資源"
-        className={`${className} hover:-translate-y-0.5 hover:bg-[#f5faf7]`}
+        className={`${className} hover:bg-[#edf5ef]`}
       >
         <span className="truncate">{label}</span>
       </Link>

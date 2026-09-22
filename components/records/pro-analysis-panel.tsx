@@ -409,10 +409,10 @@ export default function ProAnalysisPanel() {
                   ))}
                 </div>
                 <Link
-                  href="/study/mistakes"
+                  href="/study/records?tab=mistakes"
                   className="mt-3 inline-block text-xs font-black text-[#237849]"
                 >
-                  前往錯題複習 →
+                  查看待複習題目 →
                 </Link>
               </>
             )}

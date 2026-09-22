@@ -19,7 +19,7 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -31,6 +31,9 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
+          Object.entries(headers).forEach(([key, value]) =>
+            supabaseResponse.headers.set(key, value),
+          );
         },
       },
     },
@@ -39,11 +42,6 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
   const pathname = request.nextUrl.pathname;
-
-  const isPublicStudyRoute =
-    pathname === "/study" ||
-    pathname.startsWith("/study/material") ||
-    pathname.startsWith("/study/exam");
 
   const isPublicInfoRoute =
     pathname === "/about" ||
@@ -56,16 +54,26 @@ export async function updateSession(request: NextRequest) {
     pathname === "/sitemap.xml" ||
     pathname === "/robots.txt";
 
+  const isPublicApiRoute =
+    pathname === "/api/health" ||
+    pathname === "/api/payments/ecpay/return" ||
+    pathname === "/api/feedback" ||
+    pathname === "/api/beta-feedback" ||
+    pathname.startsWith("/api/internal/");
+
   const isPublicRoute =
     pathname === "/" ||
-    pathname === "/shop" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
     isPublicInfoRoute ||
-    isPublicStudyRoute ||
-    isPublicSeoRoute;
+    isPublicSeoRoute ||
+    isPublicApiRoute;
 
   if (!user && !isPublicRoute) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "請先登入。" }, { status: 401 });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     url.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);

@@ -169,9 +169,7 @@ export default function TasksPage() {
       <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-10">
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
-        <div className="mt-8 text-sm font-black tracking-[0.08em] text-[#2ba962]">
-          TASKS
-        </div>
+
         <h1 className="mt-2 text-4xl font-black">任務</h1>
 
         <section className="mt-8">
@@ -198,7 +196,7 @@ export default function TasksPage() {
             })}
           </div>
 
-          <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
+          <div className="mt-5 rounded-xl border border-[#dceae2] bg-white p-6">
             <div className="text-lg font-black">每日全清獎勵：🪙 20</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
               三項每日任務本身合計 80 金幣，全部完成後再領 20 金幣，剛好湊成 1 抽。
@@ -216,7 +214,7 @@ export default function TasksPage() {
               className={[
                 "mt-4 rounded-xl px-5 py-3 font-black",
                 dailyComplete && !dailyBonusClaimed
-                  ? "bg-[#31c978] text-white"
+                  ? "bg-[#247451] text-white"
                   : "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]",
               ].join(" ")}
             >
@@ -236,7 +234,7 @@ export default function TasksPage() {
             {weeklyItems.map(({ title, progress, target, unit }) => (
               <div
                 key={title}
-                className="rounded-[24px] border border-[#dfece4] bg-white p-5"
+                className="rounded-xl border border-[#dfece4] bg-white p-5"
               >
                 <div className="text-lg font-black">{title}</div>
                 <div className="mt-4 text-sm font-bold text-[#557768]">
@@ -254,7 +252,7 @@ export default function TasksPage() {
             ))}
           </div>
 
-          <div className="mt-5 rounded-[26px] border border-[#dceae2] bg-white p-6">
+          <div className="mt-5 rounded-xl border border-[#dceae2] bg-white p-6">
             <div className="text-lg font-black">本週全清獎勵：🎫 ×3</div>
             <div className="mt-2 text-sm font-bold leading-6 text-[#789083]">
               這週有穩定回來學習，3 張抽卡券是你的。
@@ -272,7 +270,7 @@ export default function TasksPage() {
               className={[
                 "mt-4 rounded-xl px-5 py-3 font-black",
                 weeklyComplete && !weeklyClaimed
-                  ? "bg-[#31c978] text-white"
+                  ? "bg-[#247451] text-white"
                   : "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]",
               ].join(" ")}
             >
@@ -301,7 +299,7 @@ function TaskCard({
   const percent = Math.min(100, (task.progress / task.target) * 100);
 
   return (
-    <div className="rounded-[24px] border border-[#dfece4] bg-white p-5">
+    <div className="rounded-xl border border-[#dfece4] bg-white p-5">
       <div className="text-lg font-black">{task.title}</div>
       <div className="mt-4 text-sm font-bold text-[#557768]">
         {Math.min(task.progress, task.target)} / {task.target} {task.unit}
@@ -325,7 +323,7 @@ function TaskCard({
           className={[
             "rounded-xl px-4 py-2 text-sm font-black",
             status === "claimable"
-              ? "bg-[#31c978] text-white"
+              ? "bg-[#247451] text-white"
               : "cursor-not-allowed bg-[#edf2ef] text-[#9aac9f]",
           ].join(" ")}
         >

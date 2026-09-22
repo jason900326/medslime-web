@@ -11,7 +11,7 @@ export default function SiteFooter() {
 
   return (
     <footer className="bg-[#f8fcf9] px-4 pb-10 sm:px-5 md:px-8">
-      <div className="mx-auto max-w-5xl rounded-[24px] border border-[#dfece4] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(31,83,53,0.035)] sm:px-6">
+      <div className="mx-auto max-w-5xl border-t border-[#dfece4] py-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-black text-[#17372a]">有問題、發現錯題或想聯絡我？</div>

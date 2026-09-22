@@ -131,7 +131,7 @@ export default function MedtechExamPage() {
 
         <section className="mt-8">
           <div className="max-w-3xl">
-            <p className="text-xs font-black tracking-[0.14em] text-[#2ba962]">WHY MEDSLIME</p>
+
             <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">
               不只是看答案，而是把你錯在哪裡留下來。
             </h2>
@@ -152,7 +152,7 @@ export default function MedtechExamPage() {
         </section>
 
         <section className="mt-8 rounded-[26px] border border-[#dfece4] bg-white p-6 sm:p-8">
-          <p className="text-xs font-black tracking-[0.14em] text-[#2ba962]">HOW IT WORKS</p>
+
           <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
             準備醫檢師國考時，可以這樣用 MedSlime
           </h2>

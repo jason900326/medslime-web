@@ -21,7 +21,7 @@ export default function ShopPage() {
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 md:px-8 md:py-10">
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
-        <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-6 shadow-[0_16px_42px_rgba(30,78,50,0.06)] sm:p-8">
+        <section className="mt-8 rounded-xl border border-[#dce9e1] bg-gradient-to-br from-[#fff7e8] via-white to-[#eefaf2] p-6 sm:p-8">
           <div className="text-xs font-black tracking-[0.12em] text-[#c58a2d]">
             MEDSLIME PRO
           </div>
@@ -34,7 +34,7 @@ export default function ShopPage() {
         </section>
 
         {!checkoutEnabled && (
-          <section className="mt-5 rounded-[22px] border border-[#f0dfaa] bg-[#fff9e8] px-5 py-4 text-sm font-black leading-6 text-[#80651e]">
+          <section className="mt-5 rounded-xl border border-[#f0dfaa] bg-[#fff9e8] px-5 py-4 text-sm font-black leading-6 text-[#80651e]">
             🕒 目前金流重新審核中：可以查看方案內容與價格，但暫時無法付款。
           </section>
         )}
@@ -49,7 +49,7 @@ export default function ShopPage() {
           ))}
         </section>
 
-        <section className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e2ebe5] bg-white px-5 py-4 shadow-[0_6px_18px_rgba(31,83,53,0.035)]">
+        <section className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-[#e2ebe5] bg-white px-5 py-4">
           <div>
             <div className="text-sm font-black text-[#315b45]">付款與虛擬獎勵說明</div>
             <div className="mt-1 text-xs font-bold text-[#8a9c92]">
@@ -85,7 +85,7 @@ function ProductCard({
   return (
     <article
       className={[
-        "relative flex h-full flex-col rounded-[26px] border p-5 shadow-[0_10px_28px_rgba(31,83,53,0.045)] sm:p-6",
+        "relative flex h-full flex-col rounded-xl border p-5 sm:p-6",
         product.featured
           ? "border-[#bfe1cb] bg-gradient-to-br from-[#f1fbf5] via-white to-[#fff9ec]"
           : "border-[#dce9e1] bg-white",

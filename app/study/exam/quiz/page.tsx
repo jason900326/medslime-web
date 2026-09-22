@@ -1,9 +1,11 @@
 "use client";
 
+import QuizDialog from "@/components/quiz-dialog";
+import QuizOption from "@/components/quiz-option";
+
 import {
   Suspense,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import {
@@ -12,13 +14,14 @@ import {
 } from "next/navigation";
 import TopBar from "@/components/top-bar";
 import OfficialQuestionCrop from "@/components/official-question-crop";
-import AIExplanationButton from "@/components/ai-explanation-button";
-import ExamExplanationOffer from "@/components/exam-explanation-offer";
 import {
   useGameState,
   type NationalExamRewardResult,
 } from "@/components/game-state-provider";
-import { saveNationalExamAttempt } from "@/lib/exam-attempt-store";
+import {
+  saveNationalExamAttempt,
+  type SaveExamAttemptInput,
+} from "@/lib/exam-attempt-store";
 import { upsertMistakes } from "@/lib/mistake-store";
 import { useQuizSession } from "@/lib/use-quiz-session";
 
@@ -44,19 +47,6 @@ type LoadState =
 const TUTORIAL_STORAGE_KEY =
   "medslime_exam_tutorial_seen_v2";
 const EXAM_STARTED_AT_KEY = "medslime_exam_started_at";
-const EXAM_FINISHED_EVENT = "medslime:exam-finished";
-
-function formatElapsed(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const mm = String(minutes).padStart(2, "0");
-  const ss = String(seconds).padStart(2, "0");
-
-  if (hours <= 0) return `${mm}:${ss}`;
-  return `${String(hours).padStart(2, "0")}:${mm}:${ss}`;
-}
 
 export default function ExamQuizPage() {
   return (
@@ -94,7 +84,6 @@ function ExamQuizContent() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOriginalQuestion, setShowOriginalQuestion] = useState(false);
   const [recorded, setRecorded] = useState(false);
-  const [elapsedAtFinish, setElapsedAtFinish] = useState(0);
   const [examRewardResult, setExamRewardResult] =
     useState<NationalExamRewardResult | null>(null);
 
@@ -106,7 +95,6 @@ function ExamQuizContent() {
       resetSession();
       setFinished(false);
       setRecorded(false);
-      setElapsedAtFinish(0);
       setExamRewardResult(null);
       setShowSubmitDialog(false);
 
@@ -165,7 +153,7 @@ function ExamQuizContent() {
             <button
               type="button"
               onClick={() => router.push("/study/exam")}
-              className="mt-6 rounded-xl bg-[#31c978] px-5 py-3 font-black text-white"
+              className="mt-6 rounded-xl bg-[#247451] px-5 py-3 font-black text-white"
             >
               返回選卷
             </button>
@@ -190,6 +178,7 @@ function ExamQuizContent() {
     .filter((item) => answers[item.id] === undefined)
     .map((item) => item.questionNumber);
   const unansweredCount = unansweredNumbers.length;
+  const answeredCount = questions.length - unansweredCount;
   const uncertainCount = Object.values(uncertain).filter(Boolean).length;
   const score = correctCount * 1.25;
 
@@ -234,54 +223,59 @@ function ExamQuizContent() {
         : 0;
     const answeredCount = Object.keys(answers).length;
 
-    setElapsedAtFinish(elapsed);
-    window.dispatchEvent(new Event(EXAM_FINISHED_EVENT));
+    setShowSubmitDialog(false);
+    setFinished(true);
+
+    // An incomplete submit is only a review checkpoint. Do not persist it as an
+    // exam attempt, otherwise continuing the same exam would leave a partial
+    // record and block the final completed result from being saved.
+    if (unansweredCount > 0) return;
 
     if (!recorded) {
       setRecorded(true);
 
-      try {
-        await saveNationalExamAttempt({
-          year,
-          session,
-          subject,
-          answeredCount,
-          correctCount,
-          score,
-          reviewCount: reviewQuestions.length,
-          uncertainCount,
-          durationSeconds: elapsed,
-          reviewItems: reviewQuestions.map((item) => ({
-            id: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
+      const attemptInput: SaveExamAttemptInput = {
+        year,
+        session,
+        subject,
+        answeredCount,
+        correctCount,
+        score,
+        reviewCount: reviewQuestions.length,
+        uncertainCount,
+        durationSeconds: elapsed,
+        reviewItems: reviewQuestions.map((item) => ({
+          id: "national-exam:" + year + ":" + session + ":" + subject + ":" + item.questionNumber,
+          questionNumber: item.questionNumber,
+          stem: item.stem,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          userAnswer: answers[item.id] ?? null,
+          uncertain: uncertain[item.id] ?? false,
+          officialPdfUrl: item.questionPdfUrl,
+        })),
+        questionOutcomes: questions.map((item) => {
+          const answer = answers[item.id];
+          const answered = answer !== undefined;
+          return {
+            questionId: item.id,
+            questionKey: "national-exam:" + year + ":" + session + ":" + subject + ":" + item.questionNumber,
             questionNumber: item.questionNumber,
-            stem: item.stem,
-            options: item.options,
+            userAnswer: answered ? answer : null,
             correctIndex: item.correctIndex,
-            userAnswer: answers[item.id] ?? null,
+            answered,
+            correct:
+              answered && item.correctIndex !== null
+                ? answer === item.correctIndex
+                : null,
             uncertain: uncertain[item.id] ?? false,
-            officialPdfUrl: item.questionPdfUrl,
-          })),
-          questionOutcomes: questions.map((item) => {
-            const answer = answers[item.id];
-            const answered = answer !== undefined;
-            return {
-              questionId: item.id,
-              questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
-              questionNumber: item.questionNumber,
-              userAnswer: answered ? answer : null,
-              correctIndex: item.correctIndex,
-              answered,
-              correct:
-                answered && item.correctIndex !== null
-                  ? answer === item.correctIndex
-                  : null,
-              uncertain: uncertain[item.id] ?? false,
-            };
-          }),
-        });
-      } catch (error) {
+          };
+        }),
+      };
+
+      void saveNationalExamAttempt(attemptInput).catch((error) => {
         console.error("國考作答紀錄儲存失敗：", error);
-      }
+      });
 
       game.recordQuestionsAnswered(answeredCount);
       if (answeredCount === questions.length) {
@@ -289,14 +283,10 @@ function ExamQuizContent() {
       }
     }
 
-    try {
-      await saveMistakes();
-    } catch (error) {
+    void saveMistakes().catch((error) => {
       console.error("國考錯題儲存失敗：", error);
-    }
+    });
 
-    setShowSubmitDialog(false);
-    setFinished(true);
   };
 
   const closeTutorial = () => {
@@ -305,191 +295,86 @@ function ExamQuizContent() {
   };
 
   if (finished) {
-    const previewReviewQuestions = reviewQuestions.slice(0, 3);
-    const hiddenReviewCount = Math.max(0, reviewQuestions.length - previewReviewQuestions.length);
+    const completed = unansweredCount === 0;
+    const resultTarget =
+      reviewQuestions.length > 0
+        ? "/study/records?tab=mistakes"
+        : "/study/records?tab=attempts";
 
     return (
       <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
+        <div className="mx-auto max-w-2xl px-4 py-5 sm:px-5 md:px-8 md:py-10">
           <TopBar showBack backHref="/study/exam" backLabel="返回選卷" />
 
-          <section className="mt-6 rounded-[26px] border border-[#dce9e1] bg-white p-5 text-center shadow-[0_14px_34px_rgba(30,78,50,0.06)] sm:mt-10 sm:rounded-[30px] sm:p-8">
-            <div className="text-xs font-black tracking-[0.1em] text-[#2ba962] sm:text-sm">
-              RESULT
-            </div>
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">作答完成</h1>
+          <section className="study-panel mt-6 text-center">
 
-            <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3 sm:mt-8 sm:gap-4">
-              <ResultCard label="答對" value={`${correctCount} / ${gradableCount}`} />
-              <ResultCard label="換算分數" value={`${score.toFixed(2)} 分`} />
-              <ResultCard label="需要複習" value={`${reviewQuestions.length} 題`} />
-              <ResultCard label="作答時間" value={formatElapsed(elapsedAtFinish)} />
-            </div>
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+              {completed ? "作答完成" : "這次尚未完成"}
+            </h1>
 
-            {unansweredCount > 0 ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#eadfce] bg-[#fffaf2] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
-                完整作答全部題目才會發放國考完成獎勵；這次有 {unansweredCount} 題未作答，因此不發金幣。
-              </div>
-            ) : examRewardResult?.status === "rewarded" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] p-3 text-sm font-black text-[#237849] sm:p-4">
-                國考完整作答獎勵：🪙 +{examRewardResult.amount}
-              </div>
-            ) : examRewardResult?.status === "duplicate" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
-                這份國考的首次完成獎勵已領取過；重做仍會正常保存學習紀錄，但不重複發金幣。
-              </div>
-            ) : examRewardResult?.status === "weekly-cap" ? (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#f5f8f6] p-3 text-xs font-bold leading-5 text-[#70877a] sm:p-4 sm:text-sm">
-                本週已領滿 2 份國考完成獎勵；下週可再從新的國考取得獎勵。
-              </div>
-            ) : null}
-
-            {gradableCount < questions.length && (
-              <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-[#fff8df] p-3 text-xs font-bold leading-5 text-[#80651e] sm:p-4 sm:text-sm">
-                有 {questions.length - gradableCount} 題目前沒有可用的單一標準答案，因此未納入計分。
+            {completed ? (
+              <>
+                <div className="mt-8 text-6xl font-black tracking-[-0.06em] text-[#17372a] sm:text-7xl">
+                  {score.toFixed(2)}
+                  <span className="ml-2 text-2xl tracking-normal text-[#789083]">分</span>
+                </div>
+                <div className="mt-4 text-sm font-bold text-[#70877a]">
+                  答對 {correctCount} 題 · {reviewQuestions.length} 題需要再看
+                </div>
+              </>
+            ) : (
+              <div className="mt-8 rounded-2xl bg-[#fffaf2] px-5 py-5 text-sm font-black leading-6 text-[#80651e]">
+                已作答 {answeredCount} / {questions.length} 題，還有 {unansweredCount} 題。
+                <div className="mt-1 text-xs font-bold text-[#9a7a2b]">
+                  完成整份考卷後，才會形成完整的學習紀錄。
+                </div>
               </div>
             )}
 
-            {uncertainCount > 0 && (
-              <div className="mt-3 text-xs font-bold text-[#789083] sm:text-sm">
-                你另外標記了 {uncertainCount} 題「我不確定」。
+            {completed && examRewardResult?.status === "rewarded" && (
+              <div className="mx-auto mt-5 rounded-2xl bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]">
+                國考完成獎勵：🪙 +{examRewardResult.amount}
               </div>
             )}
 
-            <div className="mx-auto mt-5 flex max-w-3xl flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
-              {reviewQuestions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/study/records?tab=mistakes")}
-                  className="rounded-2xl bg-[#31c978] px-5 py-3.5 font-black text-white transition hover:bg-[#2dbc70] sm:px-6"
-                >
-                  前往錯題紀錄
-                </button>
-              )}
+            {completed && gradableCount < questions.length && (
+              <div className="mt-4 text-xs font-bold leading-5 text-[#8a9c92]">
+                有 {questions.length - gradableCount} 題沒有標準答案，未列入分數。
+              </div>
+            )}
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (completed) {
+                    router.push(resultTarget);
+                  } else {
+                    setFinished(false);
+                    setShowSubmitDialog(false);
+                  }
+                }}
+                className="rounded-2xl bg-[#247451] px-6 py-4 font-black text-white"
+              >
+                {completed
+                  ? reviewQuestions.length > 0
+                    ? "查看錯題"
+                    : "查看學習紀錄"
+                  : "繼續作答"}
+              </button>
               <button
                 type="button"
                 onClick={() => router.push("/study/exam")}
-                className="rounded-2xl border border-[#d7e7de] bg-white px-5 py-3.5 font-black text-[#315b45] transition hover:bg-[#f5faf7] sm:px-6"
+                className="rounded-2xl border border-[#d7e7de] bg-white px-6 py-4 font-black text-[#315b45]"
               >
                 再選一份考卷
               </button>
             </div>
-
-            <ExamExplanationOffer
-              year={year}
-              session={session}
-              subject={subject}
-              reviewCount={reviewQuestions.length}
-            />
-
-            {reviewQuestions.length > 0 ? (
-              <section className="mx-auto mt-7 max-w-3xl space-y-4 text-left sm:mt-8">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-black text-[#17372a]">需要複習的題目</div>
-                    <div className="mt-1 text-xs font-bold text-[#789083]">
-                      先顯示前 {previewReviewQuestions.length} 題，完整內容已存入錯題紀錄。
-                    </div>
-                  </div>
-                </div>
-
-                {previewReviewQuestions.map((item) => {
-                  const userAnswer = answers[item.id];
-                  const isUncertain = uncertain[item.id] ?? false;
-                  const isWrong =
-                    item.correctIndex !== null &&
-                    userAnswer !== undefined &&
-                    userAnswer !== item.correctIndex;
-
-                  return (
-                    <div
-                      key={`result-review-${item.id}`}
-                      className="rounded-[22px] border border-[#dfe9e3] bg-[#fbfefc] p-4 sm:p-5"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-black text-[#2ba962]">
-                          第 {item.questionNumber} 題
-                        </div>
-                        {isWrong && (
-                          <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-black text-[#9b5050]">
-                            答錯
-                          </span>
-                        )}
-                        {isUncertain && (
-                          <span className="rounded-full bg-[#fff8df] px-3 py-1 text-xs font-black text-[#80651e]">
-                            ❓ 不確定
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-3 text-base font-black leading-7 text-[#17372a]">
-                        {item.stem}
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        {item.options.map((option, optionIndex) => {
-                          const isCorrect = item.correctIndex === optionIndex;
-                          const isChosen = userAnswer === optionIndex;
-
-                          return (
-                            <div
-                              key={`result-${item.id}-${optionIndex}`}
-                              className={[
-                                "rounded-xl border px-4 py-3 text-sm font-bold",
-                                isCorrect
-                                  ? "border-[#9ed9b5] bg-[#edf9f1] text-[#315b45]"
-                                  : isChosen
-                                    ? "border-[#e6a2a2] bg-[#fff1f1] text-[#8b4747]"
-                                    : "border-[#e1e9e4] bg-white text-[#60786c]",
-                              ].join(" ")}
-                            >
-                              {String.fromCharCode(65 + optionIndex)}. {option}
-                              {isCorrect && " ✓"}
-                              {isChosen && !isCorrect && " ← 你的答案"}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {item.correctIndex !== null && (
-                        <AIExplanationButton
-                          payload={{
-                            questionKey: `national-exam:${year}:${session}:${subject}:${item.questionNumber}`,
-                            source: "national-exam",
-                            sourceLabel: `民國 ${year} 年 · 第 ${session} 次 · ${subject}`,
-                            stem: item.stem,
-                            options: item.options,
-                            correctIndex: item.correctIndex,
-                            userAnswer: userAnswer === undefined ? null : userAnswer,
-                            uncertain: isUncertain,
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {hiddenReviewCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => router.push("/study/records?tab=mistakes")}
-                    className="w-full rounded-2xl border border-[#cfe7d8] bg-[#f3fbf6] px-4 py-3 text-sm font-black text-[#237849]"
-                  >
-                    還有 {hiddenReviewCount} 題，前往錯題紀錄查看全部 →
-                  </button>
-                )}
-              </section>
-            ) : (
-              <div className="mx-auto mt-7 max-w-3xl rounded-[22px] border border-[#cfe7d8] bg-[#f3fbf6] p-5 font-black text-[#237849]">
-                ✓ 這次沒有需要複習的錯題或不確定題目。
-              </div>
-            )}
           </section>
         </div>
       </main>
     );
   }
-
   return (
     <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
       <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 md:py-10">
@@ -502,6 +387,7 @@ function ExamQuizContent() {
           <h1 className="mt-2 text-2xl font-black">{subject}</h1>
         </section>
 
+        <p className="mt-4 text-sm leading-6 text-[#60786c]">點選項即可作答；不確定可先標記，交卷前再回來檢查。</p>
         <QuestionProgress
           questions={questions}
           currentIndex={index}
@@ -509,7 +395,7 @@ function ExamQuizContent() {
           onJump={setIndex}
         />
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_12px_28px_rgba(30,78,50,0.055)] md:p-8">
+        <section className="study-panel mt-6 ">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-black text-[#789083]">
               Q{question.questionNumber} / {questions.length}
@@ -519,7 +405,7 @@ function ExamQuizContent() {
               onClick={() => setShowSubmitDialog(true)}
               className="rounded-xl border border-[#ead8d8] bg-white px-4 py-2 text-sm font-black text-[#9b5050]"
             >
-              結束測驗
+              交卷
             </button>
           </div>
 
@@ -555,48 +441,15 @@ function ExamQuizContent() {
               const struck = struckOptions[question.id]?.includes(optionIndex) ?? false;
 
               return (
-                <div
+                <QuizOption
                   key={`${question.id}-${optionIndex}`}
-                  className={[
-                    "flex items-stretch rounded-2xl border transition",
-                    selected
-                      ? "border-[#65d795] bg-[#eaf9f0]"
-                      : "border-[#dfe8e2] bg-white hover:bg-[#f7faf8]",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [question.id]: optionIndex,
-                      }))
-                    }
-                    className="flex w-14 shrink-0 items-center justify-center"
-                  >
-                    <span
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selected
-                          ? "border-[#31c978] bg-[#31c978]"
-                          : "border-[#b8c9bf] bg-white",
-                      ].join(" ")}
-                    >
-                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStrike(question.id, optionIndex)}
-                    className={[
-                      "flex-1 px-3 py-3.5 text-left text-sm font-bold leading-6 text-[#466a58] sm:text-base",
-                      struck ? "line-through opacity-45" : "",
-                    ].join(" ")}
-                  >
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                  </button>
-                </div>
+                  label={String.fromCharCode(65 + optionIndex)}
+                  text={option}
+                  selected={selected}
+                  excluded={struck}
+                  onSelect={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))}
+                  onExclude={() => toggleStrike(question.id, optionIndex)}
+                />
               );
             })}
           </div>
@@ -647,7 +500,7 @@ function ExamQuizContent() {
                 onClick={() =>
                   setIndex((current) => Math.min(questions.length - 1, current + 1))
                 }
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
                 下一題 →
               </button>
@@ -655,9 +508,9 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={() => setShowSubmitDialog(true)}
-                className="rounded-xl bg-[#31c978] px-5 py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                className="rounded-xl bg-[#247451] px-5 py-3 font-black text-white transition hover:bg-[#1c5e40]"
               >
-                完成測驗
+                交卷
               </button>
             )}
           </div>
@@ -666,13 +519,13 @@ function ExamQuizContent() {
 
       {showSubmitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-5">
-          <div className="w-full max-w-md rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-2xl">
+          <QuizDialog onClose={() => setShowSubmitDialog(false)}>
             <div className="text-2xl font-black">是否要交卷？</div>
 
             {unansweredCount > 0 ? (
               <div className="mt-3 rounded-2xl border border-[#f0dddd] bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#9b5050]">
                 尚有 {unansweredCount} 題未作答。
-                <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-left leading-6 text-[#8f5151]">
+                <div className="mt-3 border-t border-[#ead8d8] pt-3 text-left leading-6 text-[#8f5151]">
                   未作答題號：{unansweredNumbers.join("、")}
                 </div>
                 <div className="mt-3">確定仍要交卷嗎？</div>
@@ -692,12 +545,12 @@ function ExamQuizContent() {
               <button
                 type="button"
                 onClick={finishExam}
-                className="rounded-xl bg-[#31c978] px-4 py-3 font-black text-white"
+                className="rounded-xl bg-[#247451] px-4 py-3 font-black text-white"
               >
                 確認交卷
               </button>
             </div>
-          </div>
+          </QuizDialog>
         </div>
       )}
 
@@ -706,9 +559,7 @@ function ExamQuizContent() {
           <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-[22px] border border-[#dce9e1] bg-white p-4 shadow-2xl sm:rounded-[28px] sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black tracking-[0.1em] text-[#2ba962] sm:text-xs">
-                  OFFICIAL QUESTION
-                </div>
+
                 <div className="mt-1 text-lg font-black sm:text-xl">
                   官方原題 · 第 {question.questionNumber} 題
                 </div>
@@ -956,8 +807,8 @@ function ExamTutorial({ onClose }: { onClose: () => void }) {
 
         <div className="mx-auto mt-8 max-w-4xl rounded-[26px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_36px_rgba(31,83,53,0.06)]">
           <div className="grid gap-5 md:grid-cols-3">
-            <TutorialItem icon="◯" title="點圓圈" copy="選擇正式答案" />
-            <TutorialItem icon="Aa" title="點選項文字" copy="劃掉／取消劃掉選項" />
+            <TutorialItem icon="◯" title="點選項" copy="選擇答案，已選答案會以綠色標示" />
+            <TutorialItem icon="Aa" title="排除選項" copy="點右側排除；再次點選可取消" />
             <TutorialItem icon="?" title="我不確定" copy="答案照樣保留，同時標記這題不熟" />
           </div>
 
@@ -975,7 +826,7 @@ function ExamTutorial({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="mx-auto mt-6 block w-full max-w-4xl rounded-2xl bg-[#31c978] px-6 py-4 font-black text-white"
+          className="mx-auto mt-6 block w-full max-w-4xl rounded-2xl bg-[#247451] px-6 py-4 font-black text-white"
         >
           知道了，開始作答
         </button>
@@ -1001,19 +852,6 @@ function TutorialItem({
       <div>
         <div className="text-lg font-black">{title}</div>
         <div className="mt-1 text-sm font-bold leading-6 text-[#789083]">{copy}</div>
-      </div>
-    </div>
-  );
-}
-
-function ResultCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-[18px] border border-[#dfece4] bg-[#f8fcf9] px-3 py-4 sm:rounded-[20px] sm:p-5">
-      <div className="text-xs font-bold leading-4 text-[#789083] sm:text-sm">
-        {label}
-      </div>
-      <div className="mt-1 break-keep text-lg font-black leading-tight sm:text-2xl">
-        {value}
       </div>
     </div>
   );

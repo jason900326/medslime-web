@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 import LoginRequired from "@/components/login-required";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { useGameState } from "@/components/game-state-provider";
@@ -71,26 +71,20 @@ export default function SlimesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-5 md:px-8 md:py-10">
-        <TopBar showBack />
+    <StudyShell>
 
         <section className="mt-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm font-black tracking-[0.08em] text-[#2ba962]">
-              COLLECTION
-            </div>
-            <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">
+
+            <h1 className="ms-page-title">
               史萊姆圖鑑
             </h1>
-            <p className="mt-3 text-sm font-bold text-[#70877a]">
-              收集更多史萊姆，挑一隻陪你一起讀書。
-            </p>
+
           </div>
 
           <Link
             href="/gacha"
-            className="inline-flex items-center justify-center rounded-2xl bg-[#31c978] px-6 py-3.5 font-black text-white shadow-[0_10px_24px_rgba(49,201,120,0.18)] transition hover:-translate-y-0.5 hover:bg-[#2dbc70]"
+            className="inline-flex items-center justify-center rounded-2xl bg-[#247451] px-6 py-3.5 font-black text-white transition hover:-translate-y-0.5 hover:bg-[#1c5e40]"
           >
             🎟️ 前往抽卡
           </Link>
@@ -108,8 +102,9 @@ export default function SlimesPage() {
                 key={rarity}
                 type="button"
                 onClick={() => setRarityFilter(rarity)}
+                aria-pressed={rarityFilter === rarity}
                 className={[
-                  "rounded-full border px-4 py-2 text-sm font-black transition",
+                  "min-h-11 rounded-xl border px-3 py-2 text-sm font-black transition",
                   rarityFilter === rarity
                     ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
                     : "border-[#dbe9e1] bg-white text-[#466a58]",
@@ -136,7 +131,7 @@ export default function SlimesPage() {
           </label>
         </section>
 
-        <section className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <section className="mt-6 slime-collection grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
           {sortedSlimes.map((slime) => (
             <SlimeCard
               key={slime.id}
@@ -150,8 +145,7 @@ export default function SlimesPage() {
             />
           ))}
         </section>
-      </div>
-    </main>
+    </StudyShell>
   );
 }
 
@@ -205,7 +199,7 @@ function SlimeCard({
     <article
       id={`slime-card-${slime.id}`}
       className={[
-        "scroll-mt-4 overflow-hidden rounded-[24px] border bg-white p-4 shadow-[0_8px_22px_rgba(32,85,54,0.05)] transition-all duration-300 sm:p-5",
+        "scroll-mt-4 overflow-hidden rounded-xl border bg-white p-4 transition-all duration-300 sm:p-5",
         companion
           ? "border-[#9eddb9] ring-2 ring-[#dff4e8]/70"
           : "border-[#dbe9e1]",
@@ -213,7 +207,7 @@ function SlimeCard({
       ].join(" ")}
     >
       <div className="flex items-center gap-3 sm:gap-5">
-        <div className="relative flex h-[136px] w-[136px] shrink-0 items-center justify-center overflow-visible sm:h-[164px] sm:w-[164px]">
+        <div className="relative flex h-[96px] w-[96px] shrink-0 items-center justify-center overflow-visible sm:h-[164px] sm:w-[164px]">
           <img
             src={cardImage}
             alt={hiddenSSR ? "???" : currentName}
@@ -254,7 +248,7 @@ function SlimeCard({
                 type="button"
                 onClick={saveNickname}
                 disabled={!nicknameDraft.trim()}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-[#31c978] text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-[#dce9e1] disabled:text-[#8da096]"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-[#247451] text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-[#dce9e1] disabled:text-[#8da096]"
                 aria-label="儲存名稱"
                 title="儲存"
               >
@@ -263,7 +257,7 @@ function SlimeCard({
               <button
                 type="button"
                 onClick={cancelNicknameEdit}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#d7e7de] bg-white text-xs font-black text-[#60786c]"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-[#d7e7de] bg-white text-xs font-black text-[#60786c]"
                 aria-label="取消修改名稱"
                 title="取消"
               >
@@ -272,14 +266,14 @@ function SlimeCard({
             </div>
           ) : (
             <div className="flex min-w-0 items-center gap-1">
-              <div className="truncate text-lg font-black sm:text-xl">
+              <div className="min-w-0 break-words text-base font-black sm:text-xl">
                 {hiddenSSR ? "???" : currentName}
               </div>
               {owned && !hiddenSSR && (
                 <button
                   type="button"
                   onClick={beginNicknameEdit}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-sm text-[#668276] transition hover:bg-[#eef7f1]"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-sm text-[#668276] transition hover:bg-[#eef7f1]"
                   aria-label={`修改${currentName}的名字`}
                   title="修改名字"
                 >
@@ -302,6 +296,8 @@ function SlimeCard({
           <button
             type="button"
             onClick={onToggle}
+            aria-expanded={expanded}
+            aria-controls={`slime-details-${slime.id}`}
             className="mt-3 w-full rounded-xl border border-[#d7e7de] bg-white py-2.5 text-sm font-black text-[#315b45] transition hover:bg-[#f5faf7]"
           >
             {expanded ? "收起詳情" : "查看詳情"}
@@ -310,6 +306,8 @@ function SlimeCard({
       </div>
 
       <div
+        id={`slime-details-${slime.id}`}
+        inert={!expanded}
         className={[
           "grid transition-[grid-template-rows,opacity,margin] duration-300",
           expanded
@@ -329,7 +327,7 @@ function SlimeCard({
                   <button
                     type="button"
                     onClick={chooseCompanion}
-                    className="mt-4 w-full rounded-xl bg-[#31c978] py-3 font-black text-white transition hover:bg-[#2dbc70]"
+                    className="mt-4 w-full rounded-xl bg-[#247451] py-3 font-black text-white transition hover:bg-[#1c5e40]"
                   >
                     設為陪伴
                   </button>
@@ -349,7 +347,7 @@ function SlimeCard({
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[18px] border border-[#dfece4] bg-white px-4 py-3">
+    <div className="rounded-xl border border-[#dfece4] bg-white px-4 py-3">
       <div className="text-xs font-bold text-[#789083]">{label}</div>
       <div className="mt-1 truncate text-lg font-black">{value}</div>
     </div>

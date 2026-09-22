@@ -9,7 +9,7 @@ export default function AboutPage() {
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-5 md:px-8 md:py-10">
         <TopBar showBack backHref="/" backLabel="返回首頁" />
 
-        <section className="mt-8 rounded-[28px] border border-[#dce9e1] bg-white p-6 shadow-[0_14px_36px_rgba(31,83,53,0.05)] sm:p-8">
+        <section className="mt-8 rounded-xl border border-[#dce9e1] bg-white p-6 sm:p-8">
           <div className="text-xs font-black tracking-[0.12em] text-[#2ba962]">ABOUT & SOURCES</div>
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">資料來源與 AI 使用說明</h1>
           <p className="mt-3 text-sm font-bold leading-7 text-[#70877a] sm:text-base">
@@ -50,7 +50,7 @@ export default function AboutPage() {
           <p>如果你發現答案、題目文字、AI 解析或網站功能有問題，可以直接填寫站內回報表單。</p>
           <Link
             href="/feedback"
-            className="mt-3 inline-flex rounded-xl bg-[#31c978] px-4 py-3 text-sm font-black text-white"
+            className="mt-3 inline-flex rounded-xl bg-[#247451] px-4 py-3 text-sm font-black text-white"
           >
             前往回報問題
           </Link>
@@ -70,7 +70,7 @@ export default function AboutPage() {
 
 function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-5 rounded-[24px] border border-[#dfece4] bg-white p-5 text-sm font-bold leading-7 text-[#617a6e] shadow-[0_8px_22px_rgba(31,83,53,0.035)] sm:p-6 sm:text-base">
+    <section className="mt-5 rounded-xl border border-[#dfece4] bg-white p-5 text-sm font-bold leading-7 text-[#617a6e] sm:p-6 sm:text-base">
       <h2 className="text-xl font-black text-[#17372a]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>

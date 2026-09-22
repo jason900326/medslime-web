@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import ExamExplanationPurchaseButton from "@/components/exam-explanation-purchase-button";
 import {
   formatAttemptDate,
   formatAttemptDuration,
@@ -41,20 +39,8 @@ export default function AttemptCard({
   });
   const sameExamPrevious = previous?.examKey === attempt.examKey ? previous : null;
   const delta = sameExamPrevious ? attempt.score - sameExamPrevious.score : null;
-  const [showUnlockedNotice, setShowUnlockedNotice] = useState(explanationUnlocked);
-
-  useEffect(() => {
-    if (!explanationUnlocked) {
-      setShowUnlockedNotice(false);
-      return;
-    }
-    setShowUnlockedNotice(true);
-    const timer = window.setTimeout(() => setShowUnlockedNotice(false), 4200);
-    return () => window.clearTimeout(timer);
-  }, [attempt.examKey, explanationUnlocked]);
-
   return (
-    <article className="rounded-[24px] border border-[#dce9e1] bg-white p-5 shadow-[0_8px_22px_rgba(31,83,53,0.04)] sm:p-6">
+    <article className="study-list-row">
       <div className="flex items-start justify-between gap-5">
         <div className="min-w-0 flex-1">
           <div className="text-xs font-black tracking-[0.02em] text-[#2ba962]">
@@ -62,7 +48,7 @@ export default function AttemptCard({
               ? `自由測驗 · ${attempt.year.replace("-", "–")} 年`
               : `${attempt.year} 年・第 ${attempt.session} 次`}
           </div>
-          <h3 className="mt-1 text-lg font-black leading-7 text-[#17372a]">
+          <h3 className="mt-1 text-base font-semibold leading-7 text-[#17372a]">
             {attempt.subject}
           </h3>
           <div className="mt-1 text-xs font-bold text-[#8a9c92]">
@@ -71,14 +57,14 @@ export default function AttemptCard({
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="text-4xl font-black tracking-[-0.05em] text-[#17372a]">
+          <div className="text-2xl font-bold tracking-[-0.05em] text-[#17372a]">
             {attempt.score.toFixed(2)}
           </div>
           <div className="mt-0.5 text-[11px] font-bold text-[#8a9c92]">分</div>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#edf2ef] py-3 text-xs font-bold text-[#6f8679]">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-[#6f8679]">
         <span>
           答對 <strong className="font-black text-[#315b45]">{attempt.correctCount} 題</strong>
         </span>
@@ -98,12 +84,12 @@ export default function AttemptCard({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <Link
           href={`/study/records/attempt/${attempt.id}`}
-          className="text-sm font-black text-[#237849]"
+          className="study-text-action"
         >
-          查看錯題與這次作答 →
+          檢討這次作答 →
         </Link>
 
         <Link
@@ -112,35 +98,13 @@ export default function AttemptCard({
               ? `/study/free-quiz?${freeQuizParams.toString()}`
               : `/study/exam/quiz?${quizParams.toString()}`
           }
-          className="text-xs font-black text-[#6d8578] underline decoration-[#d8e7de] underline-offset-4"
+          className="inline-flex min-h-11 items-center text-xs font-black text-[#6d8578] underline decoration-[#d8e7de] underline-offset-4"
         >
           {freeQuiz ? "再組一份" : "再次作答"}
         </Link>
       </div>
 
-      {!freeQuiz && !explanationUnlocked && (
-        <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-[#f8fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs font-bold leading-5 text-[#789083]">
-            整份考卷詳解：進入作答紀錄後，只在需要的題目上展開解析。
-          </div>
-          <ExamExplanationPurchaseButton
-            year={attempt.year}
-            session={attempt.session}
-            subject={attempt.subject}
-            compact
-            knownPurchased={false}
-          />
-        </div>
-      )}
-
-      {!freeQuiz && explanationUnlocked && showUnlockedNotice && (
-        <div
-          role="status"
-          className="mt-4 rounded-2xl border border-[#bfe1cb] bg-[#eefaf2] px-4 py-3 text-xs font-black leading-5 text-[#237849]"
-        >
-          ✓ 本卷詳解已解鎖，可以直接查看需要的題目。
-        </div>
-      )}
+      {!freeQuiz && explanationUnlocked && <p className="text-xs text-[#547a60]">✓ 本卷詳解已解鎖</p>}
     </article>
   );
 }

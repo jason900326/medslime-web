@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import TopBar from "@/components/top-bar";
+import StudyShell from "@/components/study-shell";
 
 const rocYears = Array.from({ length: 10 }, (_, index) => 115 - index);
 const questionCounts = [10, 20, 40, 80] as const;
@@ -65,20 +65,12 @@ function FreeQuizConfigurator() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f8fcf9] text-[#17372a]">
-      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-5 md:px-8 md:py-8">
-        <TopBar showBack backHref="/study" backLabel="返回學習" />
+    <StudyShell>
 
         <section className="mt-6">
-          <div className="text-xs font-black tracking-[0.1em] text-[#2ba962]">
-            {targeted ? "WEAK TOPIC PRACTICE" : "FREE QUIZ"}
-          </div>
+
           <h1 className="ms-page-title mt-2">{targeted ? "弱主題練習" : "自由測驗"}</h1>
-          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#70877a]">
-            {targeted
-              ? "這份練習會鎖定 Pro 分析找到的弱主題，優先抽出同 Subtopic 題目；細分題量不足時，只會用同一 Topic 的相關題補足。完成後的新作答也會回到弱點分析。"
-              : "自己決定年份範圍、科目與題數。系統會從歷屆國考中隨機組一份練習，答錯或標記不確定的題目一樣會進錯題紀錄。"}
-          </p>
+
         </section>
 
         {targeted && (
@@ -102,99 +94,50 @@ function FreeQuizConfigurator() {
           </section>
         )}
 
-        <section className="mt-6 rounded-[28px] border border-[#dce9e1] bg-white p-5 shadow-[0_12px_30px_rgba(30,78,50,0.05)] sm:p-7">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <div className="mb-2 text-sm font-black text-[#557768]">起始年份</div>
-              <select
-                value={fromYear}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setFromYear(next);
-                  if (next > toYear) setToYear(next);
-                }}
-                className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
-              >
-                {[...rocYears].reverse().map((year) => (
-                  <option key={year} value={year}>{year} 年</option>
-                ))}
+        <div className="study-form-layout">
+          <div>
+            <section className="study-form-section">
+              <label htmlFor="quiz-subject" className="study-field-label">01　選擇科目</label>
+              <select id="quiz-subject" value={subject} onChange={event => setSubject(event.target.value)} disabled={targeted} className="study-field disabled:bg-[#edf2ee]">
+                {subjects.map(item => <option key={item} value={item}>{item}</option>)}
               </select>
-            </div>
-
-            <div>
-              <div className="mb-2 text-sm font-black text-[#557768]">結束年份</div>
-              <select
-                value={toYear}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setToYear(next);
-                  if (next < fromYear) setFromYear(next);
-                }}
-                className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold outline-none focus:border-[#65d795]"
-              >
-                {[...rocYears].reverse().map((year) => (
-                  <option key={year} value={year}>{year} 年</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="mb-2 text-sm font-black text-[#557768]">科目</div>
-            <select
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              disabled={targeted}
-              className="w-full rounded-xl border border-[#d7e7de] bg-white px-4 py-3 text-base font-bold leading-6 outline-none focus:border-[#65d795] disabled:cursor-not-allowed disabled:bg-[#f4f8f5] disabled:text-[#789083]"
-            >
-              {subjects.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-            {targeted && (
-              <div className="mt-2 text-xs font-bold leading-5 text-[#8a9c92]">
-                弱主題隸屬這個科目，因此此模式下不切換科目；要換科請先改回隨機模式。
+              {targeted && <p className="study-muted mt-2">科目已依弱點鎖定。要換科目，可先切回隨機模式。</p>}
+            </section>
+            <section className="study-form-section">
+              <h2 className="study-field-label">02　決定練習份量</h2>
+              <div className="grid grid-cols-4 gap-2" role="group" aria-label="測驗題數">
+                {questionCounts.map(item => <button key={item} type="button" onClick={() => setCount(item)} aria-pressed={count === item} className="study-choice">{item} 題</button>)}
               </div>
-            )}
+              <p className="study-muted mt-2">少量練習或完整挑戰，依今天的時間安排。</p>
+            </section>
+            <section className="study-form-section">
+              <h2 className="study-field-label">03　設定題庫年份</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label htmlFor="quiz-from" className="study-muted mb-2 block">起始年份</label>
+                  <select id="quiz-from" value={fromYear} onChange={event => { const next = Number(event.target.value); setFromYear(next); if (next > toYear) setToYear(next); }} className="study-field">
+                    {[...rocYears].reverse().map(year => <option key={year} value={year}>{year} 年</option>)}
+                  </select>
+                </div>
+                <div><label htmlFor="quiz-to" className="study-muted mb-2 block">結束年份</label>
+                  <select id="quiz-to" value={toYear} onChange={event => { const next = Number(event.target.value); setToYear(next); if (next < fromYear) setFromYear(next); }} className="study-field">
+                    {[...rocYears].reverse().map(year => <option key={year} value={year}>{year} 年</option>)}
+                  </select>
+                </div>
+              </div>
+            </section>
           </div>
-
-          <div className="mt-6">
-            <div className="mb-2 text-sm font-black text-[#557768]">題數</div>
-            <div className="grid grid-cols-4 gap-2">
-              {questionCounts.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setCount(item)}
-                  className={[
-                    "rounded-xl border px-2 py-3 text-sm font-black transition",
-                    count === item
-                      ? "border-[#65d795] bg-[#eaf9f0] text-[#237849]"
-                      : "border-[#dbe9e1] bg-white text-[#466a58]",
-                  ].join(" ")}
-                >
-                  {item} 題
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={startQuiz}
-            className="mt-6 w-full rounded-2xl bg-[#31c978] px-5 py-4 text-base font-black text-white transition hover:bg-[#2dbc70]"
-          >
-            {targeted ? "開始弱主題練習 →" : "開始自由測驗 →"}
-          </button>
-        </section>
-
-        <section className="mt-5 rounded-[22px] border border-[#dce9e1] bg-white/70 px-5 py-4 text-sm font-bold leading-6 text-[#789083]">
-          {targeted
-            ? "弱主題模式只使用已確認 taxonomy 的題目。若指定 Subtopic 題量不足，會先保留所有精準弱點題，再從同一 Topic 補足；只有整個 Topic 題量也不足時，實際題數才會少於設定。"
-            : "自由測驗目前採隨機抽題；交卷後會保存作答紀錄與當次錯題快照。"}
-        </section>
-      </div>
-    </main>
+          <aside className="study-form-summary" aria-label="本次練習摘要">
+            <h2 className="study-section-heading">這次練習</h2>
+            <p className="mt-5 text-4xl font-bold tabular-nums">{count}<span className="ml-2 text-sm font-normal">題</span></p>
+            <p className="mt-4 text-sm font-semibold leading-7">{subject}</p>
+            <p className="study-muted mt-2">{fromYear}–{toYear} 年歷屆題</p>
+            {targeted && <p className="study-muted mt-2">鎖定：{targetSubtopic || targetTopic}</p>}
+            <button type="button" onClick={startQuiz} className="ms-primary-action mt-6 w-full">{targeted ? "開始補強練習 →" : "開始自由測驗 →"}</button>
+            <p className="study-muted mt-4 text-xs">交卷後保存作答紀錄，錯題與不確定的題目可再複習。</p>
+          </aside>
+        </div>
+        {targeted && <p className="study-muted mt-6">若細分主題的題目不足，會從同一主題補足；整個主題的題目不足時，實際題數可能少於設定。</p>}
+    </StudyShell>
   );
 }
 
