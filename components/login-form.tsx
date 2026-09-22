@@ -28,17 +28,29 @@ export function LoginForm() {
     setGoogleLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const next = getSafeRedirect();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    try {
+      const supabase = createClient();
+      const next = getSafeRedirect();
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
 
-    if (error) {
-      setError(`Google 登入失敗：${error.message}`);
+      if (error) {
+        throw error;
+      }
+
+      if (!data.url) {
+        throw new Error("Supabase 沒有回傳 Google 登入網址。");
+      }
+
+      window.location.assign(data.url);
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "無法啟動 Google 登入。";
+      setError(`Google 登入失敗：${message}`);
       setGoogleLoading(false);
     }
   };
@@ -49,24 +61,28 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+      if (error) {
+        throw error;
+      }
 
-    if (error) {
+      window.location.assign(getSafeRedirect());
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "登入時發生未知錯誤。";
       setError(
-        error.message === "Invalid login credentials"
-          ? "Email 或密碼錯誤。"
-          : error.message,
+        message === "Invalid login credentials"
+          ? "Email 或密碼錯誤。若這個帳號原本是用 Google 建立，請使用 Google 登入。"
+          : `登入失敗：${message}`,
       );
       setIsLoading(false);
-      return;
     }
-
-    window.location.assign(getSafeRedirect());
   };
 
   return (
@@ -80,7 +96,7 @@ export function LoginForm() {
       </h1>
 
       <p className="mt-2 text-sm font-bold leading-6 text-[#789083]">
-        登入後可以保存你的史萊姆、任務、成就與學習紀錄。
+        登入後開始刷題，並保存你的作答紀錄、弱點與學習進度。
       </p>
 
       <button
